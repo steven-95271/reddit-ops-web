@@ -1,0 +1,38 @@
+{
+  "date": "2026-03-20",
+  "fetched_at": "2026-03-20T05:56:26.194671+00:00",
+  "query": "testing query",
+  "subreddits": [
+    "test_sub"
+  ],
+  "total_posts": 2,
+  "posts": [
+    {
+      "id": "mock_1773986186_1",
+      "title": "[testing query] Discussion thread",
+      "selftext": "Been thinking about this lately...",
+      "score": 400,
+      "num_comments": 89,
+      "subreddit": "test_sub",
+      "url": "https://reddit.com/r/test",
+      "permalink": "/r/test/mock1",
+      "created_utc": 1773982586,
+      "author": "tester_1",
+      "is_self": true
+    },
+    {
+      "id": "mock_1773986186_2",
+      "title": "Hot take on the recent news",
+      "selftext": "Honestly, I have strong opinions on this.",
+      "score": 518,
+      "num_comments": 143,
+      "subreddit": "test_sub",
+      "url": "https://reddit.com/r/test2",
+      "permalink": "/r/test/mock2",
+      "created_utc": 1773978986,
+      "author": "tester_2",
+      "is_self": true
+    }
+  ],
+  "is_mock": true
+}

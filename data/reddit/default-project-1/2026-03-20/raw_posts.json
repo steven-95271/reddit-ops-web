@@ -1,0 +1,121 @@
+{
+  "date": "2026-03-20",
+  "fetched_at": "2026-03-20T05:57:38.592815+00:00",
+  "query": "open ear earbuds",
+  "subreddits": [
+    "headphones",
+    "earbuds",
+    "audiophile",
+    "running",
+    "commuting",
+    "Fitness"
+  ],
+  "total_posts": 8,
+  "posts": [
+    {
+      "id": "mock001",
+      "title": "Best open ear earbuds for running in 2025?",
+      "selftext": "I've been using Shokz for years but wondering if there's something better now. Running 5-6 days a week, need something that stays put.",
+      "score": 342,
+      "num_comments": 89,
+      "subreddit": "running",
+      "url": "https://reddit.com/r/running/mock001",
+      "permalink": "/r/running/mock001",
+      "created_utc": 1773982658,
+      "author": "runner_jane",
+      "is_self": true
+    },
+    {
+      "id": "mock002",
+      "title": "Shokz vs Bose Ultra Open – honest comparison after 3 months",
+      "selftext": "Bought both, here's my detailed comparison. Shokz wins for sports, Bose wins for office use.",
+      "score": 518,
+      "num_comments": 143,
+      "subreddit": "headphones",
+      "url": "https://reddit.com/r/headphones/mock002",
+      "permalink": "/r/headphones/mock002",
+      "created_utc": 1773979058,
+      "author": "audiophile_mike",
+      "is_self": true
+    },
+    {
+      "id": "mock003",
+      "title": "Open ear earbuds ruined my gym experience – rant",
+      "selftext": "Tried open ear earbuds at the gym and the sound leakage is TERRIBLE. Everyone can hear my music. Never again.",
+      "score": 87,
+      "num_comments": 234,
+      "subreddit": "earbuds",
+      "url": "https://reddit.com/r/earbuds/mock003",
+      "permalink": "/r/earbuds/mock003",
+      "created_utc": 1773971858,
+      "author": "gym_rat_99",
+      "is_self": true
+    },
+    {
+      "id": "mock004",
+      "title": "Commuting with open ear earbuds – life changing for situational awareness",
+      "selftext": "Been using open ear for 6 months on my subway commute. Can hear announcements, stay aware of surroundings, and enjoy music.",
+      "score": 621,
+      "num_comments": 77,
+      "subreddit": "commuting",
+      "url": "https://reddit.com/r/commuting/mock004",
+      "permalink": "/r/commuting/mock004",
+      "created_utc": 1773984458,
+      "author": "subway_sarah",
+      "is_self": true
+    },
+    {
+      "id": "mock005",
+      "title": "Are open ear earbuds just a gimmick? Change my mind.",
+      "selftext": "Hot take: open ear earbuds are just for people who can't commit to either headphones or IEMs. Discuss.",
+      "score": 156,
+      "num_comments": 312,
+      "subreddit": "audiophile",
+      "url": "https://reddit.com/r/audiophile/mock005",
+      "permalink": "/r/audiophile/mock005",
+      "created_utc": 1773964658,
+      "author": "contrarian_carl",
+      "is_self": true
+    },
+    {
+      "id": "mock006",
+      "title": "Everyone at my office is suddenly obsessed with open ear earbuds – what happened?",
+      "selftext": "Three coworkers got them this week. Is this a trend? Seems like everyone is switching.",
+      "score": 834,
+      "num_comments": 198,
+      "subreddit": "headphones",
+      "url": "https://reddit.com/r/headphones/mock006",
+      "permalink": "/r/headphones/mock006",
+      "created_utc": 1773985358,
+      "author": "office_observer",
+      "is_self": true
+    },
+    {
+      "id": "mock007",
+      "title": "Sony LinkBuds vs Shokz OpenFit Air – 2025 budget pick?",
+      "selftext": "Both under $150. Which one should I get for daily commute? Battery life comparison?",
+      "score": 203,
+      "num_comments": 56,
+      "subreddit": "earbuds",
+      "url": "https://reddit.com/r/earbuds/mock007",
+      "permalink": "/r/earbuds/mock007",
+      "created_utc": 1773943058,
+      "author": "budget_shopper",
+      "is_self": true
+    },
+    {
+      "id": "mock008",
+      "title": "My open ear earbuds keep falling out during sprints – any solutions?",
+      "selftext": "Love the Shokz concept but during speed work they bounce annoyingly. Has anyone solved this? Tried different tips but no luck.",
+      "score": 45,
+      "num_comments": 67,
+      "subreddit": "running",
+      "url": "https://reddit.com/r/running/mock008",
+      "permalink": "/r/running/mock008",
+      "created_utc": 1773957458,
+      "author": "sprinter_joe",
+      "is_self": true
+    }
+  ],
+  "is_mock": true
+}

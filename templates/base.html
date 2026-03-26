@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Reddit Ops{% endblock %} – 内容运营系统</title>
+  <meta name="description" content="Reddit内容运营自动化系统 – 抓取、分类、生成、审核一站式管理">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: { 50:'#eef2ff', 100:'#e0e7ff', 500:'#6366f1', 600:'#4f46e5', 700:'#4338ca', 900:'#312e81' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 text-slate-900 font-sans min-h-screen flex">
+
+<!-- Sidebar (Minimalist Icon-only) -->
+<aside class="w-20 bg-white/40 backdrop-blur-xl border-r border-slate-200/50 flex flex-col items-center flex-shrink-0 fixed h-full z-20 py-8">
+  <!-- Logo -->
+  <div class="mb-12">
+    <div class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-xl shadow-lg">🚀</div>
+  </div>
+
+  <!-- Nav (Icons) -->
+  <nav class="flex-1 w-full px-2 space-y-4">
+    <a href="/dashboard{% if project %}?project_id={{ project.id }}{% endif %}" class="nav-link {% if request.endpoint == 'dashboard' %}nav-active{% endif %}" title="Dashboard">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">概览</span>
+    </a>
+    <a href="/candidates{% if project %}?project_id={{ project.id }}{% endif %}" class="nav-link {% if request.endpoint == 'candidates' %}nav-active{% endif %}" title="Candidates">
+      <span class="nav-icon">🎯</span>
+      <span class="nav-label">池子</span>
+    </a>
+    <a href="/editor{% if project %}?project_id={{ project.id }}{% endif %}" class="nav-link {% if request.endpoint == 'editor' %}nav-active{% endif %}" title="Editor">
+      <span class="nav-icon">✍️</span>
+      <span class="nav-label">编辑</span>
+    </a>
+    <a href="/history{% if project %}?project_id={{ project.id }}{% endif %}" class="nav-link {% if request.endpoint == 'history' %}nav-active{% endif %}" title="History">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">记录</span>
+    </a>
+  </nav>
+
+  <!-- Pipeline Tool -->
+  <div class="mt-auto px-2 w-full">
+    <button onclick="triggerPipeline()" class="nav-link w-full text-slate-900 hover:text-coral transition-colors" title="Run Pipeline">
+      <span class="nav-icon">⚡</span>
+      <span class="nav-label">运行</span>
+    </button>
+  </div>
+</aside>
+
+<!-- Main Area -->
+<div class="flex-1 ml-20 flex flex-col min-h-screen">
+  <!-- Top Bar -->
+  <header class="bg-transparent px-10 py-8 flex items-center justify-between sticky top-0 z-10">
+    <div>
+      <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+      <p class="text-slate-500 text-sm font-medium animate-fade">{% block page_subtitle %}数据概览{% endblock %}</p>
+    </div>
+    
+    <div class="flex items-center gap-6">
+      <!-- Project Switcher (Clean) -->
+      <div class="relative group">
+        <select id="projectSelect" onchange="changeProject(this.value)" class="appearance-none bg-white/60 backdrop-blur-md border border-slate-200 rounded-full px-6 py-2.5 pr-10 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-coral/10 transition-all cursor-pointer">
+          {% for p in projects %}
+          <option value="{{ p.id }}" {% if project and project.id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+      </div>
+      
+      <button onclick="openNewProjectModal()" class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">+</button>
+      <button onclick="openScrapeSettingsModal()" class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors shadow-sm" title="自动抓取设置">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Page Content -->
+  <main class="flex-1 px-10 pb-12">
+    <div class="animate-fade">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+
+<!-- Modal Background Glass -->
+<div id="pipelineModal" class="fixed inset-0 bg-slate-900/20 backdrop-blur-xl z-50 hidden flex items-center justify-center">
+  <div class="glass-panel p-10 max-w-md w-full mx-4 shadow-2xl scale-in transform transition-all">
+    <h3 class="text-2xl font-black text-slate-900 mb-2">执行流水线</h3>
+    <p class="text-slate-500 text-sm mb-8">准备好抓取并生成今日内容了吗？</p>
+    
+    <div class="space-y-4 mb-10">
+      <label class="flex items-start gap-4 p-5 bg-white/50 border border-slate-200 rounded-2xl cursor-pointer hover:border-coral transition-all group">
+        <input type="radio" name="pipelineMode" value="mock" checked class="mt-1 accent-coral">
+        <div>
+          <div class="font-bold text-slate-900 group-hover:text-coral transition-colors">🧪 模拟模式</div>
+          <div class="text-slate-500 text-xs mt-1">使用测试数据，零成本验证效果</div>
+        </div>
+      </label>
+      <label class="flex items-start gap-4 p-5 bg-white/50 border border-slate-200 rounded-2xl cursor-pointer hover:border-coral transition-all group">
+        <input type="radio" name="pipelineMode" value="real" class="mt-1 accent-coral">
+        <div>
+          <div class="font-bold text-slate-900 group-hover:text-coral transition-colors">🌐 真实模式</div>
+          <div class="text-slate-500 text-xs mt-1">连接 Apify 抓取实时热门话题</div>
+        </div>
+      </label>
+    </div>
+    
+    <div class="flex gap-4">
+      <button onclick="closePipelineModal()" class="flex-1 py-4 text-slate-500 font-bold hover:text-slate-700">稍后再说</button>
+      <button onclick="confirmPipeline()" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all">立即推进</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- New Project Modal -->
+<div id="newProjectModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+  <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+    <h3 class="text-xl font-bold text-white mb-6">新建项目</h3>
+    <div class="space-y-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-400 mb-1">项目名称</label>
+        <input type="text" id="newProjectName" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" placeholder="例如：开放式耳机出海">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-400 mb-1">项目背景 (Background Info)</label>
+        <textarea id="newProjectBg" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" placeholder="简单描述业务背景，用于生成内容时作为上下文..."></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-400 mb-1">搜索关键词 (Query)</label>
+        <input type="text" id="newProjectQuery" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" placeholder="例如：open ear earbuds">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-400 mb-1">抓取版块 (Subreddits，逗号分隔)</label>
+        <input type="text" id="newProjectSubreddits" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" placeholder="例如：headphones, earbuds, running">
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="closeNewProjectModal()" class="flex-1 py-2.5 px-4 border border-gray-700 text-gray-300 rounded-xl hover:bg-gray-800 transition-colors text-sm">取消</button>
+      <button onclick="submitNewProject()" class="flex-1 py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-colors text-sm font-medium">创建项目</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+
+<!-- Scrape Settings Modal -->
+<div id="scrapeSettingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+  <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-xl font-bold text-white">⚙️ 自动抓取设置</h3>
+      <button onclick="closeScrapeSettingsModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+    </div>
+    
+    <div id="scrapeSettingsLoading" class="text-center py-8">
+      <div class="text-gray-400">加载中...</div>
+    </div>
+    
+    <div id="scrapeSettingsContent" class="hidden">
+      <div class="mb-6">
+        <label class="flex items-center justify-between p-4 bg-white/5 border border-gray-700 rounded-xl cursor-pointer hover:bg-white/10 transition-colors">
+          <div>
+            <div class="font-bold text-white">开启自动抓取</div>
+            <div class="text-gray-400 text-xs mt-1">启用后将在设定时间自动运行流水线</div>
+          </div>
+          <input type="checkbox" id="autoScrapeToggle" class="w-5 h-5 accent-coral ml-4">
+        </label>
+      </div>
+      
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-400 mb-2">抓取时间</label>
+        <input type="time" id="scrapeScheduleTime" value="09:00"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-brand-500">
+      </div>
+      
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-400 mb-2">时区</label>
+        <select id="scrapeTimezone" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-brand-500">
+          <option value="Asia/Shanghai">Asia/Shanghai (北京时间)</option>
+          <option value="America/New_York">America/New_York (美东时间)</option>
+          <option value="America/Los_Angeles">America/Los_Angeles (美西时间)</option>
+          <option value="Europe/London">Europe/London (伦敦时间)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (东京时间)</option>
+        </select>
+      </div>
+      
+      <div class="mb-6 p-4 bg-coral/10 border border-coral/20 rounded-xl">
+        <div class="text-coral text-sm font-medium">Webhook URL</div>
+        <div class="text-gray-300 text-xs mt-1 mb-2">在 Apify 后台配置此 URL 以接收抓取完成通知</div>
+        <code id="webhookUrl" class="text-xs text-white break-all bg-gray-800 px-2 py-1 rounded block"></code>
+      </div>
+      
+      <div class="flex gap-3">
+        <button onclick="closeScrapeSettingsModal()" class="flex-1 py-2.5 px-4 border border-gray-700 text-gray-300 rounded-xl hover:bg-gray-800 transition-colors text-sm">取消</button>
+        <button onclick="saveScrapeSettings()" class="flex-1 py-2.5 px-4 bg-coral hover:bg-coral/90 text-white rounded-xl transition-colors text-sm font-medium">保存设置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

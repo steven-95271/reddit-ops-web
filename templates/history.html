@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}历史记录{% endblock %}
+{% block page_title %}历史记录{% endblock %}
+{% block page_subtitle %}已发布和已通过的内容追踪{% endblock %}
+
+{% block content %}
+<!-- Filter Bar -->
+<div class="flex flex-wrap items-center gap-6 mb-10">
+  <div class="flex items-center gap-4">
+    <label class="text-slate-500 text-sm font-bold">责任账号</label>
+    <select id="personaFilter" onchange="loadHistory()"
+      class="bg-white/60 backdrop-blur-md border border-slate-200 rounded-full px-6 py-2 text-sm font-semibold text-slate-700 focus:outline-none">
+      <option value="">全部账号</option>
+      {% for p in personas %}
+      <option value="{{ p.id }}">{{ p.avatar_emoji }} {{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-4">
+    <label class="text-slate-500 text-sm font-bold">最终状态</label>
+    <select id="statusFilter" onchange="loadHistory()"
+      class="bg-white/60 backdrop-blur-md border border-slate-200 rounded-full px-6 py-2 text-sm font-semibold text-slate-700 focus:outline-none">
+      <option value="">全部</option>
+      <option value="approved">已通过</option>
+      <option value="published">已发布</option>
+    </select>
+  </div>
+
+  <!-- Stats row -->
+  <div class="ml-auto flex items-center gap-6">
+    <div class="flex items-center gap-2">
+      <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">总计产出</span>
+      <span id="totalCount" class="text-lg font-black text-slate-900">–</span>
+    </div>
+    <div class="h-4 w-[1px] bg-slate-200"></div>
+    <div class="flex items-center gap-2">
+      <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">通过率</span>
+      <span id="approvalRate" class="text-lg font-black text-coral">–</span>
+    </div>
+  </div>
+</div>
+
+<!-- History List -->
+<div id="historyContainer" class="space-y-6">
+  <div class="glass-card py-20 text-center text-slate-300">
+    <div class="text-4xl mb-4 italic">历史数据检索中...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const personaEmojis = {
+  {% for p in personas %}"{{ p.id }}": "{{ p.avatar_emoji }}",{% endfor %}
+};
+const personaColors = {
+  {% for p in personas %}"{{ p.id }}": "{{ p.avatar_color }}",{% endfor %}
+};
+
+async function loadHistory() {
+  const container = document.getElementById('historyContainer');
+  const persona = document.getElementById('personaFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const url = `/api/history?persona=${persona}&status=${status}`;
+
+  try {
+    const data = await apiGet(url);
+    const items = data.history || [];
+
+    document.getElementById('totalCount').textContent = items.length;
+    document.getElementById('approvalRate').textContent = items.length
+      ? `${Math.round((items.filter(i=>i.status==='approved'||i.status==='published').length/items.length)*100)}%`
+      : '–';
+
+    if (items.length === 0) {
+      container.innerHTML = `
+        <div class="glass-card py-24 text-center">
+          <div class="text-6xl mb-8">🌑</div>
+          <p class="text-xl font-black text-slate-900">暂无历史轨迹</p>
+          <p class="text-slate-500 mt-2">在这里，我们将见证您每一个灵感的数字化沉淀</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(item => {
+      const emoji = personaEmojis[item.persona_id] || '👤';
+      const color = personaColors[item.persona_id] || '#6366f1';
+      const date = new Date(item.logged_at).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12: false});
+      return `
+        <div class="glass-card group hover:shadow-xl transition-all duration-500">
+          <div class="flex items-start gap-6">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 group-hover:rotate-6 transition-transform shadow-sm"
+                 style="background-color: ${color}15; border: 1px solid ${color}30">
+              ${emoji}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="font-black text-slate-900 text-sm tracking-tight">${escHtml(item.persona_name || item.persona_id)}</span>
+                <span class="badge ${item.status === 'published' ? 'badge-teal' : 'badge-coral'} scale-90">${statusLabel(item.status)}</span>
+                <span class="text-slate-400 text-[10px] font-bold uppercase tracking-widest ml-auto">${date}</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-900 mb-2 leading-tight">${escHtml(item.title || '（无标题内容）')}</h3>
+              ${item.body_preview ? `<p class="text-slate-500 text-sm line-clamp-2 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">${escHtml(item.body_preview)}...</p>` : ''}
+              <div class="flex items-center gap-4 mt-4">
+                 <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">LOG DATE: ${item.date}</div>
+                 <div class="ml-auto flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span class="text-[10px] font-bold text-slate-400">已存档</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `
+      <div class="glass-card py-20 text-center text-red-400">
+        <div class="text-5xl mb-6">🌩️</div>
+        <p class="text-xl font-black">历史数据载入中断</p>
+        <p class="text-sm mt-2 opacity-70">请检查网络连接或数据库状态</p>
+      </div>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadHistory());
+</script>
+{% endblock %}

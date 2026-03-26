@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}内容编辑{% endblock %}
+{% block page_title %}内容编辑器{% endblock %}
+{% block page_subtitle %}审核、编辑并发布生成的内容{% endblock %}
+
+{% block header_actions %}
+<select id="dateSelect" onchange="changeDateParam(this.value)"
+  class="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+  {% for d in dates %}
+  <option value="{{ d }}" {% if d == current_date %}selected{% endif %}>{{ d }}</option>
+  {% endfor %}
+  {% if not dates %}<option value="">暂无数据</option>{% endif %}
+</select>
+{% endblock %}
+
+{% block content %}
+<!-- Persona Filter Tabs -->
+<div class="flex flex-wrap items-center gap-4 mb-10">
+  <button onclick="filterPersona('')" class="cat-filter-btn active px-6" data-pid="">全部账号</button>
+  {% for p in personas %}
+  <button onclick="filterPersona('{{ p.id }}')" class="cat-filter-btn" data-pid="{{ p.id }}">
+    <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2" style="background-color: {{ p.avatar_color }}20; border: 1px solid {{ p.avatar_color }}40">
+      {{ p.avatar_emoji }}
+    </span>
+    {{ p.name }}
+  </button>
+  {% endfor %}
+
+  <div class="ml-auto flex items-center gap-4">
+    <label class="text-slate-500 text-sm font-bold">状态</label>
+    <select id="statusFilter" onchange="loadContent()"
+      class="bg-white/60 backdrop-blur-md border border-slate-200 rounded-full px-6 py-2 text-sm font-semibold text-slate-700 focus:outline-none">
+      <option value="">全部</option>
+      <option value="pending">待审核</option>
+      <option value="approved">已通过</option>
+      <option value="rejected">已拒绝</option>
+      <option value="published">已发布</option>
+    </select>
+  </div>
+</div>
+
+<!-- Content Grid -->
+<div id="contentGrid" class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+  <div class="col-span-2 py-20 text-center text-slate-400">
+    <div class="text-4xl mb-4 italic">数据汇聚中...</div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="fixed inset-0 bg-slate-900/20 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+  <div class="glass-panel p-10 max-w-2xl w-full shadow-2xl scale-in transform transition-all">
+    <div class="flex items-center justify-between mb-8">
+      <h3 class="text-2xl font-black text-slate-900">优化产出内容</h3>
+      <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-900 text-2xl transition-colors">✕</button>
+    </div>
+    
+    <div class="space-y-6 mb-10">
+      <div>
+        <label class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-2 block ml-2">标题</label>
+        <input id="editTitle" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:outline-none focus:border-coral transition-all">
+      </div>
+      <div>
+        <label class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-2 block ml-2">正文内容</label>
+        <textarea id="editBody" rows="10" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-slate-700 leading-relaxed focus:outline-none focus:border-coral transition-all resize-none"></textarea>
+        <div class="text-right text-slate-400 text-[10px] font-bold mt-2 mr-2"><span id="editCharCount">0</span> CHARACTERS</div>
+      </div>
+    </div>
+    
+    <div class="flex gap-4">
+      <button onclick="closeEditModal()" class="flex-1 py-4 text-slate-500 font-bold hover:text-slate-700">放弃修改</button>
+      <button onclick="saveEdit()" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all">保存变动</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const currentDate = "{{ current_date or '' }}";
+let currentPersonaId = '';
+let editingId = null;
+
+async function loadContent() {
+  const grid = document.getElementById('contentGrid');
+  const statusFilter = document.getElementById('statusFilter').value;
+  const url = `/api/content?date=${currentDate}&persona=${currentPersonaId}&status=${statusFilter}`;
+
+  try {
+    const data = await apiGet(url);
+    const items = data.content || [];
+    window._contentItems = items;
+
+    if (items.length === 0) {
+      grid.innerHTML = `
+        <div class="col-span-2 glass-card py-20 text-center">
+          <div class="text-5xl mb-6">✍️</div>
+          <p class="text-xl font-black text-slate-900">暂无待处理内容</p>
+          <p class="text-slate-500 mt-2">点击「运行流水线」开始创作</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = items.map((item, idx) => `
+      <div class="glass-card flex flex-col h-full animate-fade" id="card-${item.id}">
+        <!-- Card Header -->
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-sm"
+               style="background-color: ${item.persona_color}15; border: 1px solid ${item.persona_color}30">
+            ${item.persona_emoji}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-black text-slate-900">${escHtml(item.persona_name)}</div>
+            <div class="text-slate-400 text-xs font-bold uppercase tracking-wider">${item.persona_username}</div>
+          </div>
+          <span class="badge badge-teal">${statusLabel(item.status)}</span>
+        </div>
+
+        <!-- Meta Context -->
+        <div class="bg-slate-50 border border-slate-100/50 rounded-2xl p-4 mb-6 text-xs text-slate-500 leading-relaxed">
+          <span class="font-black text-slate-400 mr-2 uppercase">Source context:</span>
+          <span class="text-slate-600 font-medium italic">"${escHtml(item.source_post_title?.substring(0,80) || '')}..."</span>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1">
+          <h3 class="text-xl font-black text-slate-900 mb-4 leading-tight">${escHtml(item.title)}</h3>
+          <p class="text-slate-600 text-sm leading-relaxed whitespace-pre-line line-clamp-4 bg-white/40 p-6 rounded-3xl border border-white" id="body-${item.id}">${escHtml(item.body)}</p>
+          
+          ${item.tags?.length ? `<div class="flex flex-wrap gap-2 mt-6">${item.tags.slice(0,5).map(t=>`<span class="badge badge-coral text-[10px]">#${t}</span>`).join('')}</div>` : ''}
+        </div>
+
+        <!-- Refined Actions -->
+        <div class="flex items-center gap-3 mt-8 pt-6 border-t border-slate-100">
+          <button onclick="approveItem('${item.id}')" 
+            class="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-600 transition-all ${item.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'text-slate-400'}" title="Approve">
+            ✓
+          </button>
+          <button onclick="rejectItem('${item.id}')"
+            class="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-all ${item.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'text-slate-400'}" title="Reject">
+            ✗
+          </button>
+          <button onclick="publishItem('${item.id}')"
+            class="px-6 py-2.5 bg-slate-100 text-slate-500 rounded-full text-xs font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all ${item.status === 'published' ? 'bg-slate-900 text-white' : ''}">
+            🚀 Publish
+          </button>
+          
+          <div class="ml-auto flex gap-2">
+            <button onclick="openEditModal('${item.id}')" class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-coral hover:border-coral transition-all" title="Edit">
+              ✏️
+            </button>
+            <button onclick="copyContent('${item.id}', this)" class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all" title="Copy">
+              📋
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    grid.innerHTML = '<div class="col-span-2 py-8 text-center text-red-400">加载失败，请刷新重试</div>';
+  }
+}
+
+async function updateStatus(id, status) {
+  try {
+    await apiPost(`/api/content/${id}/status`, { date: currentDate, status });
+    // Update card in place
+    const card = document.getElementById(`card-${id}`);
+    if (card) {
+      const badge = card.querySelector('.badge:last-of-type');
+      if (badge) badge.textContent = statusLabel(status);
+      
+      const buttons = card.querySelectorAll('button[title]');
+      buttons.forEach(btn => {
+        const t = btn.getAttribute('title').toLowerCase();
+        if (t === status) {
+          if (t === 'approve') btn.className = btn.className.replace('text-slate-400', 'bg-emerald-50 text-emerald-600 border-emerald-200');
+          if (t === 'reject') btn.className = btn.className.replace('text-slate-400', 'bg-rose-50 text-rose-600 border-rose-200');
+        } else {
+           btn.className = btn.className.replace(/bg-\w+-50 text-\w+-600 border-\w+-200/, 'text-slate-400');
+        }
+      });
+    }
+    showToast(`状态已同步: ${statusLabel(status)}`, 'success');
+  } catch(e) { showToast('同步失败', 'error'); }
+}
+
+function approveItem(id) { updateStatus(id, 'approved'); }
+function rejectItem(id)  { updateStatus(id, 'rejected'); }
+function publishItem(id) { updateStatus(id, 'published'); }
+
+function copyContent(id, btn) {
+  const item = window._contentItems?.find(i => i.id === id);
+  if (!item) return;
+  const text = `${item.title}\n\n${item.body}`;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅';
+    setTimeout(() => btn.innerHTML = orig, 2000);
+    showToast('已复制到灵感剪贴板', 'success');
+  });
+}
+
+function openEditModal(id) {
+  editingId = id;
+  const item = window._contentItems?.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('editTitle').value = item.title;
+  document.getElementById('editBody').value = item.body;
+  updateCharCount();
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.add('hidden');
+  editingId = null;
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const body = document.getElementById('editBody').value;
+  const title = document.getElementById('editTitle').value;
+  try {
+    await apiPost(`/api/content/${editingId}/edit`, { date: currentDate, body, title });
+    closeEditModal();
+    loadContent();
+    showToast('修改已实时保存', 'success');
+  } catch(e) { showToast('保存失败', 'error'); }
+}
+
+function updateCharCount() {
+  document.getElementById('editCharCount').textContent = document.getElementById('editBody').value.length;
+}
+
+function filterPersona(pid) {
+  currentPersonaId = pid;
+  document.querySelectorAll('.cat-filter-btn').forEach(b => b.classList.toggle('active', (b.dataset.pid || '') === pid));
+  loadContent();
+}
+
+function changeDateParam(val) {
+  window.location.href = `/editor?date=${val}`;
+}
+
+document.getElementById('editBody')?.addEventListener('input', updateCharCount);
+document.addEventListener('DOMContentLoaded', () => loadContent());
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{
+  "date": "2026-03-25",
+  "fetched_at": "2026-03-25T01:00:00.683347+00:00",
+  "query": "open ear earbuds",
+  "subreddits": [
+    "headphones",
+    "earbuds",
+    "audiophile",
+    "running",
+    "commuting",
+    "Fitness"
+  ],
+  "total_posts": 2,
+  "posts": [
+    {
+      "id": "mock_1774400400_1",
+      "title": "[open ear earbuds] Discussion thread",
+      "selftext": "Been thinking about this lately...",
+      "score": 400,
+      "num_comments": 89,
+      "subreddit": "headphones",
+      "url": "https://reddit.com/r/test",
+      "permalink": "/r/test/mock1",
+      "created_utc": 1774396800,
+      "author": "tester_1",
+      "is_self": true
+    },
+    {
+      "id": "mock_1774400400_2",
+      "title": "Hot take on the recent news",
+      "selftext": "Honestly, I have strong opinions on this.",
+      "score": 518,
+      "num_comments": 143,
+      "subreddit": "headphones",
+      "url": "https://reddit.com/r/test2",
+      "permalink": "/r/test/mock2",
+      "created_utc": 1774393200,
+      "author": "tester_2",
+      "is_self": true
+    }
+  ],
+  "is_mock": true
+}

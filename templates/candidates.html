@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}候选帖子{% endblock %}
+{% block page_title %}候选帖子{% endblock %}
+{% block page_subtitle %}热点内容筛选与分类{% endblock %}
+
+{% block header_actions %}
+<select id="dateSelect" onchange="changeDateParam(this.value)"
+  class="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+  {% for d in dates %}
+  <option value="{{ d }}" {% if d == current_date %}selected{% endif %}>{{ d }}</option>
+  {% endfor %}
+  {% if not dates %}<option value="">暂无数据</option>{% endif %}
+</select>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="flex flex-wrap items-center gap-4 mb-10">
+  <button onclick="filterCategory('')" class="cat-filter-btn active px-6" data-cat="">全部</button>
+  {% for code, cat in categories.items() %}
+  <button onclick="filterCategory('{{ code }}')" class="cat-filter-btn" data-cat="{{ code }}">
+    <span class="w-2 h-2 rounded-full mr-2" style="background-color: {{ cat.color }}"></span>
+    {{ cat.name }}
+    <span class="ml-2 bg-slate-100 text-[10px] px-2 py-0.5 rounded-full" id="filter-count-{{ code }}">0</span>
+  </button>
+  {% endfor %}
+
+  <div class="ml-auto flex items-center gap-4">
+    <label class="text-slate-500 text-sm font-bold">排序</label>
+    <select id="sortSelect" onchange="loadCandidates()"
+      class="bg-white/60 backdrop-blur-md border border-slate-200 rounded-full px-6 py-2 text-sm font-semibold text-slate-700 focus:outline-none">
+      <option value="composite_score">综合评分</option>
+      <option value="score">点赞数</option>
+      <option value="num_comments">评论数</option>
+    </select>
+  </div>
+</div>
+
+<!-- Candidates List -->
+<div id="candidatesContainer" class="space-y-6">
+  <div class="glass-card py-12 text-center text-slate-400">
+    <div class="text-4xl mb-4 italic">数据同步中...</div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detailModal" class="fixed inset-0 bg-slate-900/20 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+  <div class="glass-panel p-10 max-w-2xl w-full shadow-2xl max-h-[85vh] overflow-y-auto">
+    <div class="flex items-start justify-between mb-8">
+      <h3 id="modalTitle" class="text-2xl font-black text-slate-900 leading-tight pr-8">帖子详情</h3>
+      <button onclick="closeDetail()" class="text-slate-400 hover:text-slate-900 text-2xl transition-colors">✕</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const currentDate = "{{ current_date or '' }}";
+let currentCategory = '';
+
+async function loadCandidates() {
+  const container = document.getElementById('candidatesContainer');
+  const sort = document.getElementById('sortSelect').value;
+  const url = `/api/candidates?date=${currentDate}&category=${currentCategory}&sort=${sort}`;
+
+  try {
+    const data = await apiGet(url);
+    const candidates = data.candidates || [];
+
+    // Update filter counts
+    const cc = data.category_counts || {};
+    Object.keys(cc).forEach(k => {
+      const el = document.getElementById(`filter-count-${k}`);
+      if (el) el.textContent = cc[k];
+    });
+
+    if (candidates.length === 0) {
+      container.innerHTML = `
+        <div class="glass-card py-20 text-center">
+          <div class="text-5xl mb-6">🌪️</div>
+          <p class="text-xl font-black text-slate-900">暂无对应候选帖子</p>
+          <p class="text-slate-500 mt-2">换个分类试试，或者重新运行流水线</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = candidates.map((c, i) => `
+      <div class="glass-card group cursor-pointer" onclick="showDetail(${i})">
+        <div class="flex items-start gap-6">
+          <div class="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl font-black text-slate-300 flex-shrink-0 group-hover:bg-coral group-hover:text-white transition-all shadow-sm">
+            ${i+1}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="badge badge-coral">${c.category_name}</span>
+              <span class="text-xs font-bold text-slate-400 bg-slate-100/50 px-3 py-1 rounded-full uppercase tracking-wider">r/${c.subreddit}</span>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2 leading-tight group-hover:text-coral transition-colors">${escHtml(c.title)}</h3>
+            ${c.selftext ? `<p class="text-slate-500 text-sm line-clamp-2 leading-relaxed mb-4">${escHtml(c.selftext)}</p>` : ''}
+            <div class="flex items-center gap-6 text-sm">
+              <span class="font-bold text-slate-700">⬆️ ${c.score.toLocaleString()}</span>
+              <span class="font-bold text-slate-700">💬 ${c.num_comments.toLocaleString()}</span>
+              <div class="ml-auto flex items-center gap-2">
+                <span class="text-xs font-black text-slate-400">洞察分</span>
+                <span class="text-lg font-black text-slate-900">${(c.composite_score*100).toFixed(0)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    // Store for modal
+    window._candidates = candidates;
+  } catch(e) {
+    container.innerHTML = `
+      <div class="glass-card py-20 text-center text-red-400">
+        <div class="text-5xl mb-6">⚠️</div>
+        <p class="text-xl font-black">数据加载异常</p>
+        <p class="text-sm mt-2 opacity-70">发生错误: ${e.message}</p>
+      </div>`;
+  }
+}
+
+function filterCategory(cat) {
+  currentCategory = cat;
+  document.querySelectorAll('.cat-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.cat === cat);
+  });
+  loadCandidates();
+}
+
+function showDetail(idx) {
+  const c = window._candidates[idx];
+  if (!c) return;
+  document.getElementById('modalTitle').textContent = c.title;
+  document.getElementById('modalContent').innerHTML = `
+    <div class="space-y-8 animate-fade">
+      <div class="flex flex-wrap gap-3">
+        <span class="badge badge-coral">${c.category_name}</span>
+        <span class="text-xs font-bold text-slate-400 bg-slate-100/50 px-3 py-1 rounded-full uppercase tracking-wider">r/${c.subreddit}</span>
+      </div>
+      
+      ${c.selftext ? `
+        <div class="bg-slate-50 border border-slate-100 rounded-3xl p-8 text-slate-600 text-sm leading-relaxed max-h-64 overflow-y-auto">
+          ${escHtml(c.selftext)}
+        </div>
+      ` : '<div class="text-slate-400 italic text-sm">（该贴无正文，仅有标题）</div>'}
+      
+      <div class="grid grid-cols-3 gap-6">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
+          <div class="text-2xl font-black text-slate-900">${c.score.toLocaleString()}</div>
+          <div class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">点赞数</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
+          <div class="text-2xl font-black text-slate-900">${c.num_comments.toLocaleString()}</div>
+          <div class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">评论数</div>
+        </div>
+        <div class="bg-white border border-slate-100 rounded-2xl p-6 text-center shadow-sm border-t-4 border-coral/30">
+          <div class="text-2xl font-black text-coral">${(c.composite_score*100).toFixed(0)}</div>
+          <div class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">综合分</div>
+        </div>
+      </div>
+      
+      <div class="pt-4 flex gap-4">
+         <button onclick="closeDetail()" class="flex-1 py-4 text-slate-500 font-bold hover:text-slate-700">返回列表</button>
+         <a href="${c.url}" target="_blank" class="flex-[2] block text-center py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all">
+          在 Reddit 深度阅读 →
+        </a>
+      </div>
+    </div>`;
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.add('hidden');
+}
+
+function changeDateParam(val) {
+  window.location.href = `/candidates?date=${val}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => loadCandidates());
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{
+  "date": "2026-03-26",
+  "classified_at": "2026-03-26T01:00:00.261772+00:00",
+  "total_candidates": 2,
+  "category_counts": {
+    "A": 0,
+    "B": 0,
+    "C": 1,
+    "D": 0,
+    "E": 1
+  },
+  "candidates": [
+    {
+      "id": "mock_1774486800_2",
+      "title": "Hot take on the recent news",
+      "selftext": "Honestly, I have strong opinions on this.",
+      "full_text_lower": "hot take on the recent news honestly, i have strong opinions on this.",
+      "score": 518,
+      "num_comments": 143,
+      "subreddit": "headphones",
+      "url": "https://reddit.com/r/test2",
+      "permalink": "/r/test/mock2",
+      "created_utc": 1774479600,
+      "author": "tester_2",
+      "category": "C",
+      "category_name": "观点争议",
+      "category_name_en": "Opinion Controversy",
+      "category_color": "yellow",
+      "composite_score": 0.8893,
+      "status": "pending",
+      "classified_at": "2026-03-26T01:00:00.261716+00:00"
+    },
+    {
+      "id": "mock_1774486800_1",
+      "title": "[open ear earbuds] Discussion thread",
+      "selftext": "Been thinking about this lately...",
+      "full_text_lower": "[open ear earbuds] discussion thread been thinking about this lately...",
+      "score": 400,
+      "num_comments": 89,
+      "subreddit": "headphones",
+      "url": "https://reddit.com/r/test",
+      "permalink": "/r/test/mock1",
+      "created_utc": 1774483200,
+      "author": "tester_1",
+      "category": "E",
+      "category_name": "平台趋势",
+      "category_name_en": "Platform Trend",
+      "category_color": "green",
+      "composite_score": 0.8579,
+      "status": "pending",
+      "classified_at": "2026-03-26T01:00:00.261650+00:00"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "date": "2026-03-20",
+    "content_id": "daef7f49-0159-4e1d-bb10-c36de96deb43",
+    "status": "approved",
+    "persona_id": "sporty_runner",
+    "persona_name": "SportyRunner",
+    "title": "6 months of testing open ear earbuds for running – here's my verdict",
+    "body_preview": "Just wrapped up testing 3 different open ear earbuds for my marathon training. Here's what actually ",
+    "source_post_id": "mock002",
+    "logged_at": "2026-03-20T05:48:40.002182+00:00"
+  },
+  {
+    "date": "2026-03-20",
+    "content_id": "39c430e3-8c47-447f-9a21-244a2263b98e",
+    "status": "approved",
+    "persona_id": "audio_geek",
+    "persona_name": "AudioGeek",
+    "title": "Objective analysis: Open ear earbuds for audiophiles",
+    "body_preview": "Let me give you the technical perspective on open ear earbuds since most reviews focus purely on lif",
+    "source_post_id": "mock006",
+    "logged_at": "2026-03-20T05:48:41.663183+00:00"
+  },
+  {
+    "date": "2026-03-20",
+    "content_id": "d8bc2146-a85e-4c10-8b24-87de841d6024",
+    "status": "approved",
+    "persona_id": "audio_geek",
+    "persona_name": "AudioGeek",
+    "title": "Technical breakdown: Why open ear audio physics are more complex than you think",
+    "body_preview": "After measuring frequency response on several open ear earbuds, I want to share some observations th",
+    "source_post_id": "mock002",
+    "logged_at": "2026-03-20T05:48:42.831685+00:00"
+  }
+]

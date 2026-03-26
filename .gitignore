@@ -1,0 +1,28 @@
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Logs
+*.log
+flask_log.txt
+
+# Local/editor files
+.DS_Store
+.agent/
+
+# Web app artifacts
+web/node_modules/
+web/.next/
+web/.vercel/
+web/out/
+web/*.tsbuildinfo
+web/next-env.d.ts

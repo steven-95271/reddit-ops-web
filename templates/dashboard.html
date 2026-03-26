@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}今日运营概览{% endblock %}
+
+{% block header_actions %}
+<select id="dateSelect" onchange="changeDate(this.value)"
+  class="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+  {% for d in dates %}
+  <option value="{{ d }}" {% if d == current_date %}selected{% endif %}>{{ d }}</option>
+  {% endfor %}
+  {% if not dates %}
+  <option value="">暂无数据</option>
+  {% endif %}
+</select>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="project-grid mb-10">
+  <div class="glass-card flex flex-col items-center text-center">
+    <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl mb-4">📥</div>
+    <div class="stat-value" id="stat-posts">0</div>
+    <div class="stat-label">今日抓取</div>
+  </div>
+  <div class="glass-card flex flex-col items-center text-center border-t-4 border-coral">
+    <div class="w-12 h-12 rounded-2xl bg-coral/10 text-coral flex items-center justify-center text-xl mb-4">🎯</div>
+    <div class="stat-value" id="stat-candidates">0</div>
+    <div class="stat-label">核心候选</div>
+  </div>
+  <div class="glass-card flex flex-col items-center text-center">
+    <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl mb-4">✍️</div>
+    <div class="stat-value" id="stat-content">0</div>
+    <div class="stat-label">AI 已生成</div>
+  </div>
+  <div class="glass-card flex flex-col items-center text-center">
+    <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl mb-4">✅</div>
+    <div class="stat-value" id="stat-approved">0</div>
+    <div class="stat-label">已通过审核</div>
+  </div>
+</div>
+
+<!-- Main Section -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <!-- Chart Panel -->
+  <div class="lg:col-span-2 glass-card">
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-xl font-black text-slate-900">趋势分布</h2>
+      <div id="mockBadge" class="hidden badge badge-coral animate-pulse">🧪 模拟模式</div>
+    </div>
+    <div class="relative h-72">
+      <canvas id="categoryChart"></canvas>
+      <div id="chartEmpty" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 hidden">
+        <span class="text-4xl mb-4">🌪️</span>
+        <p class="font-bold">暂无今日洞察，请执行流水线</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persona Panel -->
+  <div class="glass-card">
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-xl font-black text-slate-900">人设矩阵</h2>
+      <button onclick="openNewPersonaModal()" class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg shadow-md hover:scale-110 transition-transform">+</button>
+    </div>
+    <div class="space-y-6">
+      {% for persona in personas %}
+      <div class="flex items-center gap-4 group cursor-pointer">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 transition-transform group-hover:rotate-12 shadow-sm"
+             style="background-color: {{ persona.avatar_color }}15; border: 1px solid {{ persona.avatar_color }}30">
+          {{ persona.avatar_emoji }}
+        </div>
+        <div class="min-w-0">
+          <div class="font-bold text-slate-900 truncate">{{ persona.name }} <span class="badge badge-teal ml-1 text-[10px]">{{ persona.platform or 'Reddit' }}</span></div>
+          <div class="text-slate-500 text-xs mt-0.5 line-clamp-1 truncate">{{ persona.description }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Recent Feed -->
+  <div class="lg:col-span-2 glass-card">
+    <h2 class="text-xl font-black text-slate-900 mb-8">最新产出</h2>
+    <div id="recentActivity" class="space-y-4">
+      <div class="text-slate-400 font-medium py-8 text-center italic">数据回传中...</div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="glass-card">
+    <h2 class="text-xl font-black text-slate-900 mb-8">关注维度</h2>
+    <div class="space-y-4" id="categoryList">
+      {% for code, cat in categories.items() %}
+      <div class="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+        <div class="flex items-center gap-4">
+          <span class="w-3 h-3 rounded-full" style="background-color: {{ cat.color }}"></span>
+          <div>
+            <div class="text-sm font-bold text-slate-800">{{ cat.name }}</div>
+          </div>
+        </div>
+        <span class="text-lg font-black text-slate-900" id="cat-count-{{ code }}">0</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Keyword Config Panel -->
+  <div class="lg:col-span-3 glass-card">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-black text-slate-900">🔍 关键词智能配置</h2>
+      <button onclick="toggleKeywordPanel()" id="keywordPanelToggle" class="text-slate-500 hover:text-slate-700 text-sm">
+        [展开]
+      </button>
+    </div>
+    
+    <div id="keywordPanelContent" class="hidden space-y-6">
+      <!-- Tabs -->
+      <div class="flex gap-2 border-b border-slate-200 pb-2">
+        <button onclick="switchKeywordTab('keywords')" id="tab-keywords" class="px-4 py-2 text-sm font-medium text-brand-600 border-b-2 border-brand-600">关键词联想</button>
+        <button onclick="switchKeywordTab('background')" id="tab-background" class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700">项目资料分析</button>
+      </div>
+
+      <!-- Tab 1: Keyword Suggestion -->
+      <div id="panel-keywords" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">输入种子关键词（逗号分隔）</label>
+          <input type="text" id="seedKeywords" placeholder="例如: open ear earbuds, bone conduction" 
+                 class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="suggestFromKeywords()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium">
+            🤖 AI 联想推荐
+          </button>
+          <button onclick="loadKeywordConfig()" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-sm">
+            加载已保存配置
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Background Analysis -->
+      <div id="panel-background" class="hidden space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">粘贴项目背景资料</label>
+          <textarea id="backgroundText" rows="4" placeholder="粘贴项目brief、产品介绍、市场分析等资料..."
+                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700"></textarea>
+        </div>
+        <div class="flex items-center gap-4">
+          <button onclick="analyzeBackground()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium">
+            🤖 AI 分析推荐
+          </button>
+          <div class="relative">
+            <input type="file" id="backgroundFile" accept=".txt,.pdf,.docx,.md" 
+                   onchange="uploadBackgroundFile()" class="hidden">
+            <button onclick="document.getElementById('backgroundFile').click()" 
+                    class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-sm">
+              📎 上传文件
+            </button>
+          </div>
+        </div>
+        <div id="uploadStatus" class="text-sm text-slate-500 hidden"></div>
+      </div>
+
+      <!-- Suggestions Result -->
+      <div id="suggestionsResult" class="hidden space-y-4 border-t border-slate-200 pt-4">
+        <h3 class="font-bold text-slate-900">AI 推荐结果</h3>
+        
+        <!-- Search Queries -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-medium text-slate-700">搜索词（勾选要使用的）</label>
+            <button onclick="toggleAllQueries()" class="text-xs text-brand-600 hover:underline">全选/取消</button>
+          </div>
+          <div id="searchQueriesList" class="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Subreddits -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-medium text-slate-700">Subreddits（勾选要监控的）</label>
+            <button onclick="toggleAllSubreddits()" class="text-xs text-brand-600 hover:underline">全选/取消</button>
+          </div>
+          <div id="subredditsList" class="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Competitor Brands -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-2">竞品品牌（用于监测）</label>
+          <div id="competitorBrandsList" class="flex flex-wrap gap-2">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Reasoning -->
+        <div id="suggestionReasoning" class="text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
+          <!-- AI reasoning -->
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2 pt-2">
+          <button onclick="applyKeywordConfig()" class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
+            ✓ 确认保存到项目配置
+          </button>
+          <button onclick="clearSuggestions()" class="py-2 px-4 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg">
+            取消
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Config Display -->
+      <div id="currentConfigDisplay" class="hidden border-t border-slate-200 pt-4">
+        <h3 class="font-bold text-slate-900 mb-2">当前项目配置</h3>
+        <div id="currentConfigContent" class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
+          <!-- Display current config -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+<!-- New Persona Modal -->
+<div id="newPersonaModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+  <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <h3 class="text-xl font-bold text-white mb-4">添加新人设</h3>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">人设代码 (英文, 如 sporty_joe)</label>
+        <input type="text" id="nPId" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">人设名称</label>
+        <input type="text" id="nPName" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">账号用户名</label>
+        <input type="text" id="nPUser" value="u/" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">发布阵地 (Platform)</label>
+        <select id="nPPlatform" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500">
+          <option value="Reddit">Reddit</option>
+          <option value="X/Twitter">X/Twitter</option>
+          <option value="Instagram">Instagram</option>
+          <option value="TikTok">TikTok</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="Facebook">Facebook</option>
+        </select>
+      </div>
+      <div class="flex gap-2">
+        <div class="w-1/2">
+            <label class="block text-xs font-medium text-gray-400 mb-1">Emoji</label>
+            <input type="text" id="nPEmoji" value="👤" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500 text-center">
+        </div>
+        <div class="w-1/2">
+            <label class="block text-xs font-medium text-gray-400 mb-1">颜色</label>
+            <input type="color" id="nPColor" value="#8b5cf6" class="w-full h-[30px] p-0 border-0 rounded bg-gray-800 cursor-pointer">
+        </div>
+      </div>
+      <div class="col-span-2">
+        <label class="block text-xs font-medium text-gray-400 mb-1">简短描述</label>
+        <input type="text" id="nPDesc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500">
+      </div>
+      <div class="col-span-2">
+        <label class="block text-xs font-medium text-gray-400 mb-1">人物背景 (Background)</label>
+        <textarea id="nPBg" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500"></textarea>
+      </div>
+      <div class="col-span-2">
+        <label class="block text-xs font-medium text-gray-400 mb-1">语气 (Tone)</label>
+        <input type="text" id="nPTone" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500">
+      </div>
+      <div class="col-span-2">
+        <label class="block text-xs font-medium text-gray-400 mb-1">写作风格 (Writing Style)</label>
+        <textarea id="nPStyle" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-sm focus:border-brand-500"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeNewPersonaModal()" class="flex-1 py-2 px-4 border border-gray-700 text-gray-300 rounded hover:bg-gray-800 transition-colors text-sm">取消</button>
+      <button onclick="submitNewPersona()" class="flex-1 py-2 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded transition-colors text-sm">创建人设</button>
+    </div>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+const currentProjectId = "{{ project.id if project else '' }}";
+const currentDate = "{{ current_date or '' }}";
+const categoryColors = {
+  A: '#ff7e67', B: '#4fd1c5', C: '#f59e0b', D: '#8b5cf6', E: '#10b981'
+};
+const categoryNames = {
+  A: '深度测评', B: '场景痛点', C: '观点争议', D: '竞品KOL', E: '平台趋势'
+};
+
+let chartInstance = null;
+
+async function loadDashboard(date) {
+  if (!date) {
+    document.getElementById('chartEmpty').classList.remove('hidden');
+    return;
+  }
+  try {
+    const stats = await apiGet(`/api/stats?project_id=${currentProjectId}&date=${date}`);
+    // Update stat cards
+    animateCount('stat-posts', stats.total_posts);
+    animateCount('stat-candidates', stats.total_candidates);
+    animateCount('stat-content', stats.total_content);
+    animateCount('stat-approved', stats.approved + stats.published);
+
+    // Mock badge
+    document.getElementById('mockBadge').classList.toggle('hidden', !stats.is_mock);
+
+    // Category counts
+    const cc = stats.category_counts || {};
+    Object.keys(cc).forEach(k => {
+      const el = document.getElementById(`cat-count-${k}`);
+      if (el) el.textContent = cc[k];
+    });
+
+    // Chart
+    renderCategoryChart(cc);
+
+    // Recent activity
+    loadRecentActivity(date);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('chartEmpty').classList.remove('hidden');
+  }
+}
+
+function renderCategoryChart(counts) {
+  const labels = Object.keys(counts).filter(k => counts[k] > 0);
+  const data = labels.map(k => counts[k]);
+  const colors = labels.map(k => categoryColors[k] || '#6366f1');
+  const names = labels.map(k => categoryNames[k] || k);
+
+  if (data.length === 0) {
+    document.getElementById('chartEmpty').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('chartEmpty').classList.add('hidden');
+
+  const ctx = document.getElementById('categoryChart').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [{
+        label: '帖子数',
+        data: data,
+        backgroundColor: colors.map(c => c + '55'),
+        borderColor: colors,
+        borderWidth: 2,
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', precision: 0 } }
+      }
+    }
+  });
+}
+
+async function loadRecentActivity(date) {
+  const container = document.getElementById('recentActivity');
+  try {
+    const data = await apiGet(`/api/content?project_id=${currentProjectId}&date=${date}`);
+    const items = data.content || [];
+    if (items.length === 0) {
+      container.innerHTML = '<div class="text-gray-500 text-sm py-4 text-center">暂无生成内容</div>';
+      return;
+    }
+    const recent = items.slice(0, 6);
+    container.innerHTML = recent.map(item => `
+      <div class="flex items-center gap-3 p-3 bg-gray-800/30 rounded-xl hover:bg-gray-800/50 transition-colors">
+        <span class="text-xl">${item.persona_emoji}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm text-white font-medium truncate">${escHtml(item.title)}</div>
+          <div class="text-xs text-gray-500">${item.persona_name} · ${item.source_category_name || ''}</div>
+        </div>
+        <span class="status-badge status-${item.status}">${statusLabel(item.status)}</span>
+      </div>
+    `).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="text-gray-500 text-sm py-4 text-center">加载失败</div>';
+  }
+}
+
+function changeDate(val) {
+  window.location.href = `/dashboard?project_id=${currentProjectId}&date=${val}`;
+}
+
+// Keyword Configuration Panel
+let currentSuggestions = null;
+
+function toggleKeywordPanel() {
+  const panel = document.getElementById('keywordPanelContent');
+  const toggle = document.getElementById('keywordPanelToggle');
+  if (panel.classList.contains('hidden')) {
+    panel.classList.remove('hidden');
+    toggle.textContent = '[收起]';
+  } else {
+    panel.classList.add('hidden');
+    toggle.textContent = '[展开]';
+  }
+}
+
+function switchKeywordTab(tab) {
+  // Update tab buttons
+  document.getElementById('tab-keywords').className = tab === 'keywords' 
+    ? 'px-4 py-2 text-sm font-medium text-brand-600 border-b-2 border-brand-600'
+    : 'px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700';
+  document.getElementById('tab-background').className = tab === 'background'
+    ? 'px-4 py-2 text-sm font-medium text-brand-600 border-b-2 border-brand-600'
+    : 'px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700';
+  
+  // Show/hide panels
+  document.getElementById('panel-keywords').classList.toggle('hidden', tab !== 'keywords');
+  document.getElementById('panel-background').classList.toggle('hidden', tab !== 'background');
+}
+
+async function suggestFromKeywords() {
+  const seedKeywords = document.getElementById('seedKeywords').value;
+  if (!seedKeywords.trim()) {
+    alert('请输入种子关键词');
+    return;
+  }
+  
+  const keywords = seedKeywords.split(',').map(k => k.trim()).filter(k => k);
+  
+  try {
+    const res = await fetch('/api/keyword-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed_keywords: keywords })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'AI 推荐失败');
+    }
+    
+    const data = await res.json();
+    currentSuggestions = data.suggestions;
+    renderSuggestions(currentSuggestions);
+  } catch (e) {
+    alert('AI 联想失败: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function analyzeBackground() {
+  const backgroundText = document.getElementById('backgroundText').value;
+  if (!backgroundText.trim()) {
+    alert('请输入项目背景资料');
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/background-analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ background_text: backgroundText })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'AI 分析失败');
+    }
+    
+    const data = await res.json();
+    currentSuggestions = data.suggestions;
+    renderSuggestions(currentSuggestions);
+  } catch (e) {
+    alert('AI 分析失败: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function uploadBackgroundFile() {
+  const fileInput = document.getElementById('backgroundFile');
+  const file = fileInput.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.classList.remove('hidden');
+  statusEl.textContent = '正在解析文件...';
+  
+  try {
+    const res = await fetch('/api/upload-background', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || '文件解析失败');
+    }
+    
+    const data = await res.json();
+    document.getElementById('backgroundText').value = data.text;
+    statusEl.textContent = `✓ 已加载: ${data.filename}`;
+  } catch (e) {
+    statusEl.textContent = '✗ 解析失败: ' + e.message;
+  }
+}
+
+function renderSuggestions(suggestions) {
+  const resultPanel = document.getElementById('suggestionsResult');
+  resultPanel.classList.remove('hidden');
+  
+  // Render search queries
+  const queriesList = document.getElementById('searchQueriesList');
+  queriesList.innerHTML = (suggestions.search_queries || []).map((q, i) => `
+    <label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+      <input type="checkbox" class="query-checkbox w-4 h-4 text-brand-600" value="${escHtml(q)}" checked>
+      <span class="text-sm text-slate-700">${escHtml(q)}</span>
+    </label>
+  `).join('');
+  
+  // Render subreddits
+  const subredditsList = document.getElementById('subredditsList');
+  subredditsList.innerHTML = (suggestions.subreddits || []).map((s, i) => `
+    <label class="flex items-start gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+      <input type="checkbox" class="subreddit-checkbox w-4 h-4 text-brand-600 mt-0.5" value="${escHtml(s.name)}" checked>
+      <div class="flex-1">
+        <div class="text-sm font-medium text-slate-700">r/${escHtml(s.name)}</div>
+        <div class="text-xs text-slate-500">${escHtml(s.reason || '')}</div>
+      </div>
+      <span class="text-xs px-2 py-0.5 rounded ${s.relevance === 'high' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${escHtml(s.relevance || 'medium')}</span>
+    </label>
+  `).join('');
+  
+  // Render competitor brands
+  const brandsList = document.getElementById('competitorBrandsList');
+  brandsList.innerHTML = (suggestions.competitor_brands || []).map(b => `
+    <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${escHtml(b)}</span>
+  `).join('') || '<span class="text-sm text-slate-400">无推荐竞品</span>';
+  
+  // Render reasoning
+  document.getElementById('suggestionReasoning').textContent = suggestions.reasoning || '';
+  
+  // Scroll to results
+  resultPanel.scrollIntoView({ behavior: 'smooth' });
+}
+
+function toggleAllQueries() {
+  const checkboxes = document.querySelectorAll('.query-checkbox');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+function toggleAllSubreddits() {
+  const checkboxes = document.querySelectorAll('.subreddit-checkbox');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+function clearSuggestions() {
+  document.getElementById('suggestionsResult').classList.add('hidden');
+  currentSuggestions = null;
+}
+
+async function applyKeywordConfig() {
+  if (!currentSuggestions) return;
+  
+  // Collect selected items
+  const selectedQueries = Array.from(document.querySelectorAll('.query-checkbox:checked')).map(cb => cb.value);
+  const selectedSubreddits = Array.from(document.querySelectorAll('.subreddit-checkbox:checked')).map(cb => cb.value);
+  
+  if (selectedQueries.length === 0) {
+    alert('请至少选择一个搜索词');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/projects/${currentProjectId}/keyword-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        search_queries: selectedQueries,
+        subreddits: selectedSubreddits,
+        competitor_brands: currentSuggestions.competitor_brands || [],
+        classification_keywords: currentSuggestions.classification_keywords || {},
+        suggested_keywords: currentSuggestions,
+        background_text: document.getElementById('backgroundText').value
+      })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || '保存失败');
+    }
+    
+    alert('✓ 配置已保存到项目');
+    clearSuggestions();
+    loadKeywordConfig();
+  } catch (e) {
+    alert('保存失败: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function loadKeywordConfig() {
+  try {
+    const res = await fetch(`/api/projects/${currentProjectId}/keyword-config`);
+    if (!res.ok) return;
+    
+    const data = await res.json();
+    if (!data.config || !data.config.search_queries) return;
+    
+    const configDisplay = document.getElementById('currentConfigDisplay');
+    const configContent = document.getElementById('currentConfigContent');
+    
+    configDisplay.classList.remove('hidden');
+    configContent.innerHTML = `
+      <div class="space-y-2">
+        <div><strong>搜索词 (${data.config.search_queries.length}个):</strong> ${data.config.search_queries.slice(0, 5).join(', ')}${data.config.search_queries.length > 5 ? '...' : ''}</div>
+        <div><strong>Subreddits (${data.config.subreddits ? data.config.subreddits.length : 0}个):</strong> ${data.config.subreddits ? data.config.subreddits.slice(0, 5).map(s => 'r/' + s).join(', ') : '未配置'}${data.config.subreddits && data.config.subreddits.length > 5 ? '...' : ''}</div>
+        ${data.config.competitor_brands && data.config.competitor_brands.length > 0 ? `<div><strong>竞品品牌:</strong> ${data.config.competitor_brands.join(', ')}</div>` : ''}
+      </div>
+    `;
+  } catch (e) {
+    console.error('Failed to load keyword config:', e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadDashboard(currentDate);
+  loadKeywordConfig();
+});
+</script>
+{% endblock %}
