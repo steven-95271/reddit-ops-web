@@ -1,14 +1,3 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "regions": ["iad1"],
-  "functions": {
-    "app/api/**/*.ts": {
-      "runtime": "nodejs18.x",
-      "memory": 512,
-      "maxDuration": 10
-    }
-  }
+  "framework": "nextjs"
 }
