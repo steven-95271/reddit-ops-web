@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit运营工具 - 系统状态报告</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #FF4500;
+            padding-bottom: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .status.ok { background: #d4edda; color: #155724; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .section h2 {
+            color: #FF4500;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .template-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            transition: transform 0.2s;
+        }
+        .template-card:hover {
+            transform: translateX(5px);
+            border-left: 4px solid #FF4500;
+        }
+        .template-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .template-role {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .template-desc {
+            color: #666;
+            font-size: 14px;
+        }
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .strategy-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #4caf50;
+        }
+        .strategy-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .strategy-value {
+            font-weight: bold;
+            color: #333;
+        }
+        .api-list {
+            list-style: none;
+        }
+        .api-list li {
+            background: white;
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #2196f3;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .api-list .method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .api-list .get { background: #e3f2fd; color: #1976d2; }
+        .api-list .post { background: #e8f5e9; color: #388e3c; }
+        .endpoint {
+            color: #666;
+        }
+        .file-list {
+            list-style: none;
+        }
+        .file-list li {
+            padding: 8px;
+            background: white;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid #9c27b0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .badge.new { background: #ffebee; color: #c62828; }
+        .badge.core { background: #e8f5e9; color: #2e7d32; }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Reddit运营工具 - 人设与多账号管理系统</h1>
+        <div class="status ok">✅ 系统运行正常</div>
+        
+        <div class="info-box">
+            <strong>📝 说明：</strong>由于服务器防火墙限制，无法直接通过公网IP访问。服务已在本地运行，API可正常使用。<br>
+            <strong>本地访问：</strong>http://localhost:3000<br>
+            <strong>API文档：</strong>详见下方
+        </div>
+
+        <div class="section">
+            <h2>📚 预置人设模板（5种）</h2>
+            
+            <div class="template-card">
+                <div class="template-name">1️⃣ 科技产品测评师 <span class="badge core">核心</span></div>
+                <div class="template-role">专家型 | expert</div>
+                <div class="template-desc">专业的产品评测者，擅长深度技术分析和对比测评，语气客观理性，偶尔分享个人长期使用体验</div>
+                <div class="strategy-grid">
+                    <div class="strategy-item">
+                        <div class="strategy-label">发帖频率</div>
+                        <div class="strategy-value">中等（每周2-3次）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">内容类型</div>
+                        <div class="strategy-value">50%测评 + 20%对比</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">语气风格</div>
+                        <div class="strategy-value">analytical（分析型）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">评论策略</div>
+                        <div class="strategy-value">补充信息 + 数据支撑</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="template-card">
+                <div class="template-name">2️⃣ 普通消费者 <span class="badge core">核心</span></div>
+                <div class="template-role">路人型 | casual_user</div>
+                <div class="template-desc">真实的产品使用者，分享日常使用体验和遇到的问题，语气轻松自然，像朋友聊天</div>
+                <div class="strategy-grid">
+                    <div class="strategy-item">
+                        <div class="strategy-label">发帖频率</div>
+                        <div class="strategy-value">低（每周1-2次）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">内容类型</div>
+                        <div class="strategy-value">40%故事 + 30%提问</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">语气风格</div>
+                        <div class="strategy-value">casual（随意型）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">评论策略</div>
+                        <div class="strategy-value">分享经历 + 个人故事</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="template-card">
+                <div class="template-name">3️⃣ 产品发烧友</div>
+                <div class="template-role">发烧友型 | enthusiast</div>
+                <div class="template-desc">热情的爱好者，对品类有深入了解，喜欢分享使用技巧和心得，偶尔激情推荐</div>
+                <div class="strategy-grid">
+                    <div class="strategy-item">
+                        <div class="strategy-label">发帖频率</div>
+                        <div class="strategy-value">高（每周4-5次）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">内容类型</div>
+                        <div class="strategy-value">30%测评 + 20%趋势</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">语气风格</div>
+                        <div class="strategy-value">enthusiastic（热情型）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">评论策略</div>
+                        <div class="strategy-value">经验分享 + 建设性批评</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="template-card">
+                <div class="template-name">4️⃣ 新手求助者</div>
+                <div class="template-role">新手型 | newcomer</div>
+                <div class="template-desc">刚入坑的新手，有很多问题需要解答，虚心请教，偶尔分享买到新产品的喜悦</div>
+                <div class="strategy-grid">
+                    <div class="strategy-item">
+                        <div class="strategy-label">发帖频率</div>
+                        <div class="strategy-value">低（每周1-2次）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">内容类型</div>
+                        <div class="strategy-value">60%提问 + 20%故事</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">语气风格</div>
+                        <div class="strategy-value">casual（随意型）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">评论策略</div>
+                        <div class="strategy-value">提问 + 征求意见</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="template-card">
+                <div class="template-name">5️⃣ 理性质疑者 <span class="badge core">核心</span></div>
+                <div class="template-role">路人型 | casual_user</div>
+                <div class="template-desc">谨慎的消费者，对营销话术保持怀疑，喜欢深入研究和对比，做出决定前会反复确认</div>
+                <div class="strategy-grid">
+                    <div class="strategy-item">
+                        <div class="strategy-label">发帖频率</div>
+                        <div class="strategy-value">中等（每周2-3次）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">内容类型</div>
+                        <div class="strategy-value">40%提问 + 30%测评</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">语气风格</div>
+                        <div class="strategy-value">skeptical（质疑型）</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-label">评论策略</div>
+                        <div class="strategy-value">温和质疑 + 逻辑分析</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔗 可用API端点</h2>
+            <ul class="api-list">
+                <li>
+                    <span class="method get">GET</span>
+                    <span class="endpoint">/api/personas/templates</span>
+                    <span class="badge">获取所有人设模板</span>
+                </li>
+                <li>
+                    <span class="method post">POST</span>
+                    <span class="endpoint">/api/personas/templates/generate-set</span>
+                    <span class="badge">基于模板生成人设组合</span>
+                </li>
+                <li>
+                    <span class="method get">GET</span>
+                    <span class="endpoint">/api/personas/analyze-profile?url=xxx</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">分析标杆账号</span>
+                </li>
+                <li>
+                    <span class="method post">POST</span>
+                    <span class="endpoint">/api/personas/analyze-profile</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">生成人设</span>
+                </li>
+                <li>
+                    <span class="method get">GET</span>
+                    <span class="endpoint">/api/reddit-accounts?project_id=xxx</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">获取Reddit账号列表</span>
+                </li>
+                <li>
+                    <span class="method post">POST</span>
+                    <span class="endpoint">/api/reddit-accounts</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">创建Reddit账号</span>
+                </li>
+                <li>
+                    <span class="method post">POST</span>
+                    <span class="endpoint">/api/content/generate</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">生成内容（发帖/评论）</span>
+                </li>
+                <li>
+                    <span class="method get">GET</span>
+                    <span class="endpoint">/api/content/review?status=pending</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">获取待审核内容</span>
+                </li>
+                <li>
+                    <span class="method patch">PATCH</span>
+                    <span class="endpoint">/api/content/review</span>
+                    <span class="badge new">NEW</span>
+                    <span class="badge">审核内容（批准/拒绝）</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>📁 新增文件列表</h2>
+            <ul class="file-list">
+                <li>web/lib/persona-templates.ts <span class="badge new">NEW</span> - 预置人设模板配置</li>
+                <li>web/lib/persona-analyzer.ts <span class="badge new">NEW</span> - 标杆账号分析模块</li>
+                <li>web/lib/persona-generator.ts <span class="badge new">NEW</span> - AI人设生成器</li>
+                <li>web/lib/content-generator.ts <span class="badge new">NEW</span> - 双轨内容生成</li>
+                <li>web/lib/db.ts <span class="badge core">更新</span> - 扩展数据库结构</li>
+                <li>web/app/api/reddit-accounts/route.ts <span class="badge new">NEW</span> - Reddit账号管理API</li>
+                <li>web/app/api/personas/analyze-profile/route.ts <span class="badge new">NEW</span> - 人设分析API</li>
+                <li>web/app/api/personas/templates/route.ts <span class="badge new">NEW</span> - 模板管理API</li>
+                <li>web/app/api/content/generate/route.ts <span class="badge new">NEW</span> - 内容生成API</li>
+                <li>web/app/api/content/review/route.ts <span class="badge new">NEW</span> - 内容审核API</li>
+                <li>web/docs/PERSONA_SYSTEM.md <span class="badge new">NEW</span> - 完整系统文档</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>🎯 推荐人设组合</h2>
+            <p>建议每个项目配置 <strong>4个人设</strong>：</p>
+            <div class="strategy-grid">
+                <div class="strategy-item">
+                    <div class="strategy-label">1️⃣ 专家型</div>
+                    <div class="strategy-value">科技产品测评师</div>
+                </div>
+                <div class="strategy-item">
+                    <div class="strategy-label">2️⃣ 路人型</div>
+                    <div class="strategy-value">普通消费者</div>
+                </div>
+                <div class="strategy-item">
+                    <div class="strategy-label">3️⃣ 路人型</div>
+                    <div class="strategy-value">理性质疑者</div>
+                </div>
+                <div class="strategy-item">
+                    <div class="strategy-label">4️⃣ 新手型</div>
+                    <div class="strategy-value">新手求助者</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🚀 快速开始</h2>
+            <div class="info-box">
+                <h3>方式1：基于预置模板生成（最简单）</h3>
+                <pre style="background: #f4f4f4; padding: 15px; border-radius: 6px; overflow-x: auto; margin: 10px 0;">
+POST http://localhost:3000/api/personas/templates/generate-set
+Content-Type: application/json
+
+{
+  "project_info": {
+    "product_name": "开放式耳机",
+    "category": "音频设备", 
+    "target_audience": "运动爱好者",
+    "key_benefits": ["不入耳设计", "运动稳固", "环境音感知"],
+    "competitors": ["AirPods", "Sony", "Bose"]
+  }
+}</pre>
+            </div>
+
+            <div class="info-box">
+                <h3>方式2：基于标杆账号生成（推荐）</h3>
+                <pre style="background: #f4f4f4; padding: 15px; border-radius: 6px; overflow-x: auto; margin: 10px 0;">
+# 第1步：分析标杆账号
+GET http://localhost:3000/api/personas/analyze-profile?url=https://reddit.com/user/ExampleUser
+
+# 第2步：生成人设
+POST http://localhost:3000/api/personas/analyze-profile
+Content-Type: application/json
+
+{
+  "profile_url": "https://reddit.com/user/ExampleUser",
+  "project_info": {
+    "product_name": "开放式耳机",
+    "key_benefits": ["不入耳", "运动适用"]
+  },
+  "differentiation": "medium",
+  "count": 3
+}</pre>
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <strong>⚠️ 注意事项：</strong>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>当前服务器防火墙阻止了外部直接访问（端口3000/5002）</li>
+                <li>服务在本地运行正常，API可通过 localhost:3000 访问</li>
+                <li>如需公网访问，建议配置反向代理（Nginx）或云服务器安全组</li>
+                <li>生产环境请使用 HTTPS 并配置认证</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; color: #666; font-size: 14px;">
+            <p>Reddit运营工具 - 人设与多账号管理系统 v1.0</p>
+            <p>生成时间: 2026-03-27</p>
+        </div>
+    </div>
+</body>
+</html>
