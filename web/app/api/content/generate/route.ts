@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Persona not found' }, { status: 404 });
     }
     
-    const persona = personaResult.rows[0];
+    const persona = personaResult.rows[0] as any;
     persona.content_strategy = JSON.parse(persona.content_strategy || '{}');
     persona.generation_config = JSON.parse(persona.generation_config || '{}');
     
