@@ -9,18 +9,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          900: '#312e81',
+        reddit: {
+          orange: '#FF4500',
+          dark: '#030303',
+          card: '#FFFFFF',
+          bg: '#F6F7F8',
+          border: '#E5E5E5',
+          hover: '#F0F0F0',
+          text: '#1A1A1B',
+          muted: '#787C7E',
+          downvote: '#BE2B1D',
+          upvote: '#FF4500',
+         社区蓝: '#0079D3',
         },
-        coral: '#FF6B6B',
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['IBM Plex Sans', 'Inter', 'sans-serif'],
+      },
+      borderRadius: {
+        DEFAULT: '4px',
+        lg: '8px',
+      },
+      boxShadow: {
+        'reddit': '0 1px 2px rgba(0,0,0,0.1)',
+        'reddit-hover': '0 2px 4px rgba(0,0,0,0.15)',
       },
     },
   },

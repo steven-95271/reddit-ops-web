@@ -3,5 +3,11 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "regions": ["hkg1"]
+  "regions": ["hkg1"],
+  "crons": [
+    {
+      "path": "/api/pipeline/cron",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

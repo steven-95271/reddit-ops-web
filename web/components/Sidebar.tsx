@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 
 const navItems = [
   { href: '/dashboard', icon: '📊', label: '概览', endpoint: 'dashboard' },
+  { href: '/personas', icon: '👤', label: '人设', endpoint: 'personas' },
   { href: '/candidates', icon: '🎯', label: '池子', endpoint: 'candidates' },
   { href: '/editor', icon: '✍️', label: '编辑', endpoint: 'editor' },
   { href: '/history', icon: '📋', label: '记录', endpoint: 'history' },
@@ -14,12 +15,15 @@ export default function Sidebar({ projectId }: { projectId?: string }) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-20 bg-white/40 backdrop-blur-xl border-r border-slate-200/50 flex flex-col items-center flex-shrink-0 fixed h-full z-20 py-8">
-      <div className="mb-12">
-        <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-xl shadow-lg">🚀</div>
+    <aside className="w-48 bg-white border-r border-[#E5E5E5] flex flex-col h-full">
+      <div className="p-4 border-b border-[#E5E5E5]">
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 bg-[#FF4500] rounded flex items-center justify-center text-lg font-bold text-white">R</div>
+          <div className="text-sm font-semibold text-[#1A1A1B]">Reddit Ops</div>
+        </div>
       </div>
 
-      <nav className="flex-1 w-full px-2 space-y-4">
+      <nav className="flex-1 py-4">
         {navItems.map(item => (
           <Link
             key={item.href}
@@ -32,10 +36,10 @@ export default function Sidebar({ projectId }: { projectId?: string }) {
         ))}
       </nav>
 
-      <div className="mt-auto px-2 w-full">
-        <button className="nav-link w-full text-slate-900 hover:text-coral transition-colors">
-          <span className="nav-icon">⚡</span>
-          <span className="nav-label">运行</span>
+      <div className="p-4 border-t border-[#E5E5E5]">
+        <button className="btn-primary w-full flex items-center justify-center gap-2">
+          <span>▶</span>
+          <span>运行流水线</span>
         </button>
       </div>
     </aside>
