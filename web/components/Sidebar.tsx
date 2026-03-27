@@ -15,11 +15,11 @@ export default function Sidebar({ projectId }: { projectId?: string }) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-48 bg-white border-r border-[#E5E5E5] flex flex-col h-full">
-      <div className="p-4 border-b border-[#E5E5E5]">
+    <aside className="w-48 bg-dark-card border-r border-dark-border flex flex-col h-full">
+      <div className="p-4 border-b border-dark-border">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-[#FF4500] rounded flex items-center justify-center text-lg font-bold text-white">R</div>
-          <div className="text-sm font-semibold text-[#1A1A1B]">Reddit Ops</div>
+          <div className="w-10 h-10 bg-reddit-orange rounded flex items-center justify-center text-lg font-bold text-white">R</div>
+          <div className="text-sm font-semibold text-dark-text">Reddit Ops</div>
         </div>
       </div>
 
@@ -36,7 +36,7 @@ export default function Sidebar({ projectId }: { projectId?: string }) {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-[#E5E5E5]">
+      <div className="p-4 border-t border-dark-border">
         <button className="btn-primary w-full flex items-center justify-center gap-2">
           <span>▶</span>
           <span>运行流水线</span>

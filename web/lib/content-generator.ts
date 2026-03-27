@@ -96,7 +96,7 @@ export async function generatePost(
   const maxTokens = persona.generation_config.max_tokens_post;
   
   try {
-    const response = await generateContent(systemPrompt, userPrompt, 'MiniMax-Text-01');
+    const response = await generateContent(systemPrompt, userPrompt, 'MiniMax-M2.5');
     
     // 解析生成的内容
     const parsed = parseGeneratedPost(response);
@@ -115,7 +115,7 @@ export async function generatePost(
       brand_mention_score: brandMentionScore,
       authenticity_score: authenticityScore,
       generation_metadata: {
-        model: 'MiniMax-Text-01',
+        model: 'MiniMax-M2.5',
         temperature,
       },
     };
@@ -284,7 +284,7 @@ export async function generateComment(
   const maxTokens = persona.generation_config.max_tokens_comment;
   
   try {
-    const response = await generateContent(systemPrompt, userPrompt, 'MiniMax-Text-01');
+    const response = await generateContent(systemPrompt, userPrompt, 'MiniMax-M2.5');
     
     // 解析评论内容
     const body = response.trim().replace(/^["']|["']$/g, '');
@@ -304,7 +304,7 @@ export async function generateComment(
       brand_mention_score: brandMentionScore,
       authenticity_score: authenticityScore,
       generation_metadata: {
-        model: 'MiniMax-Text-01',
+        model: 'MiniMax-M2.5',
         temperature,
       },
     };

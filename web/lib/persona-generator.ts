@@ -205,7 +205,7 @@ export async function generatePersonaFromPrototype(
 }`;
 
   try {
-    const response = await generateContent(systemPrompt, userPrompt, 'MiniMax-Text-01');
+    const response = await generateContent(systemPrompt, userPrompt, 'MiniMax-M2.5');
     
     // 提取JSON
     const jsonMatch = response.match(/\{[\s\S]*\}/);

@@ -19,14 +19,45 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, background_info, search_query, subreddits, auto_scrape_enabled, scrape_schedule_time, scrape_schedule_timezone } = body
+    const { 
+      name, 
+      background_info, 
+      search_query, 
+      subreddits, 
+      search_queries,
+      competitor_brands,
+      classification_keywords,
+      auto_scrape_enabled, 
+      scrape_schedule_time, 
+      scrape_schedule_timezone 
+    } = body
 
     const id = randomUUID()
     const subredditsStr = JSON.stringify(subreddits || [])
+    const searchQueriesStr = typeof search_query === 'string' ? search_query : JSON.stringify(search_query || [])
+    const competitorBrandsStr = JSON.stringify(competitor_brands || [])
+    const classificationKeywordsStr = JSON.stringify(classification_keywords || {})
 
     await sql`
-      INSERT INTO projects (id, name, background_info, search_query, subreddits, auto_scrape_enabled, scrape_schedule_time, scrape_schedule_timezone, created_at)
-      VALUES (${id}, ${name || 'New Project'}, ${background_info || ''}, ${search_query || 'open ear earbuds'}, ${subredditsStr}, ${auto_scrape_enabled || 0}, ${scrape_schedule_time || '09:00'}, ${scrape_schedule_timezone || 'Asia/Shanghai'}, ${new Date().toISOString()})
+      INSERT INTO projects (
+        id, name, background_info, search_query, subreddits, 
+        search_queries, competitor_brands, classification_keywords,
+        auto_scrape_enabled, scrape_schedule_time, scrape_schedule_timezone, created_at
+      )
+      VALUES (
+        ${id}, 
+        ${name || 'New Project'}, 
+        ${background_info || ''}, 
+        ${searchQueriesStr}, 
+        ${subredditsStr},
+        ${searchQueriesStr},
+        ${competitorBrandsStr},
+        ${classificationKeywordsStr},
+        ${auto_scrape_enabled || 0}, 
+        ${scrape_schedule_time || '09:00'}, 
+        ${scrape_schedule_timezone || 'Asia/Shanghai'}, 
+        ${new Date().toISOString()}
+      )
     `
 
     return NextResponse.json({ ok: true, project_id: id })

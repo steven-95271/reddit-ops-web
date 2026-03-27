@@ -200,7 +200,7 @@ ${commentsSample}
 输出严格的JSON格式。`;
 
   try {
-    const analysisText = await generateContent(systemPrompt, userPrompt, 'MiniMax-Text-01');
+    const analysisText = await generateContent(systemPrompt, userPrompt, 'MiniMax-M2.5');
     
     // 提取JSON部分
     const jsonMatch = analysisText.match(/\{[\s\S]*\}/);

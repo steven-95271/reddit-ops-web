@@ -1,7 +1,7 @@
 import { sql } from '@vercel/postgres'
 
 export async function initDb() {
-  // 1. 项目表（已存在，保持不变）
+  // 1. 项目表（扩展搜索策略字段）
   await sql`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
@@ -9,6 +9,9 @@ export async function initDb() {
       background_info TEXT,
       search_query TEXT,
       subreddits TEXT,
+      search_queries TEXT,
+      competitor_brands TEXT,
+      classification_keywords TEXT,
       auto_scrape_enabled INTEGER DEFAULT 0,
       scrape_schedule_time TEXT DEFAULT '09:00',
       scrape_schedule_timezone TEXT DEFAULT 'Asia/Shanghai',
@@ -119,6 +122,28 @@ export async function initDb() {
     )
   `
 
+  // 7. 抓取历史记录表（新增）
+  await sql`
+    CREATE TABLE IF NOT EXISTS scrape_history (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      apify_run_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      search_query TEXT,
+      search_subreddit TEXT,
+      sort_order TEXT,
+      time_filter TEXT,
+      max_posts INTEGER,
+      status TEXT DEFAULT 'running',
+      dataset_id TEXT,
+      posts_count INTEGER DEFAULT 0,
+      started_at TEXT,
+      finished_at TEXT,
+      created_at TEXT,
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `
+
   console.log('Database initialized successfully')
 }
 
@@ -134,6 +159,16 @@ export async function migrateDb() {
     await sql`ALTER TABLE personas ADD COLUMN IF NOT EXISTS prototype_analysis TEXT`
   } catch (e) {
     console.log('Personas table migration:', e)
+  }
+  
+  // 检查并添加projects表的新列
+  try {
+    await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS search_queries TEXT`
+    await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS competitor_brands TEXT`
+    await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS classification_keywords TEXT`
+    await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS suggested_keywords TEXT`
+  } catch (e) {
+    console.log('Projects table migration:', e)
   }
   
   console.log('Database migration completed')

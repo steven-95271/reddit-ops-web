@@ -1,5 +1,5 @@
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || 'sk-cp-ay979ATn71LK52-r38V5tum9nCH4SBe5RuMBXYYog9E4I1f6D-yFhmnAp7GaGAPTf-Ib7kwlqBOd6wktwdoRSlZf8Ykbmvaq8CQhokcxUeMzuiFiZBOs910'
-const MINIMAX_API_URL = 'https://api.minimaxi.chat/v1/text/chatcompletion_v2'
+const MINIMAX_API_URL = 'https://api.minimaxi.com/v1/text/chatcompletion_v2'
 
 interface MiniMaxMessage {
   role: 'user' | 'assistant' | 'system'
@@ -16,7 +16,7 @@ interface MiniMaxRequest {
 export async function generateContent(
   systemPrompt: string,
   userPrompt: string,
-  model: string = 'MiniMax-Text-01'
+  model: string = 'MiniMax-M2.5'
 ): Promise<string> {
   const response = await fetch(MINIMAX_API_URL, {
     method: 'POST',
