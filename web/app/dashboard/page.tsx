@@ -51,58 +51,58 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-6 mb-10">
-        <div className="glass-card flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl mb-4">📥</div>
-          <div className="stat-value" id="stat-posts">{stats?.total_posts || 0}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div className="reddit-panel p-4 flex flex-col items-center text-center">
+          <div className="w-10 h-10 rounded-lg bg-[#F6F7F8] flex items-center justify-center text-lg mb-3">📥</div>
+          <div className="stat-value text-2xl">{stats?.total_posts || 0}</div>
           <div className="stat-label">今日抓取</div>
         </div>
-        <div className="glass-card flex flex-col items-center text-center border-t-4 border-coral">
-          <div className="w-12 h-12 rounded-2xl bg-coral/10 text-coral flex items-center justify-center text-xl mb-4">🎯</div>
-          <div className="stat-value" id="stat-candidates">{stats?.total_candidates || 0}</div>
+        <div className="reddit-panel p-4 flex flex-col items-center text-center border-t-4 border-[#FF4500]">
+          <div className="w-10 h-10 rounded-lg bg-[#FF4500]/10 text-[#FF4500] flex items-center justify-center text-lg mb-3">🎯</div>
+          <div className="stat-value text-2xl">{stats?.total_candidates || 0}</div>
           <div className="stat-label">核心候选</div>
         </div>
-        <div className="glass-card flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl mb-4">✍️</div>
-          <div className="stat-value" id="stat-content">{stats?.total_content || 0}</div>
+        <div className="reddit-panel p-4 flex flex-col items-center text-center">
+          <div className="w-10 h-10 rounded-lg bg-[#F6F7F8] flex items-center justify-center text-lg mb-3">✍️</div>
+          <div className="stat-value text-2xl">{stats?.total_content || 0}</div>
           <div className="stat-label">AI 已生成</div>
         </div>
-        <div className="glass-card flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl mb-4">✅</div>
-          <div className="stat-value" id="stat-approved">{(stats?.approved || 0) + (stats?.published || 0)}</div>
+        <div className="reddit-panel p-4 flex flex-col items-center text-center">
+          <div className="w-10 h-10 rounded-lg bg-[#F6F7F8] flex items-center justify-center text-lg mb-3">✅</div>
+          <div className="stat-value text-2xl">{(stats?.approved || 0) + (stats?.published || 0)}</div>
           <div className="stat-label">已通过审核</div>
         </div>
       </div>
 
       {/* Main Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart Panel */}
-        <div className="lg:col-span-2 glass-card">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-black text-slate-900">趋势分布</h2>
+        <div className="lg:col-span-2 reddit-panel p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-[#1A1A1B]">趋势分布</h2>
             {stats?.is_mock && (
-              <span className="badge badge-coral animate-pulse">🧪 模拟模式</span>
+              <span className="badge badge-orange animate-pulse">🧪 模拟模式</span>
             )}
           </div>
-          <div className="relative h-72 flex items-center justify-center text-slate-400">
+          <div className="h-64 flex flex-col items-center justify-center text-[#787C7E]">
             <span className="text-4xl mb-4">📊</span>
-            <p className="font-bold">暂无今日洞察，请执行流水线</p>
+            <p className="font-medium">暂无今日洞察，请执行流水线</p>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="glass-card">
-          <h2 className="text-xl font-black text-slate-900 mb-8">关注维度</h2>
-          <div className="space-y-4">
+        <div className="reddit-panel p-6">
+          <h2 className="text-lg font-bold text-[#1A1A1B] mb-6">关注维度</h2>
+          <div className="space-y-3">
             {Object.entries(categoryNames).map(([code, name]) => (
-              <div key={code} className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
-                <div className="flex items-center gap-4">
+              <div key={code} className="flex items-center justify-between p-3 bg-[#F6F7F8] rounded-lg hover:bg-[#E5E5E5] transition-colors">
+                <div className="flex items-center gap-3">
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: categoryColors[code] }} />
                   <div>
-                    <div className="text-sm font-bold text-slate-800">{name}</div>
+                    <div className="text-sm font-medium text-[#1A1A1B]">{name}</div>
                   </div>
                 </div>
-                <span className="text-lg font-black text-slate-900">
+                <span className="text-base font-bold text-[#1A1A1B]">
                   {stats?.category_counts?.[code] || 0}
                 </span>
               </div>

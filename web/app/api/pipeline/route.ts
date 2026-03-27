@@ -42,22 +42,32 @@ export async function GET(request: NextRequest) {
   try {
     const projectId = request.nextUrl.searchParams.get('project_id')
 
-    let query = sql`
-      SELECT 
-        id as project_id,
-        name as project_name,
-        auto_scrape_enabled,
-        scrape_schedule_time as schedule_time,
-        scrape_schedule_timezone as schedule_timezone,
-        created_at as last_run
-      FROM projects
-    `
-
+    let result;
+    
     if (projectId) {
-      query = sql`${query} WHERE id = ${projectId}`
+      result = await sql`
+        SELECT 
+          id as project_id,
+          name as project_name,
+          auto_scrape_enabled,
+          scrape_schedule_time as schedule_time,
+          scrape_schedule_timezone as schedule_timezone,
+          created_at as last_run
+        FROM projects
+        WHERE id = ${projectId}
+      `;
+    } else {
+      result = await sql`
+        SELECT 
+          id as project_id,
+          name as project_name,
+          auto_scrape_enabled,
+          scrape_schedule_time as schedule_time,
+          scrape_schedule_timezone as schedule_timezone,
+          created_at as last_run
+        FROM projects
+      `;
     }
-
-    const result = await query
 
     const jobs: PipelineJob[] = result.rows.map(row => ({
       id: `pipeline_${row.project_id}`,

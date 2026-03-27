@@ -169,7 +169,7 @@ function buildPostUserPrompt(
   
   // 根据概率选择内容类型
   const rand = Math.random();
-  let contentType: string;
+  let contentType: string = 'story_share';
   let cumulative = 0;
   for (const [type, prob] of Object.entries(contentTypeDist)) {
     cumulative += prob;
@@ -178,7 +178,6 @@ function buildPostUserPrompt(
       break;
     }
   }
-  contentType = contentType || 'story_share';
   
   const contentTypeDesc: Record<string, string> = {
     'story_share': '分享你的使用经历/故事',

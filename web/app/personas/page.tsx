@@ -137,7 +137,7 @@ export default function PersonasPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="page-title mb-2">👤 人设矩阵</h1>
         <p className="text-[#787C7E]">基于AI生成逼真的Reddit运营人设</p>
@@ -146,7 +146,7 @@ export default function PersonasPage() {
       {/* Project Info */}
       <div className="reddit-panel p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">📋 项目信息</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-[#787C7E] mb-1">产品名称 *</label>
             <input
@@ -167,7 +167,7 @@ export default function PersonasPage() {
               onChange={e => setProjectInfo({ ...projectInfo, category: e.target.value })}
             />
           </div>
-          <div className="col-span-2">
+          <div className="md:col-span-2">
             <label className="block text-sm text-[#787C7E] mb-1">目标受众</label>
             <input
               type="text"
@@ -192,7 +192,7 @@ export default function PersonasPage() {
         {loading ? (
           <div className="text-center py-8 text-[#787C7E]">加载中...</div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map(template => (
               <div
                 key={template.id}

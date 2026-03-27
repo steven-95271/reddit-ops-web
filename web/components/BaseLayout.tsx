@@ -57,7 +57,7 @@ export default function BaseLayout({ children }: { children: React.ReactNode }) 
             </button>
           </header>
 
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-4 md:p-6 max-w-[1400px]">
             {children}
           </main>
         </div>

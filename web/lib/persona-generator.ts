@@ -395,7 +395,8 @@ function generateDifferentiationNotes(prototype: ProfileAnalysis, generated: any
   // 对比内容类型差异
   const contentTypes = generated.content_strategy?.post?.content_types;
   if (contentTypes) {
-    const maxType = Object.entries(contentTypes).sort((a, b) => b[1] - a[1])[0];
+    const entries = Object.entries(contentTypes) as [string, number][];
+    const maxType = entries.sort((a, b) => b[1] - a[1])[0];
     notes.push(`侧重${maxType[0] === 'story_share' ? '故事分享' : maxType[0] === 'question' ? '提问求助' : maxType[0] === 'review' ? '产品测评' : maxType[0]}内容`);
   }
   

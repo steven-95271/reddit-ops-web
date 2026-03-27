@@ -13,36 +13,150 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'project_id required' }, { status: 400 });
     }
     
-    let query = sql`
-      SELECT 
-        cgt.*,
-        p.name as persona_name,
-        p.username as persona_username,
-        p.avatar_emoji,
-        p.avatar_color,
-        sp.title as source_title,
-        sp.subreddit as source_subreddit
-      FROM content_generation_tasks cgt
-      LEFT JOIN personas p ON cgt.persona_id = p.id
-      LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
-      WHERE cgt.project_id = ${projectId}
-    `;
+    // Base query with all conditions using parameterized queries
+    let result;
     
-    if (status !== 'all') {
-      query = sql`${query} AND cgt.human_approval_status = ${status}`;
+    if (status !== 'all' && contentType && personaId) {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.human_approval_status = ${status}
+          AND cgt.content_type = ${contentType}
+          AND cgt.persona_id = ${personaId}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else if (status !== 'all' && contentType) {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.human_approval_status = ${status}
+          AND cgt.content_type = ${contentType}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else if (status !== 'all' && personaId) {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.human_approval_status = ${status}
+          AND cgt.persona_id = ${personaId}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else if (contentType && personaId) {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.content_type = ${contentType}
+          AND cgt.persona_id = ${personaId}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else if (status !== 'all') {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.human_approval_status = ${status}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else if (contentType) {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.content_type = ${contentType}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else if (personaId) {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+          AND cgt.persona_id = ${personaId}
+        ORDER BY cgt.created_at DESC
+      `;
+    } else {
+      result = await sql`
+        SELECT 
+          cgt.*,
+          p.name as persona_name,
+          p.username as persona_username,
+          p.avatar_emoji,
+          p.avatar_color,
+          sp.title as source_title,
+          sp.subreddit as source_subreddit
+        FROM content_generation_tasks cgt
+        LEFT JOIN personas p ON cgt.persona_id = p.id
+        LEFT JOIN scraped_posts sp ON cgt.source_content_id = sp.id
+        WHERE cgt.project_id = ${projectId}
+        ORDER BY cgt.created_at DESC
+      `;
     }
-    
-    if (contentType) {
-      query = sql`${query} AND cgt.content_type = ${contentType}`;
-    }
-    
-    if (personaId) {
-      query = sql`${query} AND cgt.persona_id = ${personaId}`;
-    }
-    
-    query = sql`${query} ORDER BY cgt.created_at DESC`;
-    
-    const result = await query;
     
     // 统计信息
     const statsResult = await sql`
@@ -92,55 +206,40 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'content_id and action required' }, { status: 400 });
     }
     
-    let newStatus: string;
-    let updateFields: any = {};
+    const reviewedAt = new Date().toISOString();
     
-    switch (action) {
-      case 'approve':
-        newStatus = 'approved';
-        break;
-      case 'reject':
-        newStatus = 'rejected';
-        updateFields.rejection_reason = rejection_reason || '';
-        break;
-      case 'edit':
-        newStatus = 'approved';
-        updateFields.edited_title = edited_title;
-        updateFields.edited_body = edited_body;
-        updateFields.was_edited = true;
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    if (action === 'approve') {
+      await sql`
+        UPDATE content_generation_tasks 
+        SET human_approval_status = 'approved', reviewed_at = ${reviewedAt}
+        WHERE id = ${content_id}
+      `;
+    } else if (action === 'reject') {
+      await sql`
+        UPDATE content_generation_tasks 
+        SET human_approval_status = 'rejected', rejection_reason = ${rejection_reason || ''}, reviewed_at = ${reviewedAt}
+        WHERE id = ${content_id}
+      `;
+    } else if (action === 'edit') {
+      await sql`
+        UPDATE content_generation_tasks 
+        SET human_approval_status = 'approved', 
+            edited_title = ${edited_title}, 
+            edited_body = ${edited_body}, 
+            was_edited = true, 
+            reviewed_at = ${reviewedAt}
+        WHERE id = ${content_id}
+      `;
+    } else {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-    
-    // 构建动态SQL
-    let setClause = `human_approval_status = '${newStatus}', reviewed_at = '${new Date().toISOString()}'`;
-    
-    if (updateFields.edited_title) {
-      setClause += `, generated_title = '${updateFields.edited_title.replace(/'/g, "''")}'`;
-    }
-    if (updateFields.edited_body) {
-      setClause += `, generated_body = '${updateFields.edited_body.replace(/'/g, "''")}'`;
-    }
-    if (updateFields.was_edited) {
-      setClause += `, was_edited = true`;
-    }
-    if (updateFields.rejection_reason) {
-      setClause += `, rejection_reason = '${updateFields.rejection_reason.replace(/'/g, "''")}'`;
-    }
-    
-    await sql`
-      UPDATE content_generation_tasks 
-      SET ${sql.unsafe(setClause)}
-      WHERE id = ${content_id}
-    `;
     
     return NextResponse.json({
       success: true,
       message: action === 'approve' ? '内容已批准' : 
                action === 'reject' ? '内容已拒绝' : '内容已编辑并批准',
       content_id,
-      new_status: newStatus,
+      new_status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'approved',
     });
   } catch (error) {
     console.error('Error updating content status:', error);
