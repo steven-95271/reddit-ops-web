@@ -6,7 +6,7 @@
 
 ## 🎯 流程概览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📝 输入"]
         I1[项目背景<br/>产品特点/卖点]
@@ -66,7 +66,7 @@ flowchart TB
     class I1,I2,I3 input
     class V1,R1_1,R1_2,R1_3,R1_4,R1_5,R1_6,R1_7,R2_1,R2_2,R2_3,R2_4,R2_5,R3_1,R3_2,R3_3,R3_4,R3_5 ai
     class O1,O2 output
-```
+</div>
 
 ---
 
@@ -87,7 +87,7 @@ flowchart TB
 
 ### 第1轮：扩展关键词
 
-```mermaid
+<div class="mermaid">
 sequenceDiagram
     participant User as 用户
     participant AI as MiniMax AI
@@ -104,10 +104,10 @@ sequenceDiagram
         System->>System: 从文本提取
     end
     System-->>User: 展示扩展结果
-```
+</div>
 
 **AI Prompt 示例**：
-```
+</div>
 你是一个 Reddit 营销专家。基于以下信息生成关键词建议：
 项目背景: Oladance开放式耳机，主打全天佩戴舒适
 种子关键词: open ear earbuds
@@ -117,12 +117,12 @@ sequenceDiagram
 2. 长尾关键词（更具体的搜索词5-10个）
 3. 竞品关键词（竞品相关的3-5个）
 4. 场景关键词（使用场景相关的5-8个）
-```
+</div>
 
 ### 第2轮：推荐 Subreddits
 
 **AI Prompt 示例**：
-```
+</div>
 基于目标人群（运动爱好者、通勤族）
 和扩展后的关键词列表，
 推荐最相关的 Reddit 板块。
@@ -133,12 +133,12 @@ sequenceDiagram
     "medium_relevance": ["r/gadgets", ...],
     "reasoning": "推荐理由"
 }
-```
+</div>
 
 ### 第3轮：生成搜索策略
 
 **输出配置**：
-```json
+</div>json
 {
     "search_queries": [
         "open ear earbuds",
@@ -158,7 +158,7 @@ sequenceDiagram
     "maxItems": 100,
     "min_score": 5
 }
-```
+</div>
 
 ---
 
@@ -179,7 +179,7 @@ sequenceDiagram
 
 ## 🔄 状态流转
 
-```mermaid
+<div class="mermaid">
 stateDiagram-v2
     [*] --> draft: 创建
     draft --> active: 点击确认
@@ -187,7 +187,7 @@ stateDiagram-v2
 
     note right of draft: 可编辑、可删除
     note right of active: 不可编辑
-```
+</div>
 
 ---
 

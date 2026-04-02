@@ -6,7 +6,7 @@
 
 ## 🎯 流程概览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📝 输入"]
         I1[产品特点<br/>开放聆听/运动安全]
@@ -60,7 +60,7 @@ flowchart TB
     class D1,D1_1,D1_2,D1_3,D1_4,D2,D2_1,D2_2,D2_3,D2_4,D3,D3_1,D3_2,D3_3,D3_4 persona
     class C1,C2,C3,C4,C5,C6 custom
     class O1,O2,O3 output
-```
+</div>
 
 ---
 
@@ -68,7 +68,7 @@ flowchart TB
 
 ### SportyRunner 🏃
 
-```mermaid
+<div class="mermaid">
 persona
     name: SportyRunner
     emoji: 🏃
@@ -80,11 +80,11 @@ persona
     post_types: ["experience_share", "gear_recommendation", "training_tips"]
     platform: "Reddit"
     subreddits: ["r/running", "r/Fitness", "r/runningshoes"]
-```
+</div>
 
 ### AudioGeek 🎧
 
-```mermaid
+<div class="mermaid">
 persona
     name: AudioGeek
     emoji: 🎧
@@ -96,11 +96,11 @@ persona
     post_types: ["review", "comparison", "technical_analysis"]
     platform: "Reddit"
     subreddits: ["r/audiophile", "r/headphones", "r/earbuds"]
-```
+</div>
 
 ### CommuterLife 🚇
 
-```mermaid
+<div class="mermaid">
 persona
     name: CommuterLife
     emoji: 🚇
@@ -112,7 +112,7 @@ persona
     post_types: ["daily_routine", "product_recommendation", "life_hacks"]
     platform: "Reddit"
     subreddits: ["r/commuting", "r/gadgets", "r/BudgetAudiophile"]
-```
+</div>
 
 ---
 
@@ -145,7 +145,7 @@ persona
 
 ## 🔗 多平台支持
 
-```mermaid
+<div class="mermaid">
 flowchart LR
     subgraph PLATFORMS["支持的平台"]
         R[Reddit]
@@ -164,13 +164,13 @@ flowchart LR
     E1 & E2 --> T
     E2 & E3 --> I
     E2 & E3 --> L
-```
+</div>
 
 ---
 
 ## 🔄 状态管理
 
-```mermaid
+<div class="mermaid">
 stateDiagram-v2
     [*] --> active: 创建默认人设
 
@@ -183,7 +183,7 @@ stateDiagram-v2
         AudioGeek --> AudioGeek: 编辑
         CommuterLife --> CommuterLife: 编辑
     }
-```
+</div>
 
 ---
 

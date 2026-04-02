@@ -6,7 +6,7 @@
 
 ## 🎯 流程概览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📝 输入"]
         I1[87条帖子<br/>P2抓取结果]
@@ -72,7 +72,7 @@ flowchart TB
     class S4,S5,S6,S7 score
     class C1,C2,C3,C4,C5,C6,C7 class
     class OUTPUT,O1,O2 output
-```
+</div>
 
 ---
 
@@ -80,9 +80,9 @@ flowchart TB
 
 ### Hot Score 计算公式
 
-```
+</div>
 Hot Score = 热度分×30% + 时效分×25% + 互动深度×20% + 关键词匹配×15% + 增长速率×10%
-```
+</div>
 
 ### 各维度计算规则
 
@@ -98,7 +98,7 @@ Hot Score = 热度分×30% + 时效分×25% + 互动深度×20% + 关键词匹�
 
 ## 🏷️ 五维分类系统
 
-```mermaid
+<div class="mermaid">
 mindmap
     root((分类))
         A 结构型测评
@@ -146,7 +146,7 @@ mindmap
             obsessed
             game changer
             用途:热度借势
-```
+</div>
 
 ### 分类统计示例
 
@@ -162,7 +162,7 @@ mindmap
 
 ## 📊 评分等级
 
-```mermaid
+<div class="mermaid">
 gantt
     title 评分等级划分
     dateFormat X
@@ -173,7 +173,7 @@ gantt
     A级 (≥50)     :0, 50
     B级 (≥30)     :0, 30
     C级 (<30)     :0, 30
-```
+</div>
 
 | 等级 | 分数范围 | 颜色 | 说明 |
 |------|----------|------|------|
@@ -186,7 +186,7 @@ gantt
 
 ## 🔄 候选筛选流程
 
-```mermaid
+<div class="mermaid">
 flowchart LR
     A[87条帖子] --> B{评分≥B级?}
     B -- 否 --> C[排除]
@@ -196,7 +196,7 @@ flowchart LR
     F --> G{Composite≥0.4?}
     G -- 是 --> H[12条候选热帖]
     G -- 否 --> I[排除]
-```
+</div>
 
 ### 特殊加分规则
 
@@ -209,7 +209,7 @@ flowchart LR
 
 ## 📈 关键词云
 
-```mermaid
+<div class="mermaid">
 wordcloud
     title 候选热帖关键词云
     comfor:45
@@ -222,7 +222,7 @@ wordcloud
     workout:18
     commute:15
     comfort:12
-```
+</div>
 
 ---
 

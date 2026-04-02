@@ -6,7 +6,7 @@
 
 ## 🎯 流程概览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📝 输入"]
         I1[6条内容<br/>status: pending]
@@ -73,7 +73,7 @@ flowchart TB
     class PUBLISH,P1,P2,P3,P4,P5 publish
     class TRACK,T1,T2,T3,T4,T5,RETENTION,RM1,RM2,RM3,RM4 track
     class OUTPUT,O1,O2,O3 output
-```
+</div>
 
 ---
 
@@ -81,7 +81,7 @@ flowchart TB
 
 ### 状态机
 
-```mermaid
+<div class="mermaid">
 stateDiagram-v2
     [*] --> pending: AI生成
 
@@ -95,7 +95,7 @@ stateDiagram-v2
     published --> [*]
 
     rejected --> [*]: 🗄️ 归档
-```
+</div>
 
 ### 审核决策说明
 
@@ -118,7 +118,7 @@ stateDiagram-v2
 
 ### 发布配置
 
-```json
+</div>json
 {
   "publishing": {
     "manual": {
@@ -136,7 +136,7 @@ stateDiagram-v2
     }
   }
 }
-```
+</div>
 
 ---
 
@@ -144,7 +144,7 @@ stateDiagram-v2
 
 ### 追踪维度
 
-```mermaid
+<div class="mermaid">
 mindmap
     root((品牌追踪))
         自有品牌
@@ -166,11 +166,11 @@ mindmap
             mention_context
             原文链接
             发布时间
-```
+</div>
 
 ### 追踪数据示例
 
-```json
+</div>json
 {
   "brand_mentions": [
     {
@@ -183,7 +183,7 @@ mindmap
     }
   ]
 }
-```
+</div>
 
 ### 情感分析规则
 
@@ -199,7 +199,7 @@ mindmap
 
 ### 保留策略
 
-```mermaid
+<div class="mermaid">
 timeline
     title 数据保留策略
         0-7天 : 全部保留
@@ -213,7 +213,7 @@ timeline
         31天+ : 自动清理
             删除 raw_posts
             保留统计聚合
-```
+</div>
 
 ### 清理规则
 
@@ -229,7 +229,7 @@ timeline
 
 ## 🔄 每日自动化循环
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph SCHEDULE["⏰ 每日定时触发"]
         S1[09:00 AM<br/>Asia/Shanghai]
@@ -249,7 +249,7 @@ flowchart TB
 
     SCHEDULE --> PIPELINE
     P4 --> NOTIFY
-```
+</div>
 
 ---
 

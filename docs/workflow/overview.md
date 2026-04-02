@@ -6,7 +6,7 @@
 
 ## 🎯 系统总览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📥 输入层"]
         I1[项目背景<br/>产品信息/卖点]
@@ -85,13 +85,13 @@ flowchart TB
 
     class P1,P2,P3,P4,P5 phase
     class I1,I2 input
-```
+</div>
 
 ---
 
 ## 🔄 数据流转总览
 
-```mermaid
+<div class="mermaid">
 flowchart LR
     subgraph PHASES["阶段"]
         P1[🎯 P1<br/>项目配置]
@@ -128,7 +128,7 @@ flowchart LR
 
     class P1,P2,P3,P4,P5 phase
     class D1,D2,D3,D4,D5,D6 data
-```
+</div>
 
 ---
 

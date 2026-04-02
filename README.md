@@ -2,9 +2,7 @@
 
 > 智能抓取 Reddit 热点、多维评分筛选、AI 内容生成与审核，构建数据驱动的社媒运营闭环。
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org) [![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com) [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
@@ -12,19 +10,19 @@
 
 | 阶段 | 名称 | 说明 |
 |------|------|------|
-| [L1 总览](workflow/overview.md) | 流程总览 | 6阶段完整流程图 |
-| [P1](workflow/p1-config.md) | 项目配置 | AI 3轮对话生成搜索策略 |
-| [P2](workflow/p2-scraping.md) | 内容抓取 | APIFY + Mock 双模式 |
-| [P3](workflow/p3-analysis.md) | 热帖识别 | 5维评分 + 自动分类 |
-| [P4-1](workflow/p4-persona.md) | 人设设计 | 3种默认人设 |
-| [P4-2](workflow/p4-content.md) | 内容创作 | AI 人设风格生成 |
-| [P5](workflow/p5-publish.md) | 发布追踪 | 审核工作流 + 品牌追踪 |
+| [L1 总览](docs/workflow/overview.md) | 流程总览 | 6阶段完整流程图 |
+| [P1](docs/workflow/p1-config.md) | 项目配置 | AI 3轮对话生成搜索策略 |
+| [P2](docs/workflow/p2-scraping.md) | 内容抓取 | APIFY + Mock 双模式 |
+| [P3](docs/workflow/p3-analysis.md) | 热帖识别 | 5维评分 + 自动分类 |
+| [P4-1](docs/workflow/p4-persona.md) | 人设设计 | 3种默认人设 |
+| [P4-2](docs/workflow/p4-content.md) | 内容创作 | AI 人设风格生成 |
+| [P5](docs/workflow/p5-publish.md) | 发布追踪 | 审核工作流 + 品牌追踪 |
 
 ---
 
 ## 📊 系统架构
 
-<div class="mermaid">
+```mermaid
 flowchart TB
     subgraph Frontend["🌐 前端层"]
         F1[Flask/Jinja2<br/>生产环境]
@@ -45,13 +43,13 @@ flowchart TB
 
     Frontend <--> Backend
     Backend <--> Data
-</div>
+```
 
 ---
 
 ## 🔄 核心流程
 
-<div class="mermaid">
+```mermaid
 flowchart LR
     subgraph Input["📥 输入"]
         I1[产品信息]
@@ -91,7 +89,7 @@ flowchart LR
     P2 --> P3
     P3 --> P4
     P4 --> P5
-</div>
+```
 
 ---
 
@@ -110,7 +108,7 @@ flowchart LR
 
 ## 🚀 快速开始
 
-</div>bash
+```bash
 # 克隆仓库
 git clone https://github.com/steven-95271/reddit-ops-web.git
 cd reddit-ops-web
@@ -122,36 +120,16 @@ pip install -r requirements.txt
 
 # 启动服务
 python app.py
-</div>
+```
 
 访问 http://127.0.0.1:5000
 
 ---
 
-## 📂 文档目录
+## 🌐 在线文档
 
-</div>
-docs/
-├── index.md                 # 本文件
-├── workflow/
-│   ├── overview.md         # L1 流程总览
-│   ├── p1-config.md       # P1 项目配置
-│   ├── p2-scraping.md     # P2 内容抓取
-│   ├── p3-analysis.md     # P3 热帖识别
-│   ├── p4-persona.md      # P4-1 人设设计
-│   ├── p4-content.md      # P4-2 内容创作
-│   └── p5-publish.md      # P5 发布追踪
-└── architecture/
-    └── system-design.md    # 系统架构设计
-</div>
-
----
-
-## 🔗 相关链接
-
-- 🌐 [GitHub 仓库](https://github.com/steven-95271/reddit-ops-web)
-- 📖 [项目 README](https://steven-95271.github.io/reddit-ops-web/)
-- 📊 [Mermaid Live Editor](https://mermaid.live/edit#https://raw.githubusercontent.com/steven-95271/reddit-ops-web/main/docs/index.md) - 在线预览图表
+- 📖 [在线文档站](https://steven-95271.github.io/reddit-ops-web/) - 包含完整流程图
+- 📊 [Mermaid Live Editor](https://mermaid.live/edit#https://raw.githubusercontent.com/steven-95271/reddit-ops-web/main/docs/index.md) - 在线编辑图表
 
 ---
 

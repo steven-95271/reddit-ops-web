@@ -6,7 +6,7 @@
 
 ## 🎯 流程概览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📝 输入"]
         I1[12条候选热帖<br/>Top 4精选]
@@ -73,7 +73,7 @@ flowchart TB
     class T2_1,T2_3,T2_4,T2_5,T2_6 template
     class L3 decision
     class OUT1,OUT2 output
-```
+</div>
 
 ---
 
@@ -81,7 +81,7 @@ flowchart TB
 
 ### System Prompt 构建
 
-```mermaid
+<div class="mermaid">
 sequenceDiagram
     participant User as 系统
     participant AI as GPT-4o-mini
@@ -96,13 +96,13 @@ sequenceDiagram
     Note over AI: 标题：TITLE: xxx
     Note over AI: 正文：BODY: xxx
     Note over AI: 标签：TAGS: tag1, tag2, tag3
-```
+</div>
 
 ### 生成内容示例
 
 **人设：AudioGeek 🎧**
 
-```
+</div>
 TITLE: After 2 weeks with Oladance OWS Pro, here's my take vs Shokz OpenFit
 
 BODY:
@@ -121,7 +121,7 @@ Oladance: 16h (real world). Shokz: 8h.
 If you prioritize sound quality above everything, Oladance. If you do hardcore trail runs, Shokz.
 
 Tags: openEar, Oladance, Shokz, comparison, review
-```
+</div>
 
 ---
 
@@ -139,7 +139,7 @@ Tags: openEar, Oladance, Shokz, comparison, review
 
 ### 模板示例
 
-```json
+</div>json
 {
   "A_comparison": {
     "title": "My take on {product} after {time_period}: {comparison_phrase}",
@@ -147,13 +147,13 @@ Tags: openEar, Oladance, Shokz, comparison, review
     "tags": ["review", "{category}"]
   }
 }
-```
+</div>
 
 ---
 
 ## 🔄 生成循环详解
 
-```mermaid
+<div class="mermaid">
 flowchart LR
     subgraph LOOP["生成循环"]
         A[人设1] --> B[帖子1]
@@ -169,11 +169,11 @@ flowchart LR
 
     D --> R1
     E --> R2
-```
+</div>
 
 ### 轮流匹配规则
 
-```
+</div>
 人设 A → 帖子 1, 2
 人设 B → 帖子 2, 3
 人设 C → 帖子 3, 4
@@ -182,13 +182,13 @@ flowchart LR
 1. 每条帖子至少被2个人设使用
 2. 每条内容关联不同角度
 3. 避免内容重复
-```
+</div>
 
 ---
 
 ## 📊 输出内容结构
 
-```json
+</div>json
 {
   "id": "uuid-xxx",
   "persona_id": "persona_001",
@@ -207,7 +207,7 @@ flowchart LR
   "generated_at": "2024-03-01T10:00:00Z",
   "method": "openai"
 }
-```
+</div>
 
 ---
 

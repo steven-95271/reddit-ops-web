@@ -6,7 +6,7 @@
 
 ## 🎯 流程概览
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     subgraph INPUT["📝 输入"]
         I1[parent_card_id<br/>P1 产品卡 ID]
@@ -90,7 +90,7 @@ flowchart TB
     class MOCK_MODE,M1,M2,M3,M4 mock
     class REAL_MODE,R1,R4,R4_1,R4_2,R4_3,R4_4,R5,R7,R8,R9,R11,R12 real
     class O1,O2 output
-```
+</div>
 
 ---
 
@@ -118,14 +118,14 @@ flowchart TB
 
 ### 搜索参数
 
-```json
+</div>json
 {
     "searches": "open ear earbuds OR running headphones OR Shokz alternative",
     "subreddits": ["headphones", "running", "earbuds", "audiophile", "commuting"],
     "maxItems": 100,
     "sort": "new"
 }
-```
+</div>
 
 ### 过滤规则
 
@@ -142,18 +142,18 @@ flowchart TB
 
 ### 板块分布
 
-```mermaid
+<div class="mermaid">
 pie title 抓取数据分布 (87条)
     "r/headphones" : 32
     "r/running" : 28
     "r/audiophile" : 15
     "r/earbuds" : 8
     "r/commuting" : 4
-```
+</div>
 
 ### 原始数据结构
 
-```json
+</div>json
 {
     "posts": [
         {
@@ -170,13 +170,13 @@ pie title 抓取数据分布 (87条)
     "total_posts": 87,
     "scraped_at": "2024-03-01T09:00:00Z"
 }
-```
+</div>
 
 ---
 
 ## 🔄 状态流转
 
-```mermaid
+<div class="mermaid">
 stateDiagram-v2
     [*] --> draft: 创建抓取任务
     draft --> pending: 提交到 APIFY
@@ -189,7 +189,7 @@ stateDiagram-v2
 
     note right of draft: Mock模式直接完成
     note right of pending: 真实模式需等待
-```
+</div>
 
 ---
 
