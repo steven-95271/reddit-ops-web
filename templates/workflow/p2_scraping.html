@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}P2 内容抓取 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- 面包屑导航 -->
+    <nav class="mb-6 text-sm">
+        <ol class="list-none p-0 flex items-center space-x-2">
+            <li><a href="/" class="text-blue-600 hover:text-blue-800">首页</a></li>
+            <li><span class="text-gray-400">/</span></li>
+            <li><a href="/workflow?project_id={{ project.id }}" class="text-blue-600 hover:text-blue-800">流程工作流</a></li>
+            <li><span class="text-gray-400">/</span></li>
+            <li class="text-gray-600">P2 内容抓取</li>
+        </ol>
+    </nav>
+
+    <!-- 页面标题 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">P2: 内容抓取</h1>
+        <p class="text-gray-600">基于 P1 配置执行 Reddit 数据抓取</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- 左侧：抓取配置 -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-6">抓取配置</h2>
+
+                <!-- 上游配置预览 -->
+                <div id="parent-config" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="font-medium text-gray-700 mb-3">P1 配置来源</h3>
+                    <div id="loading-config" class="text-center py-4">
+                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                        <p class="text-sm text-gray-500 mt-2">加载配置中...</p>
+                    </div>
+                    
+                    <div id="config-content" class="hidden space-y-3">
+                        <div>
+                            <span class="text-sm text-gray-500">搜索词：</span>
+                            <div id="search-queries" class="flex flex-wrap gap-1 mt-1"></div>
+                        </div>
+                        
+                        <div>
+                            <span class="text-sm text-gray-500">目标板块：</span>
+                            <div id="subreddits" class="flex flex-wrap gap-1 mt-1"></div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <span class="text-gray-500">时间范围：</span>
+                                <span id="time-filter" class="font-medium">-</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">最大数量：</span>
+                                <span id="post-limit" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 抓取按钮 -->
+                <div id="action-area">
+                    <div id="ready-state">
+                        <button onclick="startScraping()" id="start-btn" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            开始抓取（Mock 模式）
+                        </button>
+                        
+                        <p class="text-xs text-gray-500 mt-3 text-center">当前使用 Mock 数据进行演示</p>
+                    </div>
+
+                    <div id="running-state" class="hidden">
+                        <div class="text-center py-4">
+                            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                            <h3 class="font-medium text-gray-800 mb-2">正在抓取数据...</h3>
+                            <p class="text-sm text-gray-500 mb-4" id="progress-text">准备中</p>
+                            
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="completed-state" class="hidden">
+                        <div class="text-center py-4">
+                            <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 text-green-600 rounded-full mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-medium text-gray-800 mb-2">抓取完成！</h3>
+                            <p class="text-sm text-gray-500" id="completion-text">成功获取 0 条帖子</p>
+                        </div>
+
+                        <button onclick="goToP3()" class="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center font-medium mt-4">
+                            进入 P3 分析
+                            <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：抓取结果 -->
+        <div class="lg:col-span-2">
+            <div id="result-container" class="hidden">
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="text-sm text-gray-500 mb-1">抓取帖子数</div>
+                        <div class="text-3xl font-bold text-blue-600" id="stat-total">0</div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="text-sm text-gray-500 mb-1">涉及板块</div>
+                        <div class="text-3xl font-bold text-green-600" id="stat-subreddits">0</div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="text-sm text-gray-500 mb-1">平均互动</div>
+                        <div class="text-3xl font-bold text-purple-600" id="stat-engagement">0</div>
+                    </div>
+                </div>
+
+                <!-- 板块分布 -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">板块分布</h3>
+                    
+                    <div id="subreddit-stats" class="space-y-3">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+
+                <!-- 帖子预览 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">帖子预览</h3>
+                        <span class="text-sm text-gray-500" id="preview-count">显示前 10 条</span>
+                    </div>
+                    
+                    <div id="posts-preview" class="space-y-4">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 空状态 -->
+            <div id="empty-state" class="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-800 mb-2">准备抓取</h3>
+                <p class="text-gray-500 mb-4">点击左侧"开始抓取"按钮开始获取数据</p>
+                
+                <div class="text-sm text-gray-400">
+                    <p>将基于以下策略抓取：</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li>搜索关键词匹配</li>
+                        <li>目标 Subreddit 筛选</li>
+                        <li>时间范围过滤</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const PROJECT_ID = '{{ project.id }}';
+const PARENT_CARD_ID = '{{ parent_card_id }}';
+let currentCardId = '{{ card_id }}' || null;
+
+// 页面加载时获取 P1 配置
+document.addEventListener('DOMContentLoaded', async function() {
+    if (PARENT_CARD_ID) {
+        await loadParentConfig();
+    }
+    if (currentCardId) {
+        await loadScrapingResult();
+    }
+});
+
+// 加载 P1 配置
+async function loadParentConfig() {
+    try {
+        const response = await fetch(`/api/product-cards/${PARENT_CARD_ID}`);
+        const card = await response.json();
+        
+        if (card && card.card_data) {
+            const strategy = card.card_data.generated_data?.search_strategy || {};
+            
+            // 显示配置
+            document.getElementById('loading-config').classList.add('hidden');
+            document.getElementById('config-content').classList.remove('hidden');
+            
+            // 搜索词
+            const queries = strategy.search_queries || [];
+            document.getElementById('search-queries').innerHTML = queries.map(q => 
+                `<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">${q}</span>`
+            ).join('');
+            
+            // Subreddits
+            const subs = strategy.subreddits || [];
+            document.getElementById('subreddits').innerHTML = subs.map(s => 
+                `<span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">r/${s}</span>`
+            ).join('');
+            
+            // 其他参数
+            document.getElementById('time-filter').textContent = strategy.time_filter || 'week';
+            document.getElementById('post-limit').textContent = strategy.post_limit || 100;
+        }
+    } catch (error) {
+        console.error('Failed to load parent config:', error);
+    }
+}
+
+// 开始抓取
+async function startScraping() {
+    document.getElementById('ready-state').classList.add('hidden');
+    document.getElementById('running-state').classList.remove('hidden');
+    
+    // 模拟进度
+    let progress = 0;
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+        
+        progressBar.style.width = `${progress}%`;
+        
+        if (progress < 30) {
+            progressText.textContent = '连接 API...';
+        } else if (progress < 60) {
+            progressText.textContent = '抓取数据中...';
+        } else {
+            progressText.textContent = '解析处理中...';
+        }
+    }, 500);
+    
+    try {
+        const response = await fetch('/api/workflow/p2/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: PROJECT_ID,
+                parent_card_id: PARENT_CARD_ID,
+                use_mock: true
+            })
+        });
+        
+        const data = await response.json();
+        
+        clearInterval(progressInterval);
+        
+        if (data.ok) {
+            currentCardId = data.card_id;
+            progressBar.style.width = '100%';
+            progressText.textContent = '完成！';
+            
+            setTimeout(() => {
+                document.getElementById('running-state').classList.add('hidden');
+                document.getElementById('completed-state').classList.remove('hidden');
+                loadScrapingResult();
+            }, 500);
+        } else {
+            alert('抓取失败：' + (data.error || '未知错误'));
+            document.getElementById('running-state').classList.add('hidden');
+            document.getElementById('ready-state').classList.remove('hidden');
+        }
+    } catch (error) {
+        clearInterval(progressInterval);
+        console.error('Error:', error);
+        alert('请求失败，请稍后重试');
+        document.getElementById('running-state').classList.add('hidden');
+        document.getElementById('ready-state').classList.remove('hidden');
+    }
+}
+
+// 加载抓取结果
+async function loadScrapingResult() {
+    if (!currentCardId) return;
+    
+    try {
+        const response = await fetch(`/api/product-cards/${currentCardId}`);
+        const card = await response.json();
+        
+        if (card && card.card_data) {
+            const scrapingData = card.card_data.scraping_data || {};
+            const posts = scrapingData.posts || [];
+            const totalPosts = scrapingData.total_posts || 0;
+            const subredditBreakdown = scrapingData.subreddit_breakdown || {};
+            
+            // 更新统计
+            document.getElementById('stat-total').textContent = totalPosts;
+            document.getElementById('stat-subreddits').textContent = Object.keys(subredditBreakdown).length;
+            
+            const avgEngagement = posts.length > 0 
+                ? Math.round(posts.reduce((sum, p) => sum + (p.upvotes || 0) + (p.comments || 0), 0) / posts.length)
+                : 0;
+            document.getElementById('stat-engagement').textContent = avgEngagement;
+            
+            // 更新完成文本
+            document.getElementById('completion-text').textContent = `成功获取 ${totalPosts} 条帖子`;
+            
+            // 板块分布
+            const subredditStats = document.getElementById('subreddit-stats');
+            const sortedSubs = Object.entries(subredditBreakdown).sort((a, b) => b[1] - a[1]);
+            subredditStats.innerHTML = sortedSubs.map(([sub, count]) => {
+                const percentage = totalPosts > 0 ? Math.round((count / totalPosts) * 100) : 0;
+                return `
+                    <div class="flex items-center">
+                        <span class="w-24 font-medium">r/${sub}</span>
+                        <div class="flex-1 mx-3">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                        <span class="text-sm text-gray-500 w-16 text-right">${count} (${percentage}%)</span>
+                    </div>
+                `;
+            }).join('');
+            
+            // 帖子预览
+            const previewContainer = document.getElementById('posts-preview');
+            const previewPosts = posts.slice(0, 10);
+            previewContainer.innerHTML = previewPosts.map(post => `
+                <div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">r/${post.subreddit}</span>
+                            <span class="text-sm text-gray-500">u/${post.author}</span>
+                        </div>
+                        <div class="flex items-center space-x-3 text-sm text-gray-500">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"></path>
+                                </svg>
+                                ${post.upvotes}
+                            </span>
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                                ${post.comments}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <h4 class="font-medium text-gray-800 mb-2 line-clamp-2">${post.title}</h4>
+                    
+                    <p class="text-sm text-gray-600 line-clamp-2">${post.body?.substring(0, 200) || ''}...</p>
+                </div>
+            `).join('');
+            
+            // 显示结果容器
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('result-container').classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Failed to load result:', error);
+    }
+}
+
+// 跳转到 P3
+function goToP3() {
+    if (currentCardId) {
+        window.location.href = `/workflow/p3?project_id=${PROJECT_ID}&parent_card_id=${currentCardId}`;
+    }
+}
+</script>
+{% endblock %}

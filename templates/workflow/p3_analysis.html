@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block title %}P3 热帖识别 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- 面包屑导航 -->
+    <nav class="mb-6 text-sm">
+        <ol class="list-none p-0 flex items-center space-x-2">
+            <li><a href="/" class="text-blue-600 hover:text-blue-800">首页</a></li>
+            <li><span class="text-gray-400">/</span></li>
+            <li><a href="/workflow?project_id={{ project.id }}" class="text-blue-600 hover:text-blue-800">流程工作流</a></li>
+            <li><span class="text-gray-400">/</span></li>
+            <li class="text-gray-600">P3 热帖识别</li>
+        </ol>
+    </nav>
+
+    <!-- 页面标题 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">P3: 热帖识别</h1>
+        <p class="text-gray-600">自动评分、分类，筛选高价值候选热帖</p>
+    </div>
+
+    <!-- 分析按钮区域 -->
+    <div id="analyze-section" class="mb-8">
+        <div id="ready-analyze" class="bg-blue-50 border-2 border-blue-200 rounded-lg p-8 text-center">
+            <svg class="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">准备分析</h3>
+            <p class="text-gray-600 mb-6">基于 P2 抓取的 {{ posts_count }} 条帖子进行评分和分类</p>
+            
+            <button onclick="startAnalysis()" id="analyze-btn" class="inline-flex items-center px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-lg">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                开始分析
+            </button>
+        </div>
+
+        <div id="analyzing" class="hidden bg-white rounded-lg shadow-md p-12 text-center">
+            <div class="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-6"></div>
+            
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">正在分析数据...</h3>
+            <p class="text-gray-500" id="analyze-status">计算评分...</p>
+        </div>
+    </div>
+
+    <!-- 结果展示区域 -->
+    <div id="results-section" class="hidden">
+        <!-- 统计概览 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-500 mb-1">分析帖子数</div>
+                <div class="text-3xl font-bold text-gray-800" id="stat-total">0</div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-500 mb-1">候选热帖</div>
+                <div class="text-3xl font-bold text-green-600" id="stat-candidates">0</div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-500 mb-1">S/A 级帖子</div>
+                <div class="text-3xl font-bold text-blue-600" id="stat-high">0</div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-500 mb-1">分类覆盖</div>
+                <div class="text-3xl font-bold text-purple-600" id="stat-categories">0</div>
+            </div>
+        </div>
+
+        <!-- 分类统计 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">分类分布</h3>
+                
+                <div id="category-distribution" class="space-y-3">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">评分分布</h3>
+                
+                <div id="score-distribution" class="space-y-3">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 候选热帖列表 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold text-gray-800">候选热帖</h3>
+                
+                <div class="flex items-center space-x-4">
+                    <select id="category-filter" onchange="filterCandidates()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">全部分类</option>
+                        <option value="A">结构型测评</option>
+                        <option value="B">场景痛点</option>
+                        <option value="C">观点争议</option>
+                        <option value="D">竞品KOL</option>
+                        <option value="E">平台趋势</option>
+                    </select>
+                    
+                    <select id="score-filter" onchange="filterCandidates()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">全部等级</option>
+                        <option value="S">S 级</option>
+                        <option value="A">A 级</option>
+                        <option value="B">B 级</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="candidates-list" class="space-y-4">
+                <!-- 动态生成 -->
+            </div>
+            
+            <div class="mt-6 flex justify-center">
+                <button onclick="loadMoreCandidates()" id="load-more-btn" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                    加载更多
+                </button>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex justify-end space-x-4">
+            <button onclick="window.location.href='/workflow?project_id={{ project.id }}'" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                返回流程
+            </button>
+            
+            <button onclick="confirmAndExport()" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                确认并导出
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+const PROJECT_ID = '{{ project.id }}';
+const PARENT_CARD_ID = '{{ parent_card_id }}';
+let currentCardId = '{{ card_id }}' || null;
+let allCandidates = [];
+let displayedCount = 0;
+const PAGE_SIZE = 10;
+
+// 开始分析
+async function startAnalysis() {
+    document.getElementById('ready-analyze').classList.add('hidden');
+    document.getElementById('analyzing').classList.remove('hidden');
+    
+    const statusText = document.getElementById('analyze-status');
+    
+    try {
+        statusText.textContent = '计算评分...';
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        statusText.textContent = '分类打标...';
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        statusText.textContent = '生成统计...';
+        
+        const response = await fetch('/api/workflow/p3/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: PROJECT_ID,
+                parent_card_id: PARENT_CARD_ID
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            currentCardId = data.card_id;
+            await loadAnalysisResults();
+            
+            document.getElementById('analyzing').classList.add('hidden');
+            document.getElementById('results-section').classList.remove('hidden');
+        } else {
+            alert('分析失败：' + (data.error || '未知错误'));
+            document.getElementById('analyzing').classList.add('hidden');
+            document.getElementById('ready-analyze').classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('请求失败，请稍后重试');
+        document.getElementById('analyzing').classList.add('hidden');
+        document.getElementById('ready-analyze').classList.remove('hidden');
+    }
+}
+
+// 加载分析结果
+async function loadAnalysisResults() {
+    if (!currentCardId) return;
+    
+    try {
+        const response = await fetch(`/api/product-cards/${currentCardId}`);
+        const card = await response.json();
+        
+        if (card && card.card_data) {
+            const analysisData = card.card_data.analysis_data || {};
+            const stats = analysisData.category_stats || {};
+            
+            // 更新统计
+            document.getElementById('stat-total').textContent = analysisData.total_posts || 0;
+            document.getElementById('stat-candidates').textContent = analysisData.candidates_count || 0;
+            
+            const scoreDist = stats.score_distribution || {};
+            document.getElementById('stat-high').textContent = (scoreDist.S || 0) + (scoreDist.A || 0);
+            
+            const catDist = stats.category_distribution || {};
+            const activeCategories = Object.values(catDist).filter(c => c.count > 0).length;
+            document.getElementById('stat-categories').textContent = activeCategories;
+            
+            // 分类分布
+            const categoryColors = {
+                'A': 'bg-blue-500',
+                'B': 'bg-red-500',
+                'C': 'bg-yellow-500',
+                'D': 'bg-purple-500',
+                'E': 'bg-green-500'
+            };
+            
+            document.getElementById('category-distribution').innerHTML = Object.entries(catDist)
+                .filter(([_, info]) => info.count > 0)
+                .map(([cat, info]) => {
+                    const total = analysisData.total_posts || 1;
+                    const percentage = Math.round((info.count / total) * 100);
+                    return `
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 rounded-full ${categoryColors[cat] || 'bg-gray-400'} mr-3"></div>
+                            <span class="w-24 font-medium">${info.name}</span>
+                            <div class="flex-1 mx-3">
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="${categoryColors[cat] || 'bg-gray-400'} h-2 rounded-full" style="width: ${percentage}%"></div>
+                                </div>
+                            </div>
+                            <span class="text-sm text-gray-500 w-20 text-right">${info.count} (${percentage}%)</span>
+                        </div>
+                    `;
+                }).join('');
+            
+            // 评分分布
+            const scoreLabels = { 'S': 'S 级', 'A': 'A 级', 'B': 'B 级', 'C': 'C 级' };
+            const scoreColors = { 'S': 'bg-yellow-500', 'A': 'bg-blue-500', 'B': 'bg-green-500', 'C': 'bg-gray-400' };
+            
+            document.getElementById('score-distribution').innerHTML = Object.entries(scoreDist)
+                .map(([level, count]) => {
+                    const total = analysisData.total_posts || 1;
+                    const percentage = Math.round((count / total) * 100);
+                    return `
+                        <div class="flex items-center">
+                            <span class="w-12 font-medium">${scoreLabels[level]}</span>
+                            <div class="flex-1 mx-3">
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="${scoreColors[level]} h-2 rounded-full" style="width: ${percentage}%"></div>
+                                </div>
+                            </div>
+                            <span class="text-sm text-gray-500 w-20 text-right">${count} (${percentage}%)</span>
+                        </div>
+                    `;
+                }).join('');
+            
+            // 候选列表
+            allCandidates = analysisData.candidates_preview || [];
+            displayedCount = 0;
+            displayCandidates();
+        }
+    } catch (error) {
+        console.error('Failed to load results:', error);
+    }
+}
+
+// 显示候选热帖
+function displayCandidates() {
+    const categoryFilter = document.getElementById('category-filter').value;
+    const scoreFilter = document.getElementById('score-filter').value;
+    
+    let filtered = allCandidates;
+    
+    if (categoryFilter) {
+        filtered = filtered.filter(c => c.category === categoryFilter);
+    }
+    
+    if (scoreFilter) {
+        filtered = filtered.filter(c => c.score_level === scoreFilter);
+    }
+    
+    const toDisplay = filtered.slice(0, displayedCount + PAGE_SIZE);
+    displayedCount = toDisplay.length;
+    
+    const container = document.getElementById('candidates-list');
+    
+    if (toDisplay.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500">没有符合条件的候选热帖</div>';
+        return;
+    }
+    
+    const scoreColors = {
+        'S': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        'A': 'bg-blue-100 text-blue-800 border-blue-300',
+        'B': 'bg-green-100 text-green-800 border-green-300',
+        'C': 'bg-gray-100 text-gray-800 border-gray-300'
+    };
+    
+    const categoryLabels = {
+        'A': '结构型测评',
+        'B': '场景痛点',
+        'C': '观点争议',
+        'D': '竞品KOL',
+        'E': '平台趋势'
+    };
+    
+    container.innerHTML = toDisplay.map(candidate => `
+        <div class="border rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 rounded border text-sm font-medium ${scoreColors[candidate.score_level] || scoreColors.C}">
+                        ${candidate.score_level} 级
+                    </span>
+                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm">
+                        ${categoryLabels[candidate.category] || '未分类'}
+                    </span>
+                    <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-sm">
+                        ${candidate.subreddit}
+                    </span>
+                </div>
+                
+                <div class="flex items-center space-x-3 text-sm text-gray-500">
+                    <span>评分: ${candidate.composite_score.toFixed(2)}</span>
+                </div>
+            </div>
+            
+            <h4 class="font-semibold text-gray-800 mb-2">${candidate.title}</h4>
+            
+            <p class="text-sm text-gray-600 mb-3 line-clamp-2">${candidate.body?.substring(0, 200) || ''}</p>
+            
+            <div class="flex items-center justify-between text-sm">
+                <div class="flex items-center space-x-4 text-gray-500">
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"></path>
+                        </svg>
+                        ${candidate.upvotes}
+                    </span>
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        ${candidate.comments}
+                    </span>
+                </div>
+                
+                <span class="text-xs text-gray-500">${candidate.reasoning}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    // 显示/隐藏加载更多按钮
+    document.getElementById('load-more-btn').style.display = 
+        displayedCount < filtered.length ? 'block' : 'none';
+}
+
+// 筛选候选
+function filterCandidates() {
+    displayedCount = 0;
+    displayCandidates();
+}
+
+// 加载更多
+function loadMoreCandidates() {
+    displayCandidates();
+}
+
+// 确认并导出
+async function confirmAndExport() {
+    if (!currentCardId) return;
+    
+    try {
+        // 确认卡片
+        await fetch(`/api/product-cards/${currentCardId}/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirmed_by: 'user' })
+        });
+        
+        // 导出
+        const exportResponse = await fetch(`/api/product-cards/${currentCardId}/export`, {
+            method: 'POST'
+        });
+        
+        const exportData = await exportResponse.json();
+        
+        if (exportData.ok) {
+            alert(`已确认并导出到：${exportData.export_path}`);
+            window.location.href = `/workflow?project_id=${PROJECT_ID}`;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('操作失败');
+    }
+}
+
+// 如果已有卡片数据，直接显示结果
+if (currentCardId) {
+    document.getElementById('analyze-section').classList.add('hidden');
+    document.getElementById('results-section').classList.remove('hidden');
+    loadAnalysisResults();
+}
+</script>
+{% endblock %}

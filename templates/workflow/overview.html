@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}流程工作流 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- 页面标题 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">产品卡流程工作流</h1>
+        <p class="text-gray-600">基于 Data Card 的 Reddit 内容运营全流程管理</p>
+    </div>
+
+    <!-- 项目信息卡 -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800">{{ project.name }}</h2>
+                <p class="text-sm text-gray-500 mt-1">{{ project.background_info or '暂无项目描述' }}</p>
+            </div>
+            <div class="text-right">
+                <div class="text-sm text-gray-500">当前阶段</div>
+                <div class="text-2xl font-bold text-blue-600" id="current-phase">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 流程图可视化 -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h3 class="text-lg font-semibold text-gray-800 mb-6">流程进度</h3>
+        
+        <div class="relative">
+            <!-- 流程线 -->
+            <div class="absolute top-8 left-0 right-0 h-1 bg-gray-200 rounded"></div>
+            <div class="absolute top-8 left-0 h-1 bg-blue-500 rounded transition-all duration-500" id="progress-line" style="width: 0%"></div>
+            
+            <!-- 流程节点 -->
+            <div class="relative flex justify-between">
+                <!-- P1: 项目配置 -->
+                <div class="flex flex-col items-center w-1/6 phase-node" data-phase="P1">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200" id="node-p1">
+                        1
+                    </div>
+                    <span class="mt-2 text-sm font-medium text-gray-600">项目配置</span>
+                    <span class="text-xs text-gray-400">P1</span>
+                    <div class="mt-2" id="status-p1">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待开始</span>
+                    </div>
+                </div>
+
+                <!-- P2: 内容抓取 -->
+                <div class="flex flex-col items-center w-1/6 phase-node" data-phase="P2">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200" id="node-p2">
+                        2
+                    </div>
+                    <span class="mt-2 text-sm font-medium text-gray-600">内容抓取</span>
+                    <span class="text-xs text-gray-400">P2</span>
+                    <div class="mt-2" id="status-p2">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待开始</span>
+                    </div>
+                </div>
+
+                <!-- P3: 热帖识别 -->
+                <div class="flex flex-col items-center w-1/6 phase-node" data-phase="P3">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200" id="node-p3">
+                        3
+                    </div>
+                    <span class="mt-2 text-sm font-medium text-gray-600">热帖识别</span>
+                    <span class="text-xs text-gray-400">P3</span>
+                    <div class="mt-2" id="status-p3">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待开始</span>
+                    </div>
+                </div>
+
+                <!-- P4-1: 人设设计 -->
+                <div class="flex flex-col items-center w-1/6 phase-node" data-phase="P4-1">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200" id="node-p4-1">
+                        4
+                    </div>
+                    <span class="mt-2 text-sm font-medium text-gray-600">人设设计</span>
+                    <span class="text-xs text-gray-400">P4-1</span>
+                    <div class="mt-2" id="status-p4-1">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待实现</span>
+                    </div>
+                </div>
+
+                <!-- P4-2: 内容创作 -->
+                <div class="flex flex-col items-center w-1/6 phase-node" data-phase="P4-2">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200" id="node-p4-2">
+                        5
+                    </div>
+                    <span class="mt-2 text-sm font-medium text-gray-600">内容创作</span>
+                    <span class="text-xs text-gray-400">P4-2</span>
+                    <div class="mt-2" id="status-p4-2">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待实现</span>
+                    </div>
+                </div>
+
+                <!-- P5: 发布追踪 -->
+                <div class="flex flex-col items-center w-1/6 phase-node" data-phase="P5">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200" id="node-p5">
+                        6
+                    </div>
+                    <span class="mt-2 text-sm font-medium text-gray-600">发布追踪</span>
+                    <span class="text-xs text-gray-400">P5</span>
+                    <div class="mt-2" id="status-p5">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待实现</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按钮区域 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- 开始新流程 -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">开始新流程</h3>
+            <p class="text-sm text-gray-600 mb-4">从零开始创建 P1 项目配置卡</p>
+            <a href="/workflow/p1?project_id={{ project.id }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                创建 P1 配置
+            </a>
+        </div>
+
+        <!-- 继续当前流程 -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">继续当前流程</h3>
+            <p class="text-sm text-gray-600 mb-4" id="continue-desc">跳转到当前阶段</p>
+            <button onclick="continueWorkflow()" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+                继续
+            </button>
+        </div>
+
+        <!-- 模拟试跑 -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">模拟试跑</h3>
+            <p class="text-sm text-gray-600 mb-4">使用 Mock 数据快速体验全流程</p>
+            <a href="/workflow/mock-run?project_id={{ project.id }}" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                开始试跑
+            </a>
+        </div>
+    </div>
+
+    <!-- 产品卡历史列表 -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">产品卡历史</h3>
+            <span class="text-sm text-gray-500" id="card-count">加载中...</span>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3">阶段</th>
+                        <th class="px-4 py-3">名称</th>
+                        <th class="px-4 py-3">状态</th>
+                        <th class="px-4 py-3">创建时间</th>
+                        <th class="px-4 py-3">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="cards-table-body">
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-500">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+const PROJECT_ID = '{{ project.id }}';
+const PHASE_NAMES = {
+    'P1': '项目配置',
+    'P2': '内容抓取',
+    'P3': '热帖识别',
+    'P4-1': '人设设计',
+    'P4-2': '内容创作',
+    'P5': '发布追踪'
+};
+const PHASE_ROUTES = {
+    'P1': '/workflow/p1',
+    'P2': '/workflow/p2',
+    'P3': '/workflow/p3',
+    'P4-1': '/workflow/p4-1',
+    'P4-2': '/workflow/p4-2',
+    'P5': '/workflow/p5'
+};
+
+// 加载流程状态
+async function loadWorkflowStatus() {
+    try {
+        const response = await fetch(`/api/workflow/status?project_id=${PROJECT_ID}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error:', data.error);
+            return;
+        }
+        
+        // 更新当前阶段显示
+        const currentPhase = data.current_phase || 'P1';
+        document.getElementById('current-phase').textContent = `${PHASE_NAMES[currentPhase]} (${currentPhase})`;
+        
+        // 更新进度线
+        const phaseIndex = ['P1', 'P2', 'P3', 'P4-1', 'P4-2', 'P5'].indexOf(currentPhase);
+        const progress = phaseIndex >= 0 ? (phaseIndex / 5) * 100 : 0;
+        document.getElementById('progress-line').style.width = `${progress}%`;
+        
+        // 更新节点状态
+        updatePhaseNodes(data);
+        
+        // 更新继续按钮描述
+        updateContinueButton(currentPhase);
+        
+        // 加载产品卡列表
+        loadProductCards(data.phase_cards);
+        
+    } catch (error) {
+        console.error('Failed to load workflow status:', error);
+    }
+}
+
+// 更新阶段节点状态
+function updatePhaseNodes(data) {
+    const phases = ['P1', 'P2', 'P3', 'P4-1', 'P4-2', 'P5'];
+    const completed = data.completed_phases || [];
+    const current = data.current_phase;
+    
+    phases.forEach(phase => {
+        const node = document.getElementById(`node-${phase}`);
+        const statusDiv = document.getElementById(`status-${phase}`);
+        
+        if (completed.includes(phase)) {
+            // 已完成
+            node.className = 'w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-green-500 text-white border-4 border-green-500';
+            node.innerHTML = '✓';
+            statusDiv.innerHTML = '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">已完成</span>';
+        } else if (phase === current) {
+            // 当前
+            node.className = 'w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-blue-500 text-white border-4 border-blue-500 animate-pulse';
+            statusDiv.innerHTML = '<span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">进行中</span>';
+        } else if (['P4-1', 'P4-2', 'P5'].includes(phase)) {
+            // 待实现阶段
+            node.className = 'w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 bg-gray-100 text-gray-400 border-4 border-gray-200';
+            statusDiv.innerHTML = '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">待实现</span>';
+        }
+    });
+}
+
+// 更新继续按钮
+function updateContinueButton(currentPhase) {
+    const desc = document.getElementById('continue-desc');
+    desc.textContent = `当前在 ${PHASE_NAMES[currentPhase]} 阶段，点击继续`;
+}
+
+// 继续流程
+function continueWorkflow() {
+    // 获取当前阶段并跳转
+    const currentPhase = document.getElementById('current-phase').textContent.match(/\((.*?)\)/)?.[1] || 'P1';
+    const route = PHASE_ROUTES[currentPhase];
+    if (route) {
+        window.location.href = `${route}?project_id=${PROJECT_ID}`;
+    }
+}
+
+// 加载产品卡列表
+function loadProductCards(phaseCards) {
+    const tbody = document.getElementById('cards-table-body');
+    let allCards = [];
+    
+    // 收集所有卡片
+    Object.entries(phaseCards || {}).forEach(([phase, cards]) => {
+        cards.forEach(card => {
+            allCards.push({...card, phase});
+        });
+    });
+    
+    // 按时间排序
+    allCards.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    // 更新计数
+    document.getElementById('card-count').textContent = `共 ${allCards.length} 张产品卡`;
+    
+    // 渲染表格
+    if (allCards.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                    暂无产品卡，点击"开始新流程"创建第一张产品卡
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = allCards.map(card => {
+        const statusColors = {
+            'draft': 'bg-yellow-100 text-yellow-700',
+            'active': 'bg-green-100 text-green-700',
+            'completed': 'bg-blue-100 text-blue-700'
+        };
+        const statusLabels = {
+            'draft': '草稿',
+            'active': '已确认',
+            'completed': '已完成'
+        };
+        
+        return `
+            <tr class="border-b hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-gray-900">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        ${card.phase}
+                    </span>
+                </td>
+                <td class="px-4 py-3">${card.card_name || '未命名'}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-1 text-xs rounded-full ${statusColors[card.status] || 'bg-gray-100 text-gray-700'}">
+                        ${statusLabels[card.status] || card.status}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-gray-500">${new Date(card.created_at).toLocaleString('zh-CN')}</td>
+                <td class="px-4 py-3">
+                    <a href="${PHASE_ROUTES[card.phase] || '#'}?project_id=${PROJECT_ID}&card_id=${card.id}" 
+                       class="text-blue-600 hover:text-blue-800 font-medium">
+                        查看
+                    </a>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', loadWorkflowStatus);
+</script>
+{% endblock %}

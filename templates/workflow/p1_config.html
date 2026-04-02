@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}P1 项目配置 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- 面包屑导航 -->
+    <nav class="mb-6 text-sm">
+        <ol class="list-none p-0 flex items-center space-x-2">
+            <li><a href="/" class="text-blue-600 hover:text-blue-800">首页</a></li>
+            <li><span class="text-gray-400">/</span></li>
+            <li><a href="/workflow?project_id={{ project.id }}" class="text-blue-600 hover:text-blue-800">流程工作流</a></li>
+            <li><span class="text-gray-400">/</span></li>
+            <li class="text-gray-600">P1 项目配置</li>
+        </ol>
+    </nav>
+
+    <!-- 页面标题 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">P1: 项目配置</h1>
+        <p class="text-gray-600">输入项目信息，AI 将生成关键词策略和搜索方案</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- 左侧：输入表单 -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                    <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold mr-3">1</span>
+                    项目信息
+                </h2>
+
+                <form id="p1-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">项目背景 *</label>
+                        <textarea name="project_background" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="描述您的项目背景、产品特点...">{{ card_data.generated_data.project_background if card_data else '' }}</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">目标人群 *</label>
+                        <input type="text" name="target_audience" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如：跑步爱好者、健身人群" value="{{ card_data.generated_data.target_audience if card_data else '' }}">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">核心卖点</label>
+                        <input type="text" name="unique_selling_points" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="用逗号分隔，例如：开放聆听，舒适佩戴，运动安全" value="{{ ', '.join(card_data.generated_data.unique_selling_points) if card_data and card_data.generated_data.unique_selling_points else '' }}">
+                        <p class="text-xs text-gray-500 mt-1">多个卖点请用逗号分隔</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">种子关键词 *</label>
+                        <input type="text" name="seed_keywords" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="用逗号分隔，例如：open ear earbuds, bone conduction" value="{{ ', '.join(card_data.generated_data.seed_keywords) if card_data and card_data.generated_data.seed_keywords else '' }}">
+                        <p class="text-xs text-gray-500 mt-1">AI 将基于这些关键词进行扩展</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">品牌名称</label>
+                            <input type="text" name="brand_names" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="您的品牌" value="{{ ', '.join(card_data.generated_data.brand_names) if card_data and card_data.generated_data.brand_names else '' }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">竞品品牌</label>
+                            <input type="text" name="competitor_brands" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="用逗号分隔" value="{{ ', '.join(card_data.generated_data.competitor_brands) if card_data and card_data.generated_data.competitor_brands else '' }}">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex space-x-3">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            生成配置
+                        </button>
+                        
+                        <button type="button" onclick="window.location.href='/workflow?project_id={{ project.id }}'" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            取消
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 右侧：生成结果展示 -->
+        <div class="space-y-6">
+            <!-- 加载中提示 -->
+            <div id="loading-indicator" class="hidden bg-white rounded-lg shadow-md p-12 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                <h3 class="text-lg font-medium text-gray-800 mb-2">AI 正在生成配置...</h3>
+                <p class="text-gray-500">正在进行多轮对话优化，请稍候</p>
+            </div>
+
+            <!-- 结果展示区域 -->
+            <div id="result-container" class="{% if not card_data %}hidden{% endif %}">
+                <!-- 关键词建议 -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-bold mr-3">2</span>
+                        AI 生成内容
+                    </h3>
+
+                    <div class="space-y-4">
+                        <!-- 核心关键词 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-medium text-gray-700">核心关键词</h4>
+                                <span class="text-xs text-gray-500" id="core-count">0 个</span>
+                            </div>
+                            <div id="core-keywords" class="flex flex-wrap gap-2">
+                                {% if card_data and card_data.generated_data.core_keywords %}
+                                    {% for kw in card_data.generated_data.core_keywords %}
+                                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">{{ kw }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 长尾关键词 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-medium text-gray-700">长尾关键词</h4>
+                                <span class="text-xs text-gray-500" id="longtail-count">0 个</span>
+                            </div>
+                            <div id="longtail-keywords" class="flex flex-wrap gap-2">
+                                {% if card_data and card_data.generated_data.long_tail_keywords %}
+                                    {% for kw in card_data.generated_data.long_tail_keywords %}
+                                    <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">{{ kw }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 场景关键词 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-medium text-gray-700">场景关键词</h4>
+                                <span class="text-xs text-gray-500" id="scenario-count">0 个</span>
+                            </div>
+                            <div id="scenario-keywords" class="flex flex-wrap gap-2">
+                                {% if card_data and card_data.generated_data.scenario_keywords %}
+                                    {% for kw in card_data.generated_data.scenario_keywords %}
+                                    <span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">{{ kw }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 推荐的 Subreddits -->
+                        <div class="border-t pt-4 mt-4">
+                            <h4 class="font-medium text-gray-700 mb-3">推荐的 Subreddits</h4>
+                            <div id="subreddit-suggestions" class="space-y-2">
+                                {% if card_data and card_data.generated_data.subreddit_suggestions %}
+                                    {% for sub in card_data.generated_data.subreddit_suggestions.high_relevance %}
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div class="flex items-center">
+                                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                            <span class="font-medium">r/{{ sub.name }}</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500">{{ sub.reason }}</span>
+                                    </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 搜索策略 -->
+                        <div class="border-t pt-4 mt-4">
+                            <h4 class="font-medium text-gray-700 mb-3">APIFY 搜索策略</h4>
+                            <div id="search-strategy" class="bg-gray-50 rounded-lg p-4 text-sm">
+                                {% if card_data and card_data.generated_data.search_strategy %}
+                                    <div class="space-y-2">
+                                        <div><span class="text-gray-500">搜索词：</span> {{ ', '.join(card_data.generated_data.search_strategy.search_queries) }}</div>
+                                        <div><span class="text-gray-500">目标板块：</span> {{ ', '.join(card_data.generated_data.search_strategy.subreddits) }}</div>
+                                        <div><span class="text-gray-500">时间范围：</span> {{ card_data.generated_data.search_strategy.time_filter }}</div>
+                                        <div><span class="text-gray-500">最大数量：</span> {{ card_data.generated_data.search_strategy.post_limit }} 条</div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div id="action-buttons" class="{% if not card_id %}hidden{% endif %} flex space-x-3">
+                    <button onclick="confirmCard()" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center font-medium">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        确认并进入 P2
+                    </button>
+                    
+                    <button onclick="regenerate()" class="px-6 py-3 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+                        重新生成
+                    </button>
+                </div>
+            </div>
+
+            <!-- 空状态提示 -->
+            <div id="empty-state" class="{% if card_data %}hidden{% endif %} bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-800 mb-2">等待生成</h3>
+                <p class="text-gray-500">在左侧填写项目信息后，点击"生成配置"按钮</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const PROJECT_ID = '{{ project.id }}';
+let currentCardId = '{{ card_id }}' || null;
+
+document.getElementById('p1-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const inputData = {
+        project_background: formData.get('project_background'),
+        target_audience: formData.get('target_audience'),
+        unique_selling_points: formData.get('unique_selling_points').split(',').map(s => s.trim()).filter(Boolean),
+        seed_keywords: formData.get('seed_keywords').split(',').map(s => s.trim()).filter(Boolean),
+        brand_names: formData.get('brand_names').split(',').map(s => s.trim()).filter(Boolean),
+        competitor_brands: formData.get('competitor_brands').split(',').map(s => s.trim()).filter(Boolean)
+    };
+    
+    // 验证必填项
+    if (!inputData.project_background || !inputData.target_audience || inputData.seed_keywords.length === 0) {
+        alert('请填写所有必填项（带 * 号）');
+        return;
+    }
+    
+    // 显示加载
+    document.getElementById('loading-indicator').classList.remove('hidden');
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('result-container').classList.add('hidden');
+    
+    try {
+        const response = await fetch('/api/workflow/p1/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: PROJECT_ID,
+                input_data: inputData
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            currentCardId = data.card_id;
+            await loadCardData(currentCardId);
+            document.getElementById('action-buttons').classList.remove('hidden');
+        } else {
+            alert('生成失败：' + (data.error || '未知错误'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('请求失败，请稍后重试');
+    } finally {
+        document.getElementById('loading-indicator').classList.add('hidden');
+    }
+});
+
+async function loadCardData(cardId) {
+    try {
+        const response = await fetch(`/api/product-cards/${cardId}`);
+        const card = await response.json();
+        
+        if (card && card.card_data) {
+            const generated = card.card_data.generated_data || {};
+            displayResults(generated);
+            document.getElementById('result-container').classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Failed to load card:', error);
+    }
+}
+
+function displayResults(data) {
+    // 核心关键词
+    const coreKws = data.core_keywords || [];
+    document.getElementById('core-count').textContent = `${coreKws.length} 个`;
+    document.getElementById('core-keywords').innerHTML = coreKws.map(kw => 
+        `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">${kw}</span>`
+    ).join('');
+    
+    // 长尾关键词
+    const longtailKws = data.long_tail_keywords || [];
+    document.getElementById('longtail-count').textContent = `${longtailKws.length} 个`;
+    document.getElementById('longtail-keywords').innerHTML = longtailKws.map(kw => 
+        `<span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">${kw}</span>`
+    ).join('');
+    
+    // 场景关键词
+    const scenarioKws = data.scenario_keywords || [];
+    document.getElementById('scenario-count').textContent = `${scenarioKws.length} 个`;
+    document.getElementById('scenario-keywords').innerHTML = scenarioKws.map(kw => 
+        `<span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">${kw}</span>`
+    ).join('');
+    
+    // Subreddits
+    const subs = data.subreddit_suggestions || {};
+    const highRelevance = subs.high_relevance || [];
+    document.getElementById('subreddit-suggestions').innerHTML = highRelevance.map(sub => `
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                <span class="font-medium">r/${sub.name}</span>
+            </div>
+            <span class="text-xs text-gray-500">${sub.reason}</span>
+        </div>
+    `).join('');
+    
+    // 搜索策略
+    const strategy = data.search_strategy || {};
+    document.getElementById('search-strategy').innerHTML = `
+        <div class="space-y-2">
+            <div><span class="text-gray-500">搜索词：</span> ${(strategy.search_queries || []).join(', ')}</div>
+            <div><span class="text-gray-500">目标板块：</span> ${(strategy.subreddits || []).join(', ')}</div>
+            <div><span class="text-gray-500">时间范围：</span> ${strategy.time_filter || 'week'}</div>
+            <div><span class="text-gray-500">最大数量：</span> ${strategy.post_limit || 100} 条</div>
+        </div>
+    `;
+}
+
+async function confirmCard() {
+    if (!currentCardId) return;
+    
+    try {
+        const response = await fetch(`/api/product-cards/${currentCardId}/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirmed_by: 'user' })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            // 跳转到 P2
+            window.location.href = `/workflow/p2?project_id=${PROJECT_ID}&parent_card_id=${currentCardId}`;
+        } else {
+            alert('确认失败：' + (data.error || '未知错误'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('请求失败，请稍后重试');
+    }
+}
+
+function regenerate() {
+    document.getElementById('p1-form').dispatchEvent(new Event('submit'));
+}
+
+// 如果已有 card_id，加载数据
+if (currentCardId) {
+    loadCardData(currentCardId);
+}
+</script>
+{% endblock %}

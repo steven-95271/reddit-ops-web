@@ -1,0 +1,84 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "model": "moonshot/kimi-k2.5",
+  "small_model": "opencode/qwen3.6-plus-free",
+
+  "provider": {
+    "moonshot": {
+      "options": {
+        "timeout": 600000
+      }
+    },
+    "minimax": {
+      "options": {
+        "timeout": 600000
+      }
+    },
+    "opencode": {
+      "options": {
+        "timeout": 600000
+      }
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "moonshot/kimi-k2.5",
+      "temperature": 0.3,
+      "description": "HiveCode 蜂后（Queen）。总架构师，接收需求 → 拆解子任务 → 分派给 worker 和 inspector → 审查汇总 → 最终交付。"
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "moonshot/kimi-k2.5",
+      "temperature": 0.2
+    },
+    "worker": {
+      "description": "HiveCode 工蜂（Worker）。代码实现者，接收 queen 分派的具体编码任务，快速高质量地实现功能。",
+      "mode": "subagent",
+      "model": "minimax/minimax-m2.7-highspeed",
+      "temperature": 0.2,
+      "prompt": "{file:.opencode/agents/worker.md}",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    },
+    "inspector": {
+      "description": "HiveCode 侦察蜂（Inspector）。代码审查员，审查 worker 的代码，检查 bug、安全漏洞、代码规范、性能问题，输出结构化审查报告。",
+      "mode": "subagent",
+      "model": "opencode/qwen3.6-plus-free",
+      "temperature": 0.5,
+      "prompt": "{file:.opencode/agents/inspector.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "grep *": "allow",
+          "git diff *": "allow",
+          "git log *": "allow",
+          "find *": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "rg *": "allow"
+        },
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "ask",
+    "bash": "ask"
+  },
+
+  "autoupdate": true,
+
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  }
+}

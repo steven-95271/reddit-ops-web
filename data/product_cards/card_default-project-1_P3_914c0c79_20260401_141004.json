@@ -1,0 +1,399 @@
+{
+  "id": "card_default-project-1_P3_914c0c79",
+  "project_id": "default-project-1",
+  "phase": "P3",
+  "parent_card_id": "card_default-project-1_P2_ce52643a",
+  "card_name": "热帖识别 - 8个候选",
+  "card_data": {
+    "card_id": "",
+    "card_name": "热帖识别 - 0个候选",
+    "level": "L2",
+    "owner": "AI分析",
+    "status": "draft",
+    "tags": [
+      "热帖识别",
+      "评分分析",
+      "内容分类"
+    ],
+    "input_parameters": [
+      {
+        "param_name": "min_candidate_score",
+        "data_type": "float",
+        "format": "0.0-1.0",
+        "is_required": false,
+        "default_value": "0.4",
+        "description": "候选热帖最低评分阈值"
+      },
+      {
+        "param_name": "category_weights",
+        "data_type": "object",
+        "format": "JSON",
+        "is_required": false,
+        "default_value": "{}",
+        "description": "分类权重配置"
+      }
+    ],
+    "upstream_data": [
+      {
+        "source_id": "card_default-project-1_P2_ce52643a",
+        "source_name": "P2 内容抓取卡",
+        "storage_type": "SQLite",
+        "data_format": "JSON",
+        "owner": "P2ScrapingManager",
+        "description": "包含 87 条原始 Reddit 帖子数据"
+      }
+    ],
+    "outputs": [
+      {
+        "output_id": "out_p3_candidates",
+        "output_name": "候选热帖列表",
+        "output_mode": "batch",
+        "storage_type": "SQLite",
+        "file_type": "JSON",
+        "volume_estimate": "0条",
+        "directory_structure": "product_cards table",
+        "description": "经过评分和分类筛选的 0 条候选热帖",
+        "fields": [
+          {
+            "field_name": "post_id",
+            "data_type": "string",
+            "description": "帖子唯一ID",
+            "is_primary_key": true
+          },
+          {
+            "field_name": "title",
+            "data_type": "string",
+            "description": "帖子标题"
+          },
+          {
+            "field_name": "composite_score",
+            "data_type": "float",
+            "description": "综合评分 0-1"
+          },
+          {
+            "field_name": "score_level",
+            "data_type": "string",
+            "description": "评分等级 S/A/B/C"
+          },
+          {
+            "field_name": "category",
+            "data_type": "string",
+            "description": "内容分类 A/B/C/D/E"
+          },
+          {
+            "field_name": "upvotes",
+            "data_type": "integer",
+            "description": "点赞数"
+          },
+          {
+            "field_name": "comments",
+            "data_type": "integer",
+            "description": "评论数"
+          },
+          {
+            "field_name": "reasoning",
+            "data_type": "string",
+            "description": "入选理由"
+          }
+        ]
+      },
+      {
+        "output_id": "out_p3_analysis_stats",
+        "output_name": "分析统计报告",
+        "output_mode": "single",
+        "storage_type": "SQLite",
+        "file_type": "JSON",
+        "volume_estimate": "1条",
+        "directory_structure": "product_cards table",
+        "description": "分类分布、评分分布、关键词云等统计数据",
+        "fields": [
+          {
+            "field_name": "category_distribution",
+            "data_type": "object",
+            "description": "分类分布统计"
+          },
+          {
+            "field_name": "score_distribution",
+            "data_type": "object",
+            "description": "评分等级分布"
+          },
+          {
+            "field_name": "subreddit_breakdown",
+            "data_type": "object",
+            "description": "各板块表现"
+          },
+          {
+            "field_name": "keyword_cloud",
+            "data_type": "array",
+            "description": "关键词云数据"
+          },
+          {
+            "field_name": "total_analyzed",
+            "data_type": "integer",
+            "description": "分析帖子总数"
+          }
+        ]
+      }
+    ],
+    "downstream": [
+      {
+        "target_id": "P4-1_persona",
+        "target_name": "P4-1 人设设计",
+        "relied_output_id": "out_p3_candidates",
+        "usage_description": "基于候选热帖设计针对性人设",
+        "contact_person": "系统"
+      },
+      {
+        "target_id": "P4-2_content",
+        "target_name": "P4-2 内容创作",
+        "relied_output_id": "out_p3_candidates",
+        "usage_description": "基于候选热帖创作互动内容",
+        "contact_person": "系统"
+      }
+    ],
+    "processing_logic": {
+      "engine": "Scoring + DataCleaner",
+      "architecture_desc": "复用现有评分算法和分类器，对抓取数据进行全自动评分和分类",
+      "processing_steps": [
+        "1. 从 P2 产品卡加载抓取数据",
+        "2. 计算综合评分：热度、时效性、互动深度、关键词匹配度",
+        "3. 5 维分类打标：结构测评、场景痛点、观点争议、竞品KOL、平台趋势",
+        "4. 筛选候选热帖（评分等级 B 及以上）",
+        "5. 生成分类统计和关键词云",
+        "6. 构建标准化 Data Card JSON"
+      ],
+      "manual_intervention": {
+        "is_required": true,
+        "trigger_condition": "需要调整评分阈值，或人工筛选特定类型的候选帖",
+        "intervention_steps": "1. 查看候选热帖列表 2. 调整评分阈值重新筛选 3. 手动标记重点关注帖子 4. 确认后进入内容创作阶段"
+      }
+    },
+    "analysis_data": {
+      "total_posts": 87,
+      "candidates_count": 0,
+      "candidates_preview": [],
+      "category_stats": {
+        "category_distribution": {
+          "A": {
+            "count": 44,
+            "name": "结构型测评",
+            "color": "blue"
+          },
+          "B": {
+            "count": 1,
+            "name": "场景痛点",
+            "color": "red"
+          },
+          "C": {
+            "count": 15,
+            "name": "观点争议",
+            "color": "yellow"
+          },
+          "D": {
+            "count": 24,
+            "name": "竞品KOL",
+            "color": "purple"
+          },
+          "E": {
+            "count": 1,
+            "name": "平台趋势",
+            "color": "green"
+          },
+          "uncategorized": {
+            "count": 2,
+            "name": "未分类",
+            "color": "gray"
+          }
+        },
+        "score_distribution": {
+          "S": 0,
+          "A": 0,
+          "B": 0,
+          "C": 87
+        },
+        "subreddit_breakdown": {
+          "audiophile": {
+            "count": 31,
+            "avg_score": 0.0,
+            "total_score": 0
+          },
+          "earbuds": {
+            "count": 30,
+            "avg_score": 0.0,
+            "total_score": 0
+          },
+          "headphones": {
+            "count": 26,
+            "avg_score": 0.0,
+            "total_score": 0
+          }
+        },
+        "total_analyzed": 87,
+        "candidates_count": 0
+      },
+      "keyword_cloud": [
+        {
+          "text": "earbuds",
+          "count": 100,
+          "weight": 1.0
+        },
+        {
+          "text": "conduction",
+          "count": 74,
+          "weight": 0.74
+        },
+        {
+          "text": "sound",
+          "count": 58,
+          "weight": 0.58
+        },
+        {
+          "text": "really",
+          "count": 58,
+          "weight": 0.58
+        },
+        {
+          "text": "quality",
+          "count": 55,
+          "weight": 0.55
+        },
+        {
+          "text": "shokz",
+          "count": 55,
+          "weight": 0.55
+        },
+        {
+          "text": "using",
+          "count": 53,
+          "weight": 0.53
+        },
+        {
+          "text": "battery",
+          "count": 47,
+          "weight": 0.47
+        },
+        {
+          "text": "mainly",
+          "count": 47,
+          "weight": 0.47
+        },
+        {
+          "text": "performing",
+          "count": 47,
+          "weight": 0.47
+        },
+        {
+          "text": "recommend",
+          "count": 46,
+          "weight": 0.46
+        },
+        {
+          "text": "lasts",
+          "count": 39,
+          "weight": 0.39
+        },
+        {
+          "text": "hours",
+          "count": 39,
+          "weight": 0.39
+        },
+        {
+          "text": "which",
+          "count": 39,
+          "weight": 0.39
+        },
+        {
+          "text": "needs",
+          "count": 39,
+          "weight": 0.39
+        },
+        {
+          "text": "compared",
+          "count": 38,
+          "weight": 0.38
+        },
+        {
+          "text": "previous",
+          "count": 38,
+          "weight": 0.38
+        },
+        {
+          "text": "setup",
+          "count": 38,
+          "weight": 0.38
+        },
+        {
+          "text": "these",
+          "count": 38,
+          "weight": 0.38
+        },
+        {
+          "text": "great",
+          "count": 24,
+          "weight": 0.24
+        },
+        {
+          "text": "working",
+          "count": 22,
+          "weight": 0.22
+        },
+        {
+          "text": "experience",
+          "count": 22,
+          "weight": 0.22
+        },
+        {
+          "text": "commuting",
+          "count": 21,
+          "weight": 0.21
+        },
+        {
+          "text": "thoughts",
+          "count": 19,
+          "weight": 0.19
+        },
+        {
+          "text": "unpopular",
+          "count": 18,
+          "weight": 0.18
+        },
+        {
+          "text": "opinion",
+          "count": 18,
+          "weight": 0.18
+        },
+        {
+          "text": "overrated",
+          "count": 18,
+          "weight": 0.18
+        },
+        {
+          "text": "better",
+          "count": 17,
+          "weight": 0.17
+        },
+        {
+          "text": "different",
+          "count": 16,
+          "weight": 0.16
+        },
+        {
+          "text": "wanted",
+          "count": 15,
+          "weight": 0.15
+        }
+      ],
+      "score_thresholds": {
+        "S": 0.8,
+        "A": 0.6,
+        "B": 0.4,
+        "C": 0.0
+      }
+    }
+  },
+  "status": "draft",
+  "created_at": "2026-04-01T14:10:04.480278",
+  "confirmed_at": null,
+  "confirmed_by": null,
+  "export_path": null
+}
