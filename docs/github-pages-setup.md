@@ -7,7 +7,7 @@
 ## 🎯 目标
 
 将 `docs/` 目录部署为独立的文档网站：
-- **网站地址**: https://steven-95271.github.io/reddit-ops/
+- **网站地址**: https://steven-95271.github.io/reddit-ops-web/
 - **docs/index.md** → 成为网站首页
 
 ---
@@ -16,7 +16,7 @@
 
 ### Step 1: 进入仓库 Settings
 
-访问：`https://github.com/steven-95271/reddit-ops/settings`
+访问：`https://github.com/steven-95271/reddit-ops-web/settings`
 
 找到左侧菜单的 **Pages**：
 
@@ -46,7 +46,7 @@
 ┌─────────────────────────────────────────────────────────┐
 │  GitHub Pages                                           │
 │  Your site is ready to be published at                 │
-│  https://steven-95271.github.io/reddit-ops/           │
+│  https://steven-95271.github.io/reddit-ops-web/           │
 │                                                         │
 │  ┌─────────────────────────────────────────────────┐   │
 │  │ Build and deployment                            │   │
@@ -83,7 +83,7 @@
 ⏱️ 部署状态：待部署（首次可能需要 2-5 分钟）
 
 部署完成后会显示：
-✅ "Your site is published at https://steven-95271.github.io/reddit-ops/"
+✅ "Your site is published at https://steven-95271.github.io/reddit-ops-web/"
 ```
 
 ---
@@ -94,9 +94,9 @@
 
 | URL | 对应文件 |
 |-----|----------|
-| https://steven-95271.github.io/reddit-ops/ | docs/index.md |
-| https://steven-95271.github.io/reddit-ops/workflow/overview | docs/workflow/overview.md |
-| https://steven-95271.github.io/reddit-ops/workflow/p1-config | docs/workflow/p1-config.md |
+| https://steven-95271.github.io/reddit-ops-web/ | docs/index.md |
+| https://steven-95271.github.io/reddit-ops-web/workflow/overview | docs/workflow/overview.md |
+| https://steven-95271.github.io/reddit-ops-web/workflow/p1-config | docs/workflow/p1-config.md |
 | ... | ... |
 
 ---
@@ -169,7 +169,7 @@ CNAME  docs.oladance.com  steven-95271.github.io
 部署完成后，在浏览器打开：
 
 ```
-https://steven-95271.github.io/reddit-ops/
+https://steven-95271.github.io/reddit-ops-web/
 ```
 
 你应该能看到：

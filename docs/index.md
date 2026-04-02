@@ -112,8 +112,8 @@ flowchart LR
 
 ```bash
 # 克隆仓库
-git clone https://github.com/steven-95271/reddit-ops.git
-cd reddit-ops
+git clone https://github.com/steven-95271/reddit-ops-web.git
+cd reddit-ops-web
 
 # 安装依赖
 python3 -m venv venv
@@ -149,8 +149,8 @@ docs/
 
 ## 🔗 相关链接
 
-- 🌐 [GitHub 仓库](https://github.com/steven-95271/reddit-ops)
-- 📖 [项目 README](../README.md)
+- 🌐 [GitHub 仓库](https://github.com/steven-95271/reddit-ops-web)
+- 📖 [项目 README](https://github.com/steven-95271/reddit-ops-web/blob/main/README.md)
 - 📊 [Mermaid Live Editor](https://mermaid.live) - 在线预览图表
 
 ---
