@@ -6,7 +6,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import ToastContainer, { showToast } from '@/components/Toast'
 
-export default function BaseLayout({ children }: { children: React.ReactNode }) {
+export default function BaseLayout({ children, title, subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {
   const router = useRouter()
   const [projects, setProjects] = useState<any[]>([])
   const [currentProject, setCurrentProject] = useState<any>(null)
@@ -27,18 +27,21 @@ export default function BaseLayout({ children }: { children: React.ReactNode }) 
     const pid = e.target.value
     const project = projects.find(p => p.id === pid)
     setCurrentProject(project)
-    router.push(`/dashboard?project_id=${pid}`)
+    const currentPath = window.location.pathname
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.set('project_id', pid)
+    router.push(`${currentPath}?${searchParams.toString()}`)
   }
 
   return (
     <>
       <Sidebar projectId={currentProject?.id} />
       
-      <div className="flex-1 ml-20 flex flex-col min-h-screen">
+      <div className="flex-1 ml-52 flex flex-col min-h-screen">
         <header className="bg-transparent px-10 py-8 flex items-center justify-between sticky top-0 z-10">
           <div>
-            <h1 className="page-title">Dashboard</h1>
-            <p className="text-slate-500 text-sm font-medium animate-fade">数据概览</p>
+            <h1 className="page-title">{title || 'Dashboard'}</h1>
+            <p className="text-slate-500 text-sm font-medium animate-fade">{subtitle || '数据概览'}</p>
           </div>
           
           <div className="flex items-center gap-6">

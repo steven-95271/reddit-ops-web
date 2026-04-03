@@ -36,6 +36,20 @@ body {
   @apply text-[10px] font-medium;
 }
 
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .badge {
   @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
 }
