@@ -65,6 +65,8 @@ class P1ConfigGenerator:
         """第一轮：基于种子关键词生成扩展建议"""
         seed_keywords = input_data.get("seed_keywords", [])
         project_context = input_data.get("project_background", "")
+        brand_names = input_data.get("brand_names", [])
+        competitor_brands = input_data.get("competitor_brands", [])
 
         if not self.api_key:
             # 如果没有 API key，返回基础建议
@@ -77,19 +79,27 @@ class P1ConfigGenerator:
 
 项目背景: {project_context}
 种子关键词: {", ".join(seed_keywords)}
+品牌名称: {", ".join(brand_names)}
+竞品品牌: {", ".join(competitor_brands)}
 
-请分析并提供：
-1. 核心关键词（直接相关的 5-8 个）
-2. 长尾关键词（更具体的搜索词 5-10 个）
-3. 竞品关键词（竞品相关的 3-5 个）
-4. 场景关键词（使用场景相关的 5-8 个）
+请生成 6 类关键词，每类 5-8 个：
+1. brand_keywords：品牌名和产品名（如 toniebox, tonies）
+2. product_keywords：具体型号（如 toniebox 2, yoto mini）
+3. category_keywords：品类通用词（如 audio player for kids, toddler speaker）
+4. comparison_keywords：对比词（如 toniebox vs yoto, best X vs Y）
+5. scenario_keywords：使用场景词（如 bedtime routine toddler, screen-free toy）
+6. problem_keywords：问题/痛点词（如 toniebox not charging, toniebox broken）
+
+重要要求：请生成 Reddit 用户实际会搜索的口语化表达，而不是书面化的产品描述词。
 
 以 JSON 格式输出：
 {{
-    "core_keywords": ["..."],
-    "long_tail_keywords": ["..."],
-    "competitor_keywords": ["..."],
+    "brand_keywords": ["..."],
+    "product_keywords": ["..."],
+    "category_keywords": ["..."],
+    "comparison_keywords": ["..."],
     "scenario_keywords": ["..."],
+    "problem_keywords": ["..."],
     "reasoning": "简要说明推荐理由"
 }}"""
 
@@ -137,7 +147,8 @@ class P1ConfigGenerator:
 
             all_keywords = (
                 seed_keywords
-                + keyword_suggestions.get("core_keywords", [])
+                + keyword_suggestions.get("brand_keywords", [])
+                + keyword_suggestions.get("category_keywords", [])
                 + keyword_suggestions.get("scenario_keywords", [])
             )
 
@@ -199,11 +210,19 @@ class P1ConfigGenerator:
         competitor_brands = input_data.get("competitor_brands", [])
 
         # 构建搜索策略
-        core_keywords = keyword_suggestions.get("core_keywords", seed_keywords)
+        brand_keywords = keyword_suggestions.get("brand_keywords", seed_keywords)
+        product_keywords = keyword_suggestions.get("product_keywords", [])
+        comparison_keywords = keyword_suggestions.get("comparison_keywords", [])
 
-        # 基础搜索词
+        # 基础搜索词：优先使用品牌词和产品词
         search_queries = []
-        for kw in core_keywords[:3]:
+        for kw in brand_keywords[:2]:
+            search_queries.append(kw)
+        for kw in product_keywords[:2]:
+            search_queries.append(kw)
+
+        # 添加对比词
+        for kw in comparison_keywords[:1]:
             search_queries.append(kw)
 
         # 添加竞品相关搜索
@@ -226,7 +245,7 @@ class P1ConfigGenerator:
             "post_limit": 100,
             "scrape_hours": 168,  # 7 天
             "min_score": 5,
-            "search_strategy_logic": f"基于核心关键词 {', '.join(core_keywords[:3])} 进行搜索",
+            "search_strategy_logic": f"基于品牌关键词 {', '.join(brand_keywords[:3])} 进行搜索",
         }
 
         return strategy
@@ -243,9 +262,12 @@ class P1ConfigGenerator:
         # 合并所有关键词
         all_keywords = []
         all_keywords.extend(input_data.get("seed_keywords", []))
-        all_keywords.extend(keyword_suggestions.get("core_keywords", []))
-        all_keywords.extend(keyword_suggestions.get("long_tail_keywords", []))
+        all_keywords.extend(keyword_suggestions.get("brand_keywords", []))
+        all_keywords.extend(keyword_suggestions.get("product_keywords", []))
+        all_keywords.extend(keyword_suggestions.get("category_keywords", []))
+        all_keywords.extend(keyword_suggestions.get("comparison_keywords", []))
         all_keywords.extend(keyword_suggestions.get("scenario_keywords", []))
+        all_keywords.extend(keyword_suggestions.get("problem_keywords", []))
         all_keywords = list(set(all_keywords))  # 去重
 
         card_data = {
@@ -327,24 +349,34 @@ class P1ConfigGenerator:
                             "description": "核心卖点",
                         },
                         {
-                            "field_name": "all_keywords",
+                            "field_name": "brand_keywords",
                             "data_type": "array",
-                            "description": f"全部关键词 ({len(all_keywords)}个)",
+                            "description": f"品牌关键词 ({len(keyword_suggestions.get('brand_keywords', []))}个)",
                         },
                         {
-                            "field_name": "core_keywords",
+                            "field_name": "product_keywords",
                             "data_type": "array",
-                            "description": f"核心关键词 ({len(keyword_suggestions.get('core_keywords', []))}个)",
+                            "description": f"产品型号关键词 ({len(keyword_suggestions.get('product_keywords', []))}个)",
                         },
                         {
-                            "field_name": "long_tail_keywords",
+                            "field_name": "category_keywords",
                             "data_type": "array",
-                            "description": f"长尾关键词 ({len(keyword_suggestions.get('long_tail_keywords', []))}个)",
+                            "description": f"品类通用词 ({len(keyword_suggestions.get('category_keywords', []))}个)",
+                        },
+                        {
+                            "field_name": "comparison_keywords",
+                            "data_type": "array",
+                            "description": f"对比词 ({len(keyword_suggestions.get('comparison_keywords', []))}个)",
                         },
                         {
                             "field_name": "scenario_keywords",
                             "data_type": "array",
                             "description": f"场景关键词 ({len(keyword_suggestions.get('scenario_keywords', []))}个)",
+                        },
+                        {
+                            "field_name": "problem_keywords",
+                            "data_type": "array",
+                            "description": f"问题/痛点词 ({len(keyword_suggestions.get('problem_keywords', []))}个)",
                         },
                         {
                             "field_name": "recommended_subreddits",
@@ -373,7 +405,7 @@ class P1ConfigGenerator:
                 "architecture_desc": "三轮对话生成项目配置：1)关键词扩展 2)Subreddit推荐 3)搜索策略生成",
                 "processing_steps": [
                     "1. 接收用户输入：项目背景、目标人群、种子关键词等",
-                    "2. 第一轮对话：基于种子关键词扩展为核心/长尾/场景/竞品关键词",
+                    "2. 第一轮对话：基于种子关键词扩展为6类关键词（品牌/产品/品类/对比/场景/问题）",
                     "3. 第二轮对话：基于目标人群和关键词推荐高/中相关度 Subreddits",
                     "4. 第三轮对话：整合信息生成 APIFY 搜索策略（搜索词、板块、时间范围等）",
                     "5. 构建标准化 Data Card JSON 输出",
@@ -387,12 +419,14 @@ class P1ConfigGenerator:
             # 附加数据
             "generated_data": {
                 "all_keywords": all_keywords,
-                "core_keywords": keyword_suggestions.get("core_keywords", []),
-                "long_tail_keywords": keyword_suggestions.get("long_tail_keywords", []),
-                "competitor_keywords": keyword_suggestions.get(
-                    "competitor_keywords", []
+                "brand_keywords": keyword_suggestions.get("brand_keywords", []),
+                "product_keywords": keyword_suggestions.get("product_keywords", []),
+                "category_keywords": keyword_suggestions.get("category_keywords", []),
+                "comparison_keywords": keyword_suggestions.get(
+                    "comparison_keywords", []
                 ),
                 "scenario_keywords": keyword_suggestions.get("scenario_keywords", []),
+                "problem_keywords": keyword_suggestions.get("problem_keywords", []),
                 "subreddit_suggestions": subreddit_suggestions,
                 "search_strategy": search_strategy,
                 "reasoning": keyword_suggestions.get("reasoning", ""),
@@ -403,25 +437,41 @@ class P1ConfigGenerator:
 
     def _generate_fallback_keywords(self, seed_keywords: List[str]) -> Dict:
         """当 API 不可用时生成基础关键词建议"""
-        core = seed_keywords[:5] if seed_keywords else ["product", "review"]
+        brand = seed_keywords[:3] if seed_keywords else ["brand"]
 
-        # 基于种子关键词生成简单扩展
-        long_tail = []
+        product = []
+        for kw in seed_keywords[:2]:
+            product.extend([f"{kw} 2", f"{kw} mini", f"{kw} pro"])
+        if not product:
+            product = ["product model"]
+
+        category = ["best alternative", "top rated", "budget option"]
+
+        comparison = []
+        for kw in seed_keywords[:2]:
+            comparison.append(f"{kw} vs")
+        if not comparison:
+            comparison = ["X vs Y"]
+
         scenario = []
+        for kw in seed_keywords[:2]:
+            scenario.extend([f"{kw} for daily use", f"{kw} for travel"])
+        if not scenario:
+            scenario = ["everyday use"]
 
-        for kw in seed_keywords[:3]:
-            long_tail.extend(
-                [f"best {kw}", f"{kw} review", f"{kw} vs", f"{kw} recommendation"]
-            )
-            scenario.extend(
-                [f"{kw} for running", f"{kw} for workout", f"{kw} daily use"]
-            )
+        problem = []
+        for kw in seed_keywords[:2]:
+            problem.extend([f"{kw} not working", f"{kw} broken"])
+        if not problem:
+            problem = ["not working"]
 
         return {
-            "core_keywords": core,
-            "long_tail_keywords": list(set(long_tail))[:8],
-            "competitor_keywords": [],
-            "scenario_keywords": list(set(scenario))[:6],
+            "brand_keywords": list(set(brand))[:5],
+            "product_keywords": list(set(product))[:5],
+            "category_keywords": list(set(category))[:5],
+            "comparison_keywords": list(set(comparison))[:5],
+            "scenario_keywords": list(set(scenario))[:5],
+            "problem_keywords": list(set(problem))[:5],
             "reasoning": "基于种子关键词的基础扩展（API 不可用时使用）",
         }
 
@@ -460,10 +510,12 @@ class P1ConfigGenerator:
                 keywords.extend(matches)
 
         return {
-            "core_keywords": keywords[:8] if keywords else seed_keywords,
-            "long_tail_keywords": [],
-            "competitor_keywords": [],
+            "brand_keywords": keywords[:6] if keywords else seed_keywords,
+            "product_keywords": [],
+            "category_keywords": [],
+            "comparison_keywords": [],
             "scenario_keywords": [],
+            "problem_keywords": [],
             "reasoning": "从文本中提取的关键词",
         }
 
@@ -510,12 +562,24 @@ class P1ConfigGenerator:
 原始种子关键词: {", ".join(seed_keywords)}
 用户反馈: {feedback}
 
+请生成 6 类关键词，每类 5-8 个：
+1. brand_keywords：品牌名和产品名
+2. product_keywords：具体型号
+3. category_keywords：品类通用词
+4. comparison_keywords：对比词
+5. scenario_keywords：使用场景词
+6. problem_keywords：问题/痛点词
+
+重要要求：请生成 Reddit 用户实际会搜索的口语化表达，而不是书面化的产品描述词。
+
 请根据反馈调整关键词建议，以 JSON 格式输出：
 {{
-    "core_keywords": ["..."],
-    "long_tail_keywords": ["..."],
-    "competitor_keywords": ["..."],
+    "brand_keywords": ["..."],
+    "product_keywords": ["..."],
+    "category_keywords": ["..."],
+    "comparison_keywords": ["..."],
     "scenario_keywords": ["..."],
+    "problem_keywords": ["..."],
     "changes": "相比之前的改动说明"
 }}"""
 
