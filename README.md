@@ -10,13 +10,15 @@
 
 | 阶段 | 名称 | 说明 |
 |------|------|------|
-| [L1 总览](docs/workflow/overview.md) | 流程总览 | 6阶段完整流程图 |
-| [P1](docs/workflow/p1-config.md) | 项目配置 | AI 3轮对话生成搜索策略 |
-| [P2](docs/workflow/p2-scraping.md) | 内容抓取 | APIFY + Mock 双模式 |
-| [P3](docs/workflow/p3-analysis.md) | 热帖识别 | 5维评分 + 自动分类 |
-| [P4-1](docs/workflow/p4-persona.md) | 人设设计 | 3种默认人设 |
-| [P4-2](docs/workflow/p4-content.md) | 内容创作 | AI 人设风格生成 |
-| [P5](docs/workflow/p5-publish.md) | 发布追踪 | 审核工作流 + 品牌追踪 |
+| 主页 | 欢迎弹窗 | 首次展示系统功能和工作流程 |
+| /workflow/config | P1 配置 | AI 生成关键词和搜索策略 |
+| /workflow/scraping | P2 抓取 | 从 Reddit 抓取目标帖子 |
+| /workflow/analysis | P3 分析 | 评分、分类、筛选候选热帖 |
+| /workflow/persona | P4-1 人设 | 创建和管理账号人设 |
+| /workflow/content | P4-2 创作 | AI 生成互动内容 |
+| /workflow/publish | P5 发布 | 审核、发布、品牌追踪 |
+| /dashboard | 仪表盘 | 全局数据概览 |
+| /history | 历史记录 | 发布历史 |
 
 ---
 
@@ -25,8 +27,7 @@
 ```mermaid
 flowchart TB
     subgraph Frontend["🌐 前端层"]
-        F1[Flask/Jinja2<br/>生产环境]
-        F2[Next.js 14<br/>开发中]
+        F1[Next.js 14<br/>React + TypeScript<br/>Tailwind CSS]
     end
 
     subgraph Backend["⚙️ 后端层"]
@@ -113,16 +114,14 @@ flowchart LR
 git clone https://github.com/steven-95271/reddit-ops-web.git
 cd reddit-ops-web
 
-# 安装依赖
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# 安装前端依赖
+npm install
 
-# 启动服务
-python app.py
+# 启动前端开发服务器
+npm run dev
 ```
 
-访问 http://127.0.0.1:5000
+访问 http://localhost:3003
 
 ---
 
@@ -133,4 +132,4 @@ python app.py
 
 ---
 
-*最后更新：2026-04-01*
+*最后更新：2026-04-03*
