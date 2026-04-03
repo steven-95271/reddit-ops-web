@@ -13,6 +13,35 @@ import config
 logger = logging.getLogger(__name__)
 
 
+# 品类模板配置
+CATEGORY_TEMPLATES = {
+    "consumer_electronics": {
+        "keyword_emphasis": "重点生成 problem_keywords 和 comparison_keywords",
+        "sort_default": "relevance",
+        "time_default": "all",
+        "subreddit_hints": "寻找产品名专属板块、BuyItForLife、gadgets 等",
+    },
+    "baby_and_kids": {
+        "keyword_emphasis": "重点生成 scenario_keywords 和 problem_keywords",
+        "sort_default": "relevance",
+        "time_default": "all",
+        "subreddit_hints": "parenting, daddit, Mommit, toddlers, BuyingForBaby 等育儿板块",
+    },
+    "saas_tool": {
+        "keyword_emphasis": "重点生成 comparison_keywords 和 scenario_keywords",
+        "sort_default": "top",
+        "time_default": "year",
+        "subreddit_hints": "SaaS, startups, Entrepreneur, 以及产品对应的垂直领域板块",
+    },
+    "general": {
+        "keyword_emphasis": "均衡生成各类关键词",
+        "sort_default": "relevance",
+        "time_default": "year",
+        "subreddit_hints": "根据产品描述推断相关板块",
+    },
+}
+
+
 class P1ConfigGenerator:
     """P1 项目配置卡生成器"""
 
@@ -32,12 +61,24 @@ class P1ConfigGenerator:
                 'unique_selling_points': ['卖点1', '卖点2'],
                 'seed_keywords': ['种子关键词1', '种子关键词2'],
                 'brand_names': ['品牌名'],
-                'competitor_brands': ['竞品1', '竞品2']
+                'competitor_brands': ['竞品1', '竞品2'],
+                'product_category': '可选：consumer_electronics/baby_and_kids/saas_tool/general'
             }
 
         Returns:
             Data Card JSON
         """
+        # 步骤 0：判断品类
+        category = self._detect_category(input_data)
+        category_template = CATEGORY_TEMPLATES.get(
+            category, CATEGORY_TEMPLATES["general"]
+        )
+        logger.info(f"P1: 检测到产品品类: {category}, 模板: {category_template}")
+
+        # 将品类信息存入 input_data 供后续使用
+        input_data["_detected_category"] = category
+        input_data["_category_template"] = category_template
+
         # 第一轮对话：扩展种子关键词
         logger.info("P1: 开始第一轮对话 - 扩展种子关键词")
         keyword_suggestions = self._generate_keywords(input_data)
@@ -59,7 +100,84 @@ class P1ConfigGenerator:
             input_data, keyword_suggestions, subreddit_suggestions, search_tasks
         )
 
+        # 添加品类信息到输出
+        card_data["detected_category"] = category
+        card_data["category_template"] = category_template
+
         return card_data
+
+    def _detect_category(self, input_data: Dict) -> str:
+        """
+        判断产品所属品类
+
+        优先使用用户提供的 product_category，如果没有则通过 AI 判断
+        """
+        # 1. 检查用户是否已指定品类
+        user_category = input_data.get("product_category", "")
+        if user_category and user_category in CATEGORY_TEMPLATES:
+            logger.info(f"P1: 用户使用指定品类: {user_category}")
+            return user_category
+
+        # 2. 如果没有 API key，返回通用模板
+        if not self.api_key:
+            logger.warning("P1: API key 不可用，使用通用品类模板")
+            return "general"
+
+        # 3. 使用 AI 判断品类
+        try:
+            import httpx
+
+            project_context = input_data.get("project_background", "")
+            seed_keywords = input_data.get("seed_keywords", [])
+
+            prompt = f"""请根据以下产品信息，判断它最可能属于哪个品类：
+
+项目背景: {project_context}
+种子关键词: {", ".join(seed_keywords)}
+
+可选品类：
+- consumer_electronics: 消费电子产品（耳机、音箱、智能设备等）
+- baby_and_kids: 母婴儿童产品（玩具、育儿用品、儿童教育产品等）
+- saas_tool: SaaS 工具/软件（效率工具、营销软件、企业服务等）
+- general: 通用/其他
+
+请只返回品类名称（consumer_electronics/baby_and_kids/saas_tool/general），不要其他解释。"""
+
+            response = httpx.post(
+                self.api_url,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=30.0,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                content = (
+                    result.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
+                    .lower()
+                )
+
+                # 清理可能的额外字符
+                for key in CATEGORY_TEMPLATES.keys():
+                    if key in content:
+                        logger.info(f"P1: AI 判断品类为: {key}")
+                        return key
+
+                logger.warning(f"P1: AI 返回无法识别的品类: {content}，使用通用模板")
+                return "general"
+            else:
+                logger.warning(f"P1: 品类判断 API 调用失败: {response.status_code}")
+                return "general"
+
+        except Exception as e:
+            logger.error(f"P1: 品类判断失败: {e}")
+            return "general"
 
     def _generate_keywords(self, input_data: Dict) -> Dict:
         """第一轮：基于种子关键词生成扩展建议"""
@@ -67,6 +185,14 @@ class P1ConfigGenerator:
         project_context = input_data.get("project_background", "")
         brand_names = input_data.get("brand_names", [])
         competitor_brands = input_data.get("competitor_brands", [])
+
+        # 获取品类模板信息
+        category_template = input_data.get(
+            "_category_template", CATEGORY_TEMPLATES["general"]
+        )
+        keyword_emphasis = category_template.get(
+            "keyword_emphasis", "均衡生成各类关键词"
+        )
 
         if not self.api_key:
             # 如果没有 API key，返回基础建议
@@ -82,6 +208,8 @@ class P1ConfigGenerator:
 品牌名称: {", ".join(brand_names)}
 竞品品牌: {", ".join(competitor_brands)}
 
+品类策略参考：{keyword_emphasis}
+
 请生成 6 类关键词，每类 5-8 个：
 1. brand_keywords：品牌名和产品名（如 toniebox, tonies）
 2. product_keywords：具体型号（如 toniebox 2, yoto mini）
@@ -90,7 +218,9 @@ class P1ConfigGenerator:
 5. scenario_keywords：使用场景词（如 bedtime routine toddler, screen-free toy）
 6. problem_keywords：问题/痛点词（如 toniebox not charging, toniebox broken）
 
-重要要求：请生成 Reddit 用户实际会搜索的口语化表达，而不是书面化的产品描述词。
+重要要求：
+- 请生成 Reddit 用户实际会搜索的口语化表达，而不是书面化的产品描述词
+- 参考品类策略，重点生成对应类型的关键词
 
 以 JSON 格式输出：
 {{
@@ -139,6 +269,14 @@ class P1ConfigGenerator:
         seed_keywords = input_data.get("seed_keywords", [])
         target_audience = input_data.get("target_audience", "")
 
+        # 获取品类模板信息
+        category_template = input_data.get(
+            "_category_template", CATEGORY_TEMPLATES["general"]
+        )
+        subreddit_hints = category_template.get(
+            "subreddit_hints", "根据产品描述推断相关板块"
+        )
+
         if not self.api_key:
             return self._generate_fallback_subreddits(seed_keywords)
 
@@ -156,6 +294,8 @@ class P1ConfigGenerator:
 
 目标人群: {target_audience}
 相关关键词: {", ".join(all_keywords[:10])}
+
+板块推荐参考：{subreddit_hints}
 
 请推荐：
 1. 高相关度 Subreddits（5-8 个）
@@ -212,6 +352,13 @@ class P1ConfigGenerator:
         search_tasks = []
         task_id = 0
 
+        # 获取品类模板的默认配置
+        category_template = input_data.get(
+            "_category_template", CATEGORY_TEMPLATES["general"]
+        )
+        default_sort = category_template.get("sort_default", "relevance")
+        default_time = category_template.get("time_default", "year")
+
         # 获取各类关键词
         brand_keywords = keyword_suggestions.get("brand_keywords", [])
         product_keywords = keyword_suggestions.get("product_keywords", [])
@@ -226,11 +373,7 @@ class P1ConfigGenerator:
             s.get("name", "") for s in high_relevance[:3] if s.get("name")
         ]
 
-        # 如果没有推荐，使用默认值
-        if not top_subreddits:
-            top_subreddits = ["headphones", "earbuds", "audiophile"]
-
-        # 1. brand_keywords: priority=1, sort=relevance, time=all, max_posts=100, subreddit=""
+        # 1. brand_keywords: priority=1, max_posts=100, 使用品类默认 sort/time
         for kw in brand_keywords:
             task_id += 1
             search_tasks.append(
@@ -238,8 +381,8 @@ class P1ConfigGenerator:
                     "task_id": f"task_{task_id:03d}",
                     "query": kw,
                     "subreddit": "",
-                    "sort_order": "relevance",
-                    "time_filter": "all",
+                    "sort_order": default_sort,
+                    "time_filter": default_time,
                     "max_posts": 100,
                     "priority": 1,
                     "keyword_type": "brand",
@@ -247,7 +390,7 @@ class P1ConfigGenerator:
                 }
             )
 
-        # 2. product_keywords: priority=1, sort=relevance, time=all, max_posts=100, subreddit=""
+        # 2. product_keywords: priority=1, max_posts=100, 使用品类默认 sort/time
         for kw in product_keywords:
             task_id += 1
             search_tasks.append(
@@ -255,8 +398,8 @@ class P1ConfigGenerator:
                     "task_id": f"task_{task_id:03d}",
                     "query": kw,
                     "subreddit": "",
-                    "sort_order": "relevance",
-                    "time_filter": "all",
+                    "sort_order": default_sort,
+                    "time_filter": default_time,
                     "max_posts": 100,
                     "priority": 1,
                     "keyword_type": "product",
@@ -273,8 +416,8 @@ class P1ConfigGenerator:
                         "task_id": f"task_{task_id:03d}",
                         "query": kw,
                         "subreddit": subreddit,
-                        "sort_order": "relevance",
-                        "time_filter": "all",
+                        "sort_order": default_sort,
+                        "time_filter": default_time,
                         "max_posts": 50,
                         "priority": 3,
                         "keyword_type": "brand_subreddit",
@@ -282,7 +425,7 @@ class P1ConfigGenerator:
                     }
                 )
 
-        # 4. comparison_keywords: priority=1, sort=top, time=year, max_posts=50, subreddit=""
+        # 4. comparison_keywords: priority=1, sort=top, time=year, max_posts=50
         for kw in comparison_keywords:
             task_id += 1
             search_tasks.append(
@@ -299,7 +442,7 @@ class P1ConfigGenerator:
                 }
             )
 
-        # 5. category_keywords: priority=2, sort=top, time=year, max_posts=30, subreddit=""
+        # 5. category_keywords: priority=2, sort=top, time=year, max_posts=30
         for kw in category_keywords:
             task_id += 1
             search_tasks.append(
@@ -316,7 +459,7 @@ class P1ConfigGenerator:
                 }
             )
 
-        # 6. scenario_keywords: priority=2, sort=top, time=year, max_posts=30, subreddit=""
+        # 6. scenario_keywords: priority=2, sort=top, time=year, max_posts=30
         for kw in scenario_keywords:
             task_id += 1
             search_tasks.append(
@@ -333,7 +476,7 @@ class P1ConfigGenerator:
                 }
             )
 
-        # 7. problem_keywords: priority=2, sort=relevance, time=all, max_posts=30, subreddit=""
+        # 7. problem_keywords: priority=2, 使用品类默认 sort/time, max_posts=30
         for kw in problem_keywords:
             task_id += 1
             search_tasks.append(
@@ -341,8 +484,8 @@ class P1ConfigGenerator:
                     "task_id": f"task_{task_id:03d}",
                     "query": kw,
                     "subreddit": "",
-                    "sort_order": "relevance",
-                    "time_filter": "all",
+                    "sort_order": default_sort,
+                    "time_filter": default_time,
                     "max_posts": 30,
                     "priority": 2,
                     "keyword_type": "problem",
@@ -539,43 +682,49 @@ class P1ConfigGenerator:
         return card_data
 
     def _generate_fallback_keywords(self, seed_keywords: List[str]) -> Dict:
-        """当 API 不可用时生成基础关键词建议"""
-        brand = seed_keywords[:3] if seed_keywords else ["brand"]
+        """当 API 不可用时生成基础关键词建议
+
+        基于 seed_keywords 做简单扩展，使用通用模式：
+        best {kw}, {kw} review, {kw} vs, {kw} worth it, {kw} alternative, {kw} problem
+        """
+        if not seed_keywords:
+            seed_keywords = ["product"]
+
+        brand = seed_keywords[:3]
 
         product = []
-        for kw in seed_keywords[:2]:
-            product.extend([f"{kw} 2", f"{kw} mini", f"{kw} pro"])
-        if not product:
-            product = ["product model"]
-
-        category = ["best alternative", "top rated", "budget option"]
-
+        category = []
         comparison = []
-        for kw in seed_keywords[:2]:
-            comparison.append(f"{kw} vs")
-        if not comparison:
-            comparison = ["X vs Y"]
-
         scenario = []
-        for kw in seed_keywords[:2]:
-            scenario.extend([f"{kw} for daily use", f"{kw} for travel"])
-        if not scenario:
-            scenario = ["everyday use"]
-
         problem = []
-        for kw in seed_keywords[:2]:
-            problem.extend([f"{kw} not working", f"{kw} broken"])
-        if not problem:
-            problem = ["not working"]
+
+        # 基于每个种子关键词生成通用扩展
+        for kw in seed_keywords[:5]:  # 限制前5个种子词
+            # product_keywords: 型号类（如 {kw} 2, {kw} pro）
+            product.extend([f"{kw} 2", f"{kw} pro"])
+
+            # category_keywords: 通用搜索模式
+            category.extend(
+                [f"best {kw}", f"{kw} review", f"{kw} worth it", f"{kw} alternative"]
+            )
+
+            # comparison_keywords: 对比词
+            comparison.append(f"{kw} vs")
+
+            # scenario_keywords: 场景词（通用模式）
+            scenario.extend([f"{kw} for home", f"{kw} for work"])
+
+            # problem_keywords: 问题词
+            problem.extend([f"{kw} problem", f"{kw} issue", f"{kw} not working"])
 
         return {
             "brand_keywords": list(set(brand))[:5],
-            "product_keywords": list(set(product))[:5],
-            "category_keywords": list(set(category))[:5],
+            "product_keywords": list(set(product))[:6],
+            "category_keywords": list(set(category))[:6],
             "comparison_keywords": list(set(comparison))[:5],
             "scenario_keywords": list(set(scenario))[:5],
-            "problem_keywords": list(set(problem))[:5],
-            "reasoning": "基于种子关键词的基础扩展（API 不可用时使用）",
+            "problem_keywords": list(set(problem))[:6],
+            "reasoning": "这是基于种子关键词的通用扩展（best/review/vs/worth it/alternative/problem/issue 等模式），建议配置 API 后重新生成更精准的关键词",
         }
 
     def _generate_fallback_subreddits(self, seed_keywords: List[str]) -> Dict:
@@ -654,6 +803,14 @@ class P1ConfigGenerator:
         """
         seed_keywords = input_data.get("seed_keywords", [])
 
+        # 获取品类模板信息
+        category_template = input_data.get(
+            "_category_template", CATEGORY_TEMPLATES["general"]
+        )
+        keyword_emphasis = category_template.get(
+            "keyword_emphasis", "均衡生成各类关键词"
+        )
+
         if not self.api_key:
             return self._generate_fallback_keywords(seed_keywords)
 
@@ -665,6 +822,8 @@ class P1ConfigGenerator:
 原始种子关键词: {", ".join(seed_keywords)}
 用户反馈: {feedback}
 
+品类策略参考：{keyword_emphasis}
+
 请生成 6 类关键词，每类 5-8 个：
 1. brand_keywords：品牌名和产品名
 2. product_keywords：具体型号
@@ -673,7 +832,10 @@ class P1ConfigGenerator:
 5. scenario_keywords：使用场景词
 6. problem_keywords：问题/痛点词
 
-重要要求：请生成 Reddit 用户实际会搜索的口语化表达，而不是书面化的产品描述词。
+重要要求：
+- 请生成 Reddit 用户实际会搜索的口语化表达，而不是书面化的产品描述词
+- 参考品类策略，重点生成对应类型的关键词
+- 根据用户反馈进行调整
 
 请根据反馈调整关键词建议，以 JSON 格式输出：
 {{
