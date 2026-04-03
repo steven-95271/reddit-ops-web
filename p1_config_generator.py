@@ -711,8 +711,8 @@ class P1ConfigGenerator:
             # comparison_keywords: 对比词
             comparison.append(f"{kw} vs")
 
-            # scenario_keywords: 场景词（通用模式）
-            scenario.extend([f"{kw} for home", f"{kw} for work"])
+            # scenario_keywords: 场景词（通用模式，不依赖特定场景如 running/workout）
+            scenario.extend([f"{kw} help", f"{kw} advice", f"{kw} experience"])
 
             # problem_keywords: 问题词
             problem.extend([f"{kw} problem", f"{kw} issue", f"{kw} not working"])
@@ -729,23 +729,12 @@ class P1ConfigGenerator:
 
     def _generate_fallback_subreddits(self, seed_keywords: List[str]) -> Dict:
         """当 API 不可用时生成基础 Subreddit 建议"""
-        # 默认推荐
-        defaults = [
-            {
-                "name": "headphones",
-                "reason": "耳机讨论主社区",
-                "estimated_posts": "daily",
-            },
-            {"name": "earbuds", "reason": "耳塞专门讨论区", "estimated_posts": "daily"},
-            {"name": "audiophile", "reason": "音质发烧友", "estimated_posts": "daily"},
-            {"name": "running", "reason": "运动场景", "estimated_posts": "daily"},
-            {"name": "commuting", "reason": "通勤场景", "estimated_posts": "weekly"},
-        ]
-
+        # API 不可用时，不推荐任何具体板块
+        # 将在 P2 阶段通过全站搜索自动发现相关板块
         return {
-            "high_relevance": defaults[:3],
-            "medium_relevance": defaults[3:],
-            "reasoning": "默认推荐（API 不可用时使用）",
+            "high_relevance": [],
+            "medium_relevance": [],
+            "reasoning": "API 不可用，无法推荐板块，将在 P2 阶段通过全站搜索自动发现相关板块",
         }
 
     def _extract_keywords_from_text(self, text: str, seed_keywords: List[str]) -> Dict:
