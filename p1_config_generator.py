@@ -48,15 +48,15 @@ class P1ConfigGenerator:
             input_data, keyword_suggestions
         )
 
-        # 第三轮对话：生成 APIFY 搜索策略
-        logger.info("P1: 开始第三轮对话 - 生成搜索策略")
-        search_strategy = self._generate_search_strategy(
+        # 第三轮：生成 APIFY 搜索任务列表
+        logger.info("P1: 开始第三轮对话 - 生成搜索任务列表")
+        search_tasks = self._generate_search_strategy(
             input_data, keyword_suggestions, subreddit_suggestions
         )
 
         # 构建 Data Card
         card_data = self._build_data_card(
-            input_data, keyword_suggestions, subreddit_suggestions, search_strategy
+            input_data, keyword_suggestions, subreddit_suggestions, search_tasks
         )
 
         return card_data
@@ -203,59 +203,162 @@ class P1ConfigGenerator:
 
     def _generate_search_strategy(
         self, input_data: Dict, keyword_suggestions: Dict, subreddit_suggestions: Dict
-    ) -> Dict:
-        """第三轮：生成 APIFY 搜索策略"""
-        seed_keywords = input_data.get("seed_keywords", [])
-        brand_names = input_data.get("brand_names", [])
-        competitor_brands = input_data.get("competitor_brands", [])
+    ) -> List[Dict]:
+        """第三轮：生成 APIFY 搜索任务列表
 
-        # 构建搜索策略
-        brand_keywords = keyword_suggestions.get("brand_keywords", seed_keywords)
+        每个任务是一个独立的搜索配置，Apify Reddit Scraper 会单独运行每个任务。
+        任务根据关键词类型有不同的优先级和配置。
+        """
+        search_tasks = []
+        task_id = 0
+
+        # 获取各类关键词
+        brand_keywords = keyword_suggestions.get("brand_keywords", [])
         product_keywords = keyword_suggestions.get("product_keywords", [])
         comparison_keywords = keyword_suggestions.get("comparison_keywords", [])
+        category_keywords = keyword_suggestions.get("category_keywords", [])
+        scenario_keywords = keyword_suggestions.get("scenario_keywords", [])
+        problem_keywords = keyword_suggestions.get("problem_keywords", [])
 
-        # 基础搜索词：优先使用品牌词和产品词
-        search_queries = []
-        for kw in brand_keywords[:2]:
-            search_queries.append(kw)
-        for kw in product_keywords[:2]:
-            search_queries.append(kw)
-
-        # 添加对比词
-        for kw in comparison_keywords[:1]:
-            search_queries.append(kw)
-
-        # 添加竞品相关搜索
-        for brand in competitor_brands[:2]:
-            for kw in seed_keywords[:2]:
-                search_queries.append(f"{brand} {kw}")
-
-        # 获取推荐的 subreddits
+        # 获取推荐的 subreddits（用于品牌词额外任务）
         high_relevance = subreddit_suggestions.get("high_relevance", [])
-        subreddits = [s.get("name", "") for s in high_relevance[:5]]
+        top_subreddits = [
+            s.get("name", "") for s in high_relevance[:3] if s.get("name")
+        ]
 
         # 如果没有推荐，使用默认值
-        if not subreddits:
-            subreddits = ["headphones", "earbuds", "audiophile"]
+        if not top_subreddits:
+            top_subreddits = ["headphones", "earbuds", "audiophile"]
 
-        strategy = {
-            "search_queries": list(set(search_queries))[:5],  # 去重，最多 5 个
-            "subreddits": subreddits,
-            "time_filter": "week",  # 默认最近一周
-            "post_limit": 100,
-            "scrape_hours": 168,  # 7 天
-            "min_score": 5,
-            "search_strategy_logic": f"基于品牌关键词 {', '.join(brand_keywords[:3])} 进行搜索",
-        }
+        # 1. brand_keywords: priority=1, sort=relevance, time=all, max_posts=100, subreddit=""
+        for kw in brand_keywords:
+            task_id += 1
+            search_tasks.append(
+                {
+                    "task_id": f"task_{task_id:03d}",
+                    "query": kw,
+                    "subreddit": "",
+                    "sort_order": "relevance",
+                    "time_filter": "all",
+                    "max_posts": 100,
+                    "priority": 1,
+                    "keyword_type": "brand",
+                    "description": f"品牌词全站搜索: {kw}",
+                }
+            )
 
-        return strategy
+        # 2. product_keywords: priority=1, sort=relevance, time=all, max_posts=100, subreddit=""
+        for kw in product_keywords:
+            task_id += 1
+            search_tasks.append(
+                {
+                    "task_id": f"task_{task_id:03d}",
+                    "query": kw,
+                    "subreddit": "",
+                    "sort_order": "relevance",
+                    "time_filter": "all",
+                    "max_posts": 100,
+                    "priority": 1,
+                    "keyword_type": "product",
+                    "description": f"产品型号全站搜索: {kw}",
+                }
+            )
+
+        # 3. 对每个 brand_keyword，额外生成指定 subreddit 的任务（priority=3）
+        for kw in brand_keywords[:3]:  # 限制前3个品牌词，避免任务过多
+            for subreddit in top_subreddits:
+                task_id += 1
+                search_tasks.append(
+                    {
+                        "task_id": f"task_{task_id:03d}",
+                        "query": kw,
+                        "subreddit": subreddit,
+                        "sort_order": "relevance",
+                        "time_filter": "all",
+                        "max_posts": 50,
+                        "priority": 3,
+                        "keyword_type": "brand_subreddit",
+                        "description": f"品牌词在 r/{subreddit} 搜索: {kw}",
+                    }
+                )
+
+        # 4. comparison_keywords: priority=1, sort=top, time=year, max_posts=50, subreddit=""
+        for kw in comparison_keywords:
+            task_id += 1
+            search_tasks.append(
+                {
+                    "task_id": f"task_{task_id:03d}",
+                    "query": kw,
+                    "subreddit": "",
+                    "sort_order": "top",
+                    "time_filter": "year",
+                    "max_posts": 50,
+                    "priority": 1,
+                    "keyword_type": "comparison",
+                    "description": f"对比词高赞搜索: {kw}",
+                }
+            )
+
+        # 5. category_keywords: priority=2, sort=top, time=year, max_posts=30, subreddit=""
+        for kw in category_keywords:
+            task_id += 1
+            search_tasks.append(
+                {
+                    "task_id": f"task_{task_id:03d}",
+                    "query": kw,
+                    "subreddit": "",
+                    "sort_order": "top",
+                    "time_filter": "year",
+                    "max_posts": 30,
+                    "priority": 2,
+                    "keyword_type": "category",
+                    "description": f"品类通用词搜索: {kw}",
+                }
+            )
+
+        # 6. scenario_keywords: priority=2, sort=top, time=year, max_posts=30, subreddit=""
+        for kw in scenario_keywords:
+            task_id += 1
+            search_tasks.append(
+                {
+                    "task_id": f"task_{task_id:03d}",
+                    "query": kw,
+                    "subreddit": "",
+                    "sort_order": "top",
+                    "time_filter": "year",
+                    "max_posts": 30,
+                    "priority": 2,
+                    "keyword_type": "scenario",
+                    "description": f"场景词搜索: {kw}",
+                }
+            )
+
+        # 7. problem_keywords: priority=2, sort=relevance, time=all, max_posts=30, subreddit=""
+        for kw in problem_keywords:
+            task_id += 1
+            search_tasks.append(
+                {
+                    "task_id": f"task_{task_id:03d}",
+                    "query": kw,
+                    "subreddit": "",
+                    "sort_order": "relevance",
+                    "time_filter": "all",
+                    "max_posts": 30,
+                    "priority": 2,
+                    "keyword_type": "problem",
+                    "description": f"问题/痛点词搜索: {kw}",
+                }
+            )
+
+        logger.info(f"生成了 {len(search_tasks)} 个搜索任务")
+        return search_tasks
 
     def _build_data_card(
         self,
         input_data: Dict,
         keyword_suggestions: Dict,
         subreddit_suggestions: Dict,
-        search_strategy: Dict,
+        search_tasks: List[Dict],
     ) -> Dict:
         """构建完整的 Data Card JSON"""
 
@@ -384,9 +487,9 @@ class P1ConfigGenerator:
                             "description": f"推荐Subreddits ({len(subreddit_suggestions.get('high_relevance', []))}个)",
                         },
                         {
-                            "field_name": "search_strategy",
-                            "data_type": "object",
-                            "description": "APIFY搜索策略配置",
+                            "field_name": "search_tasks",
+                            "data_type": "array",
+                            "description": f"搜索任务列表 ({len(search_tasks)}个任务)",
                         },
                     ],
                 }
@@ -428,7 +531,7 @@ class P1ConfigGenerator:
                 "scenario_keywords": keyword_suggestions.get("scenario_keywords", []),
                 "problem_keywords": keyword_suggestions.get("problem_keywords", []),
                 "subreddit_suggestions": subreddit_suggestions,
-                "search_strategy": search_strategy,
+                "search_tasks": search_tasks,
                 "reasoning": keyword_suggestions.get("reasoning", ""),
             },
         }
