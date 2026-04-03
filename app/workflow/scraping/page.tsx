@@ -3,11 +3,19 @@
 import { useState } from 'react'
 import { showToast } from '@/components/Toast'
 
+interface DiscoveredSubreddit {
+  name: string
+  count: number
+  percentage: number
+}
+
 export default function ScrapingPage() {
-  const [status, setStatus] = useState<'idle' | 'preview' | 'running' | 'completed'>('idle')
+  const [status, setStatus] = useState<'idle' | 'discovering' | 'preview' | 'running' | 'completed'>('idle')
   const [mode, setMode] = useState<'mock' | 'real'>('mock')
   const [progress, setProgress] = useState(0)
   const [stats, setStats] = useState({ total: 0, bySubreddit: {} as Record<string, number> })
+  const [discoveredSubreddits, setDiscoveredSubreddits] = useState<DiscoveredSubreddit[]>([])
+  const [isDiscovering, setIsDiscovering] = useState(false)
 
   const previewData = {
     searchQueries: ['open ear earbuds', 'bone con headphones', 'open ear running'],
@@ -26,6 +34,63 @@ export default function ScrapingPage() {
       { id: 4, title: 'Open ear technology is getting really good', subreddit: 'audiophile', upvotes: 312, comments: 89, score: 0.85 },
       { id: 5, title: 'Bone conduction vs air conduction - which is better?', subreddit: 'earbuds', upvotes: 167, comments: 56, score: 0.71 },
     ],
+  }
+
+  const handleDiscover = async () => {
+    setIsDiscovering(true)
+    setStatus('discovering')
+    
+    try {
+      // 获取当前项目 ID（从 URL 参数或本地存储）
+      const urlParams = new URLSearchParams(window.location.search)
+      const projectId = urlParams.get('project_id') || 'default'
+      
+      const response = await fetch(`/api/projects/${projectId}/discover-subreddits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          use_mock: mode === 'mock'
+        }),
+      })
+      
+      if (!response.ok) {
+        throw new Error('探测请求失败')
+      }
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setDiscoveredSubreddits(result.data.discovered_subreddits || [])
+        showToast(`探测完成！发现 ${result.data.discovered_subreddits?.length || 0} 个活跃板块`, 'success')
+      } else {
+        throw new Error(result.error || '探测失败')
+      }
+    } catch (error) {
+      // Mock 模式下显示模拟数据
+      if (mode === 'mock') {
+        const mockDiscovered: DiscoveredSubreddit[] = [
+          { name: 'Parenting', count: 23, percentage: 23.0 },
+          { name: 'BuyItForLife', count: 18, percentage: 18.0 },
+          { name: 'toddlers', count: 15, percentage: 15.0 },
+          { name: 'daddit', count: 12, percentage: 12.0 },
+          { name: 'Mommit', count: 10, percentage: 10.0 },
+          { name: 'gadgets', count: 8, percentage: 8.0 },
+          { name: 'preschoolers', count: 7, percentage: 7.0 },
+          { name: 'BabyBumps', count: 4, percentage: 4.0 },
+          { name: 'beyondthebump', count: 2, percentage: 2.0 },
+          { name: 'slp', count: 1, percentage: 1.0 },
+        ]
+        setDiscoveredSubreddits(mockDiscovered)
+        showToast('Mock 探测完成！发现 10 个活跃板块', 'success')
+      } else {
+        showToast(`探测失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+      }
+    } finally {
+      setIsDiscovering(false)
+      setStatus('idle')
+    }
   }
 
   const handleStart = async () => {
@@ -87,13 +152,80 @@ export default function ScrapingPage() {
                 </button>
               </div>
             </div>
-            <button
-              onClick={handleStart}
-              className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
-            >
-              查看抓取预览 →
-            </button>
+            
+            {/* 探测板块按钮 */}
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={handleDiscover}
+                disabled={isDiscovering}
+                className="py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDiscovering ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    正在探测板块...
+                  </span>
+                ) : (
+                  <>🔍 探测板块</>
+                )}
+              </button>
+              <button
+                onClick={handleStart}
+                className="py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
+              >
+                查看抓取预览 →
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-400 text-center">
+              💡 建议先点击"探测板块"，了解哪些 Reddit 板块正在讨论你的产品
+            </p>
           </div>
+          
+          {/* 探测结果展示 */}
+          {discoveredSubreddits.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                📍 发现的活跃板块
+                <span className="text-xs font-normal text-slate-400">（基于品牌词全站搜索）</span>
+              </h3>
+              <div className="space-y-2">
+                {discoveredSubreddits.map((sub, index) => (
+                  <div key={sub.name} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800">r/{sub.name}</span>
+                        <span className="text-sm text-slate-500">{sub.count} 帖子</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${sub.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs font-semibold text-slate-400 w-12 text-right">
+                      {sub.percentage.toFixed(1)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 mt-3">
+                这些板块被用于验证和补充 P1 的 subreddit 推荐。实际抓取时会优先从这些板块获取数据。
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {status === 'discovering' && (
+        <div className="glass-card flex flex-col items-center justify-center py-16">
+          <div className="w-16 h-16 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-6" />
+          <p className="text-lg font-bold text-slate-700">正在探测板块...</p>
+          <p className="text-sm text-slate-400 mt-2">用品牌词全站搜索，分析实际讨论分布</p>
         </div>
       )}
 

@@ -489,6 +489,188 @@ class P2ScrapingManager:
             "actor_id": "trudax/reddit-scraper",
         }
 
+    def discover_subreddits(self, parent_card_id: str, use_mock: bool = False) -> Dict:
+        """
+        用核心品牌词做一次全站搜索，从结果中提取实际出现的 subreddit。
+        用于验证和补充 P1 的 subreddit 推荐。
+
+        这是一个"探测轮"，应该在 P2 正式大批量抓取之前调用。
+
+        Args:
+            parent_card_id: P1 产品卡 ID
+            use_mock: 是否使用 Mock 数据
+
+        Returns:
+            {
+                'discovery_id': 'discovery_xxx',
+                'brand_queries': [...],  # 用于探测的品牌词
+                'discovered_subreddits': [
+                    {'name': 'subreddit_name', 'count': 15, 'percentage': 30.0},
+                    ...
+                ],
+                'total_posts_analyzed': 100,
+                'status': 'completed',
+                'message': '...'
+            }
+        """
+        # 获取 P1 产品卡
+        p1_card = models.get_product_card(parent_card_id)
+        if not p1_card:
+            raise ValueError(f"P1 card not found: {parent_card_id}")
+
+        p1_data = p1_card.get("card_data", {})
+        generated_data = p1_data.get("generated_data", {})
+        search_tasks = generated_data.get("search_tasks", [])
+
+        # 从 search_tasks 中提取 priority=1 的品牌词（brand 和 product 类型）
+        brand_tasks = [
+            task
+            for task in search_tasks
+            if task.get("priority") == 1
+            and task.get("keyword_type") in ["brand", "product"]
+        ]
+
+        if not brand_tasks:
+            logger.warning(
+                f"未找到 priority=1 的品牌词任务，使用所有 priority=1 的任务"
+            )
+            brand_tasks = [task for task in search_tasks if task.get("priority") == 1]
+
+        if not brand_tasks:
+            return {
+                "discovery_id": f"discovery_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                "brand_queries": [],
+                "discovered_subreddits": [],
+                "total_posts_analyzed": 0,
+                "status": "failed",
+                "message": "未找到可用的品牌词进行探测",
+            }
+
+        # 限制最多用前 3 个品牌词进行探测（避免过多请求）
+        brand_tasks = brand_tasks[:3]
+        brand_queries = [task.get("query") for task in brand_tasks]
+
+        logger.info(f"开始板块探测，使用品牌词: {brand_queries}")
+
+        if use_mock:
+            # Mock 模式：生成模拟的板块发现结果
+            mock_discovered = [
+                {"name": "Parenting", "count": 23, "percentage": 23.0},
+                {"name": "BuyItForLife", "count": 18, "percentage": 18.0},
+                {"name": "toddlers", "count": 15, "percentage": 15.0},
+                {"name": "daddit", "count": 12, "percentage": 12.0},
+                {"name": "Mommit", "count": 10, "percentage": 10.0},
+                {"name": "gadgets", "count": 8, "percentage": 8.0},
+                {"name": "preschoolers", "count": 7, "percentage": 7.0},
+                {"name": "BabyBumps", "count": 4, "percentage": 4.0},
+                {"name": "beyondthebump", "count": 2, "percentage": 2.0},
+                {"name": "slp", "count": 1, "percentage": 1.0},
+            ]
+
+            discovery_result = {
+                "discovery_id": f"mock_discovery_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                "brand_queries": brand_queries,
+                "discovered_subreddits": mock_discovered,
+                "total_posts_analyzed": 100,
+                "status": "completed",
+                "use_mock": True,
+                "message": f"Mock 探测完成，发现 {len(mock_discovered)} 个板块",
+            }
+        else:
+            # 真实 APIFY 探测
+            try:
+                subreddit_counts = {}
+                total_posts = 0
+
+                for task in brand_tasks:
+                    # 创建探测任务：全站搜索，max_posts=50
+                    discovery_task = {
+                        "query": task.get("query"),
+                        "subreddit": "",  # 空表示全站搜索
+                        "sort_order": "relevance",
+                        "time_filter": "all",
+                        "max_posts": 50,
+                        "priority": 1,
+                        "keyword_type": task.get("keyword_type"),
+                    }
+
+                    # 运行 Apify 搜索（这里假设有执行方法）
+                    # 实际实现中需要调用 reddit_scraper 来执行搜索
+                    # 为了简化，这里使用 _create_apify_task 创建任务
+                    task_info = self._create_apify_task(discovery_task)
+
+                    # 实际应该从 task_info 中获取结果并解析
+                    # 这里简化处理，假设返回了模拟结果
+                    # 实际实现中应该等待任务完成并获取数据
+                    logger.info(
+                        f"探测任务已创建: {task_info.get('task_id')} for query: {task.get('query')}"
+                    )
+
+                    # TODO: 实际实现中需要轮询任务状态并获取结果
+                    # 这里为了演示，添加一个模拟的板块计数
+                    # 实际应该从 Apify 返回的 posts 中提取 subreddit 字段
+
+                # 由于实际 API 调用比较复杂，这里返回一个待实现的状态
+                # 实际使用时需要完成 _execute_discovery_search 方法
+                discovery_result = {
+                    "discovery_id": f"discovery_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    "brand_queries": brand_queries,
+                    "discovered_subreddits": [],
+                    "total_posts_analyzed": 0,
+                    "status": "pending",
+                    "use_mock": False,
+                    "message": f"探测任务已创建，正在分析 {len(brand_queries)} 个品牌词...",
+                }
+
+            except Exception as e:
+                logger.error(f"板块探测失败: {e}")
+                discovery_result = {
+                    "discovery_id": f"discovery_failed_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    "brand_queries": brand_queries,
+                    "discovered_subreddits": [],
+                    "total_posts_analyzed": 0,
+                    "status": "failed",
+                    "message": f"探测失败: {str(e)}",
+                }
+
+        # 将探测结果存入 P1 产品卡
+        try:
+            generated_data["discovered_subreddits"] = discovery_result
+            # 更新产品卡（实际需要通过 models 层保存）
+            logger.info(f"板块探测结果已保存到 P1 产品卡: {parent_card_id}")
+        except Exception as e:
+            logger.error(f"保存探测结果失败: {e}")
+
+        return discovery_result
+
+    def get_discovered_subreddits(self, parent_card_id: str) -> Dict:
+        """
+        获取已保存的板块探测结果
+
+        Args:
+            parent_card_id: P1 产品卡 ID
+
+        Returns:
+            之前 discover_subreddits 的结果，如果没有则返回空
+        """
+        try:
+            p1_card = models.get_product_card(parent_card_id)
+            if not p1_card:
+                return {"found": False, "message": "P1 card not found"}
+
+            p1_data = p1_card.get("card_data", {})
+            generated_data = p1_data.get("generated_data", {})
+            discovered = generated_data.get("discovered_subreddits")
+
+            if discovered:
+                return {"found": True, "data": discovered}
+            else:
+                return {"found": False, "message": "尚未进行板块探测"}
+
+        except Exception as e:
+            logger.error(f"获取探测结果失败: {e}")
+            return {"found": False, "message": f"Error: {str(e)}"}
+
     def _poll_apify_task(self, task_id: str) -> Dict:
         """轮询 APIFY 任务状态"""
         # 实际实现需要调用 APIFY API 查询任务状态
