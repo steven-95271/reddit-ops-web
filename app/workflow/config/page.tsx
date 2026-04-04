@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { showToast } from '@/components/Toast'
+import WorkflowGuide from '@/components/WorkflowGuide'
 
 interface Project {
   id: string
@@ -37,6 +38,10 @@ export default function ConfigPage() {
   const [viewingProject, setViewingProject] = useState<Project | null>(null)
   const [expanding, setExpanding] = useState(false)
   const [saving, setSaving] = useState(false)
+  
+  // URL 提取
+  const [productUrl, setProductUrl] = useState('')
+  const [extracting, setExtracting] = useState(false)
   
   // 表单状态
   const [formData, setFormData] = useState({
@@ -84,6 +89,7 @@ export default function ConfigPage() {
       competitor_brands: [''],
       seed_keywords: ['']
     })
+    setProductUrl('')
     setEditingProject(null)
   }
 
@@ -299,6 +305,45 @@ export default function ConfigPage() {
     }
   }
 
+  // URL 提取处理
+  const handleExtractUrl = async () => {
+    if (!productUrl.trim()) {
+      showToast('请输入产品页面 URL', 'error')
+      return
+    }
+
+    try {
+      setExtracting(true)
+      const res = await fetch('/api/extract-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: productUrl.trim() })
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        const extracted = data.data
+        setFormData(prev => ({
+          ...prev,
+          product_name: extracted.product_name || prev.product_name,
+          product_description: extracted.product_description || prev.product_description,
+          target_audience: extracted.target_audience || prev.target_audience,
+          brand_names: extracted.brand_names?.length ? extracted.brand_names : prev.brand_names,
+          competitor_brands: extracted.competitor_brands?.length ? extracted.competitor_brands : prev.competitor_brands,
+          seed_keywords: extracted.suggested_keywords?.length ? extracted.suggested_keywords : prev.seed_keywords
+        }))
+        showToast('产品信息提取成功！', 'success')
+      } else {
+        showToast(data.error || '无法提取，请手动填写', 'error')
+      }
+    } catch (error) {
+      console.error('Error extracting URL:', error)
+      showToast('无法提取，请手动填写', 'error')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
   // 添加/删除多值字段
   const addArrayField = (field: 'brand_names' | 'competitor_brands' | 'seed_keywords') => {
     setFormData(prev => ({
@@ -359,6 +404,32 @@ export default function ConfigPage() {
           <p className="text-slate-600 mt-2">
             创建和管理你的 Reddit 运营项目，配置产品信息和关键词策略
           </p>
+        </div>
+
+        {/* 工作流说明 */}
+        <div className="mb-6">
+          <WorkflowGuide
+            title="P1 项目配置"
+            description="在这里创建运营项目，AI 会根据你的产品信息自动推荐关键词和 Reddit 板块"
+            steps={[
+              {
+                title: '填写产品基本信息',
+                description: '粘贴产品链接让 AI 提取，或手动填写产品名称、描述等信息'
+              },
+              {
+                title: '点击 AI 生成配置',
+                description: 'AI 会自动分析并推荐适合 Reddit 营销的关键词和板块'
+              },
+              {
+                title: '审核并编辑关键词和 Subreddit',
+                description: '检查 AI 生成的结果，删除不相关的，添加遗漏的'
+              },
+              {
+                title: '保存后进入 P2 抓取',
+                description: '配置完成后保存，即可进入下一步抓取 Reddit 帖子'
+              }
+            ]}
+          />
         </div>
 
         {/* 操作栏 */}
@@ -659,6 +730,42 @@ export default function ConfigPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* URL 提取 */}
+              {!editingProject && (
+                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    产品页面 URL（可选）
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={productUrl}
+                      onChange={e => setProductUrl(e.target.value)}
+                      placeholder="粘贴产品页面 URL（如 Amazon、官网链接），AI 自动提取产品信息"
+                      className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleExtractUrl}
+                      disabled={extracting || !productUrl.trim()}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {extracting ? (
+                        <span className="flex items-center gap-2">
+                          <span className="animate-spin">⏳</span>
+                          提取中...
+                        </span>
+                      ) : (
+                        '🤖 AI 提取'
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    支持 Amazon、品牌官网等产品页面。AI 会自动提取产品名称、描述、卖点等信息。
+                  </p>
+                </div>
+              )}
+
               {/* 项目名称 */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
