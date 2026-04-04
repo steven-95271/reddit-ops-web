@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { showToast } from '@/components/Toast'
 
 interface Project {
@@ -12,19 +11,32 @@ interface Project {
   target_audience?: string
   brand_names?: string[]
   competitor_brands?: string[]
-  keywords?: { seed?: string[] }
-  subreddits?: any[]
+  keywords?: {
+    seed?: string[]
+    core?: string[]
+    longTail?: string[]
+    competitor?: string[]
+    scenario?: string[]
+  }
+  subreddits?: {
+    high?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
+    medium?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
+    low?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
+  }
   status: string
   created_at: string
   updated_at: string
 }
 
 export default function ConfigPage() {
-  const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [showDetail, setShowDetail] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [viewingProject, setViewingProject] = useState<Project | null>(null)
+  const [expanding, setExpanding] = useState(false)
+  const [saving, setSaving] = useState(false)
   
   // 表单状态
   const [formData, setFormData] = useState({
@@ -96,8 +108,15 @@ export default function ConfigPage() {
     setShowForm(true)
   }
 
+  // 查看项目详情
+  const handleViewDetail = (project: Project) => {
+    setViewingProject(project)
+    setShowDetail(true)
+  }
+
   // 删除项目
-  const handleDelete = async (project: Project) => {
+  const handleDelete = async (project: Project, e?: React.MouseEvent) => {
+    e?.stopPropagation()
     if (!confirm(`确定要删除项目"${project.name}"吗？此操作不可恢复。`)) {
       return
     }
@@ -118,6 +137,99 @@ export default function ConfigPage() {
       console.error('Error deleting project:', error)
       showToast('删除失败', 'error')
     }
+  }
+
+  // AI 生成配置
+  const handleAIExpand = async () => {
+    if (!viewingProject) return
+
+    try {
+      setExpanding(true)
+      const res = await fetch(`/api/projects/${viewingProject.id}/expand`, {
+        method: 'POST'
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        showToast('AI 配置生成成功', 'success')
+        // 更新当前查看的项目
+        setViewingProject(prev => prev ? {
+          ...prev,
+          keywords: {
+            ...prev.keywords,
+            ...data.data.keywords
+          },
+          subreddits: data.data.subreddits
+        } : null)
+        // 刷新项目列表
+        fetchProjects()
+      } else {
+        showToast(data.error || 'AI 生成失败', 'error')
+      }
+    } catch (error) {
+      console.error('Error expanding project:', error)
+      showToast('AI 生成失败', 'error')
+    } finally {
+      setExpanding(false)
+    }
+  }
+
+  // 保存配置
+  const handleSaveConfig = async () => {
+    if (!viewingProject) return
+
+    try {
+      setSaving(true)
+      const res = await fetch(`/api/projects/${viewingProject.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keywords: viewingProject.keywords,
+          subreddits: viewingProject.subreddits
+        })
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        showToast('配置已保存', 'success')
+        fetchProjects()
+      } else {
+        showToast(data.error || '保存失败', 'error')
+      }
+    } catch (error) {
+      console.error('Error saving config:', error)
+      showToast('保存失败', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 删除关键词
+  const removeKeyword = (category: 'core' | 'longTail' | 'competitor' | 'scenario', keyword: string) => {
+    setViewingProject(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        keywords: {
+          ...prev.keywords,
+          [category]: prev.keywords?.[category]?.filter(k => k !== keyword) || []
+        }
+      }
+    })
+  }
+
+  // 删除 Subreddit
+  const removeSubreddit = (relevance: 'high' | 'medium' | 'low', name: string) => {
+    setViewingProject(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        subreddits: {
+          ...prev.subreddits,
+          [relevance]: prev.subreddits?.[relevance]?.filter(s => s.name !== name) || []
+        }
+      }
+    })
   }
 
   // 提交表单
@@ -209,6 +321,35 @@ export default function ConfigPage() {
     }))
   }
 
+  const getRelevanceColor = (relevance: string) => {
+    switch (relevance) {
+      case 'high': return 'bg-green-100 text-green-700 border-green-200'
+      case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+      case 'low': return 'bg-slate-100 text-slate-600 border-slate-200'
+      default: return 'bg-blue-100 text-blue-700 border-blue-200'
+    }
+  }
+
+  const getKeywordCategoryColor = (category: string) => {
+    switch (category) {
+      case 'core': return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'longTail': return 'bg-purple-100 text-purple-700 border-purple-200'
+      case 'competitor': return 'bg-orange-100 text-orange-700 border-orange-200'
+      case 'scenario': return 'bg-green-100 text-green-700 border-green-200'
+      default: return 'bg-slate-100 text-slate-600 border-slate-200'
+    }
+  }
+
+  const getKeywordCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'core': return '核心词'
+      case 'longTail': return '长尾词'
+      case 'competitor': return '竞品词'
+      case 'scenario': return '场景词'
+      default: return category
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -255,7 +396,8 @@ export default function ConfigPage() {
             {projects.map(project => (
               <div
                 key={project.id}
-                className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition-shadow p-6 group"
+                onClick={() => handleViewDetail(project)}
+                className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition-all p-6 group cursor-pointer"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -276,6 +418,19 @@ export default function ConfigPage() {
                   {project.product_description || '暂无描述'}
                 </p>
 
+                {/* 显示关键词配置状态 */}
+                <div className="flex items-center gap-2 mb-4">
+                  {project.keywords?.core && project.keywords.core.length > 0 ? (
+                    <span className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded flex items-center gap-1">
+                      ✅ 已配置关键词
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs rounded flex items-center gap-1">
+                      ⏳ 待生成配置
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex flex-wrap gap-2 mb-4">
                   {project.brand_names?.slice(0, 3).map((brand, i) => (
                     <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
@@ -293,7 +448,7 @@ export default function ConfigPage() {
                   <span className="text-xs text-slate-400">
                     {new Date(project.created_at).toLocaleDateString('zh-CN')}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => handleEdit(project)}
                       className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -301,7 +456,7 @@ export default function ConfigPage() {
                       编辑
                     </button>
                     <button
-                      onClick={() => handleDelete(project)}
+                      onClick={(e) => handleDelete(project, e)}
                       className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       删除
@@ -313,6 +468,176 @@ export default function ConfigPage() {
           </div>
         )}
       </div>
+
+      {/* 项目详情弹窗 */}
+      {showDetail && viewingProject && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{viewingProject.name}</h2>
+                <p className="text-sm text-slate-500">{viewingProject.product_name}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDetail(false)
+                  setViewingProject(null)
+                }}
+                className="text-slate-400 hover:text-slate-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-8">
+              {/* 产品信息 */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">产品信息</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-500">产品描述：</span>
+                    <span className="text-slate-700">{viewingProject.product_description || '暂无'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">目标受众：</span>
+                    <span className="text-slate-700">{viewingProject.target_audience || '暂无'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">品牌：</span>
+                    <span className="text-slate-700">{viewingProject.brand_names?.join(', ') || '暂无'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">竞品：</span>
+                    <span className="text-slate-700">{viewingProject.competitor_brands?.join(', ') || '暂无'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI 生成按钮 */}
+              <div className="flex justify-center">
+                <button
+                  onClick={handleAIExpand}
+                  disabled={expanding}
+                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                >
+                  {expanding ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      AI 生成中...
+                    </>
+                  ) : (
+                    <>
+                      🤖 AI 生成配置
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 关键词展示 */}
+              {viewingProject.keywords?.core && viewingProject.keywords.core.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">关键词策略</h3>
+                  <div className="space-y-4">
+                    {(['core', 'longTail', 'competitor', 'scenario'] as const).map(category => {
+                      const keywords = viewingProject.keywords?.[category] || []
+                      if (keywords.length === 0) return null
+                      return (
+                        <div key={category} className="bg-white border border-slate-200 rounded-xl p-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-medium text-slate-700">
+                              {getKeywordCategoryLabel(category)}
+                              <span className="ml-2 text-sm text-slate-500">({keywords.length}个)</span>
+                            </h4>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {keywords.map((keyword, idx) => (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getKeywordCategoryColor(category)}`}
+                              >
+                                {keyword}
+                                <button
+                                  onClick={() => removeKeyword(category, keyword)}
+                                  className="ml-1 hover:text-red-500 transition-colors"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Subreddit 展示 */}
+              {viewingProject.subreddits && (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">推荐 Subreddits</h3>
+                  <div className="space-y-4">
+                    {(['high', 'medium', 'low'] as const).map(relevance => {
+                      const subreddits = viewingProject.subreddits?.[relevance] || []
+                      if (subreddits.length === 0) return null
+                      return (
+                        <div key={relevance}>
+                          <h4 className="font-medium text-slate-700 mb-3">
+                            {relevance === 'high' ? '高相关度' : relevance === 'medium' ? '中相关度' : '低相关度'}
+                            <span className="ml-2 text-sm text-slate-500">({subreddits.length}个)</span>
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {subreddits.map((sub, idx) => (
+                              <div
+                                key={idx}
+                                className={`p-4 rounded-xl border ${getRelevanceColor(relevance)} flex justify-between items-start`}
+                              >
+                                <div>
+                                  <div className="font-semibold">r/{sub.name}</div>
+                                  <div className="text-sm mt-1 opacity-80">{sub.reason}</div>
+                                  <div className="text-xs mt-2 opacity-60">
+                                    发帖频率: {sub.estimatedPosts === 'daily' ? '每日' : '每周'}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => removeSubreddit(relevance, sub.name)}
+                                  className="text-slate-400 hover:text-red-500 transition-colors"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 保存按钮 */}
+              {viewingProject.keywords?.core && viewingProject.keywords.core.length > 0 && (
+                <div className="flex justify-end pt-4 border-t border-slate-200">
+                  <button
+                    onClick={handleSaveConfig}
+                    disabled={saving}
+                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        保存中...
+                      </>
+                    ) : (
+                      '💾 保存配置'
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 表单弹窗 */}
       {showForm && (
