@@ -1,349 +1,442 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { showToast } from '@/components/Toast'
 
-interface DiscoveredSubreddit {
+interface Project {
+  id: string
   name: string
-  count: number
-  percentage: number
+  product_name: string
+  keywords?: {
+    core?: string[]
+    longTail?: string[]
+    competitor?: string[]
+    scenario?: string[]
+    seed?: string[]
+  }
+  subreddits?: {
+    high?: Array<{ name: string; reason: string }>
+    medium?: Array<{ name: string; reason: string }>
+    low?: Array<{ name: string; reason: string }>
+  }
 }
 
+type ScrapingStatus = 'idle' | 'pending' | 'running' | 'succeeded' | 'failed'
+
 export default function ScrapingPage() {
-  const [status, setStatus] = useState<'idle' | 'discovering' | 'preview' | 'running' | 'completed'>('idle')
-  const [mode, setMode] = useState<'mock' | 'real'>('mock')
-  const [progress, setProgress] = useState(0)
-  const [stats, setStats] = useState({ total: 0, bySubreddit: {} as Record<string, number> })
-  const [discoveredSubreddits, setDiscoveredSubreddits] = useState<DiscoveredSubreddit[]>([])
-  const [isDiscovering, setIsDiscovering] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(false)
+  
+  // 抓取参数
+  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('7d')
+  const [maxPosts, setMaxPosts] = useState(100)
+  const [sortBy, setSortBy] = useState<'hot' | 'new' | 'top'>('hot')
+  
+  // 抓取状态
+  const [scrapingStatus, setScrapingStatus] = useState<ScrapingStatus>('idle')
+  const [runId, setRunId] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [results, setResults] = useState<{ total: number; inserted: number; skipped: number } | null>(null)
 
-  const previewData = {
-    searchQueries: ['open ear earbuds', 'bone con headphones', 'open ear running'],
-    subreddits: ['r/headphones', 'r/earbuds', 'r/audiophile'],
-    estimatedPosts: '87 条',
-    timeRange: '最近 7 天',
-  }
+  // 加载项目列表
+  useEffect(() => {
+    fetchProjects()
+  }, [])
 
-  const mockResults = {
-    totalPosts: 87,
-    bySubreddit: { headphones: 32, earbuds: 28, audiophile: 18, running: 9 },
-    topPosts: [
-      { id: 1, title: 'Best open ear earbuds for running in 2024?', subreddit: 'running', upvotes: 234, comments: 67, score: 0.89 },
-      { id: 2, title: 'Shokz OpenFit vs Oladance OWS Pro - honest comparison', subreddit: 'headphones', upvotes: 456, comments: 123, score: 0.92 },
-      { id: 3, title: 'Finally found earbuds that don\'t hurt during long runs', subreddit: 'running', upvotes: 189, comments: 45, score: 0.76 },
-      { id: 4, title: 'Open ear technology is getting really good', subreddit: 'audiophile', upvotes: 312, comments: 89, score: 0.85 },
-      { id: 5, title: 'Bone conduction vs air conduction - which is better?', subreddit: 'earbuds', upvotes: 167, comments: 56, score: 0.71 },
-    ],
-  }
-
-  const handleDiscover = async () => {
-    setIsDiscovering(true)
-    setStatus('discovering')
-    
+  const fetchProjects = async () => {
     try {
-      // 获取当前项目 ID（从 URL 参数或本地存储）
-      const urlParams = new URLSearchParams(window.location.search)
-      const projectId = urlParams.get('project_id') || 'default'
+      const res = await fetch('/api/projects')
+      const data = await res.json()
       
-      const response = await fetch(`/api/projects/${projectId}/discover-subreddits`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          use_mock: mode === 'mock'
-        }),
-      })
-      
-      if (!response.ok) {
-        throw new Error('探测请求失败')
-      }
-      
-      const result = await response.json()
-      
-      if (result.success) {
-        setDiscoveredSubreddits(result.data.discovered_subreddits || [])
-        showToast(`探测完成！发现 ${result.data.discovered_subreddits?.length || 0} 个活跃板块`, 'success')
+      if (data.success) {
+        setProjects(data.data || [])
       } else {
-        throw new Error(result.error || '探测失败')
+        showToast(data.error || '获取项目列表失败', 'error')
       }
     } catch (error) {
-      // Mock 模式下显示模拟数据
-      if (mode === 'mock') {
-        const mockDiscovered: DiscoveredSubreddit[] = [
-          { name: 'Parenting', count: 23, percentage: 23.0 },
-          { name: 'BuyItForLife', count: 18, percentage: 18.0 },
-          { name: 'toddlers', count: 15, percentage: 15.0 },
-          { name: 'daddit', count: 12, percentage: 12.0 },
-          { name: 'Mommit', count: 10, percentage: 10.0 },
-          { name: 'gadgets', count: 8, percentage: 8.0 },
-          { name: 'preschoolers', count: 7, percentage: 7.0 },
-          { name: 'BabyBumps', count: 4, percentage: 4.0 },
-          { name: 'beyondthebump', count: 2, percentage: 2.0 },
-          { name: 'slp', count: 1, percentage: 1.0 },
-        ]
-        setDiscoveredSubreddits(mockDiscovered)
-        showToast('Mock 探测完成！发现 10 个活跃板块', 'success')
-      } else {
-        showToast(`探测失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
-      }
-    } finally {
-      setIsDiscovering(false)
-      setStatus('idle')
+      console.error('Error fetching projects:', error)
+      showToast('获取项目列表失败', 'error')
     }
   }
 
-  const handleStart = async () => {
-    setStatus('preview')
+  // 轮询抓取状态
+  const pollStatus = useCallback(async (rid: string, projectId: string) => {
+    try {
+      const res = await fetch(`/api/scraping/${rid}`)
+      const data = await res.json()
+
+      if (!data.success) {
+        setScrapingStatus('failed')
+        setStatusMessage(data.error || '查询状态失败')
+        showToast(data.error || '查询状态失败', 'error')
+        return
+      }
+
+      const status = data.data.status
+      setStatusMessage(`当前状态: ${status}`)
+
+      if (status === 'SUCCEEDED') {
+        setScrapingStatus('succeeded')
+        showToast('抓取完成，正在保存数据...', 'success')
+        
+        // 自动保存结果
+        await saveResults(rid, projectId)
+      } else if (status === 'FAILED' || status === 'TIMED_OUT' || status === 'ABORTED') {
+        setScrapingStatus('failed')
+        setStatusMessage(`抓取失败: ${data.data.errorMessage || status}`)
+        showToast(`抓取失败: ${data.data.errorMessage || status}`, 'error')
+      } else {
+        // 继续轮询
+        setTimeout(() => pollStatus(rid, projectId), 10000)
+      }
+    } catch (error) {
+      console.error('Error polling status:', error)
+      setScrapingStatus('failed')
+      setStatusMessage('轮询状态失败')
+      showToast('轮询状态失败', 'error')
+    }
+  }, [])
+
+  // 保存抓取结果
+  const saveResults = async (rid: string, projectId: string) => {
+    try {
+      const res = await fetch(`/api/scraping/${rid}/results?project_id=${projectId}`, {
+        method: 'POST'
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        setResults(data.data)
+        showToast(`数据保存完成！新增 ${data.data.inserted} 条，跳过 ${data.data.skipped} 条`, 'success')
+      } else {
+        showToast(data.error || '保存数据失败', 'error')
+      }
+    } catch (error) {
+      console.error('Error saving results:', error)
+      showToast('保存数据失败', 'error')
+    }
   }
 
-  const handleConfirm = async () => {
-    setStatus('running')
-    setProgress(0)
+  // 开始抓取
+  const startScraping = async () => {
+    if (!selectedProject) {
+      showToast('请先选择一个项目', 'error')
+      return
+    }
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setStatus('completed')
-          setStats({
-            total: mockResults.totalPosts,
-            bySubreddit: mockResults.bySubreddit,
-          })
-          showToast(`抓取完成！共获取 ${mockResults.totalPosts} 条帖子`, 'success')
-          return 100
-        }
-        return prev + 5
+    // 检查项目是否有配置
+    const hasKeywords = selectedProject.keywords && 
+      (selectedProject.keywords.core?.length || 
+       selectedProject.keywords.longTail?.length ||
+       selectedProject.keywords.seed?.length)
+    
+    const hasSubreddits = selectedProject.subreddits &&
+      (selectedProject.subreddits.high?.length ||
+       selectedProject.subreddits.medium?.length)
+
+    if (!hasKeywords && !hasSubreddits) {
+      showToast('该项目尚未配置关键词和 Subreddit，请先完成 P1 配置', 'error')
+      return
+    }
+
+    setLoading(true)
+    setScrapingStatus('pending')
+    setStatusMessage('启动抓取任务...')
+    setResults(null)
+
+    try {
+      const res = await fetch('/api/scraping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject.id,
+          time_range: timeRange,
+          max_posts: maxPosts,
+          sort_by: sortBy
+        })
       })
-    }, 200)
+
+      const data = await res.json()
+
+      if (data.success) {
+        const rid = data.data.run_id
+        setRunId(rid)
+        setScrapingStatus('running')
+        setStatusMessage('抓取任务已启动，正在等待...')
+        showToast('抓取任务已启动', 'success')
+        
+        // 开始轮询
+        setTimeout(() => pollStatus(rid, selectedProject.id), 5000)
+      } else {
+        setScrapingStatus('failed')
+        setStatusMessage(data.error || '启动抓取失败')
+        showToast(data.error || '启动抓取失败', 'error')
+      }
+    } catch (error) {
+      console.error('Error starting scraping:', error)
+      setScrapingStatus('failed')
+      setStatusMessage('启动抓取失败')
+      showToast('启动抓取失败', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 计算总关键词数和 subreddit 数
+  const getTotalKeywords = (project: Project) => {
+    if (!project.keywords) return 0
+    return (project.keywords.core?.length || 0) +
+           (project.keywords.longTail?.length || 0) +
+           (project.keywords.competitor?.length || 0) +
+           (project.keywords.scenario?.length || 0) +
+           (project.keywords.seed?.length || 0)
+  }
+
+  const getTotalSubreddits = (project: Project) => {
+    if (!project.subreddits) return 0
+    return (project.subreddits.high?.length || 0) +
+           (project.subreddits.medium?.length || 0) +
+           (project.subreddits.low?.length || 0)
+  }
+
+  const getStatusColor = (status: ScrapingStatus) => {
+    switch (status) {
+      case 'idle': return 'text-slate-500'
+      case 'pending': return 'text-yellow-600'
+      case 'running': return 'text-blue-600'
+      case 'succeeded': return 'text-green-600'
+      case 'failed': return 'text-red-600'
+      default: return 'text-slate-500'
+    }
+  }
+
+  const getStatusBg = (status: ScrapingStatus) => {
+    switch (status) {
+      case 'idle': return 'bg-slate-100'
+      case 'pending': return 'bg-yellow-50'
+      case 'running': return 'bg-blue-50'
+      case 'succeeded': return 'bg-green-50'
+      case 'failed': return 'bg-red-50'
+      default: return 'bg-slate-100'
+    }
   }
 
   return (
-    <div className="space-y-6">
-      {status === 'idle' && (
-        <div className="glass-card">
-          <h2 className="text-xl font-black text-slate-900 mb-6">抓取配置</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">抓取模式</label>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* 页面标题 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">P2 内容抓取</h1>
+          <p className="text-slate-600 mt-2">
+            根据项目配置的关键词和 Subreddit，从 Reddit 抓取帖子数据
+          </p>
+        </div>
+
+        {/* 项目选择器 */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            选择项目 <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={selectedProject?.id || ''}
+            onChange={(e) => {
+              const project = projects.find(p => p.id === e.target.value)
+              setSelectedProject(project || null)
+              setScrapingStatus('idle')
+              setResults(null)
+            }}
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">请选择一个项目</option>
+            {projects.map(project => (
+              <option key={project.id} value={project.id}>
+                {project.name} - {project.product_name}
+              </option>
+            ))}
+          </select>
+
+          {/* 项目配置摘要 */}
+          {selectedProject && (
+            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
               <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setMode('mock')}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    mode === 'mock'
-                      ? 'border-slate-900 bg-slate-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="text-lg font-bold text-slate-900">🧪 Mock 模式</div>
-                  <div className="text-xs text-slate-500 mt-1">使用预置数据，快速测试流程</div>
-                </button>
-                <button
-                  onClick={() => setMode('real')}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    mode === 'real'
-                      ? 'border-slate-900 bg-slate-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="text-lg font-bold text-slate-900">🌐 真实抓取</div>
-                  <div className="text-xs text-slate-500 mt-1">通过 APIFY 抓取真实 Reddit 数据</div>
-                </button>
+                <div>
+                  <span className="text-sm text-slate-500">关键词数量：</span>
+                  <span className="text-sm font-semibold text-slate-700">{getTotalKeywords(selectedProject)} 个</span>
+                </div>
+                <div>
+                  <span className="text-sm text-slate-500">Subreddit 数量：</span>
+                  <span className="text-sm font-semibold text-slate-700">{getTotalSubreddits(selectedProject)} 个</span>
+                </div>
               </div>
-            </div>
-            
-            {/* 探测板块按钮 */}
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={handleDiscover}
-                disabled={isDiscovering}
-                className="py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isDiscovering ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    正在探测板块...
-                  </span>
-                ) : (
-                  <>🔍 探测板块</>
-                )}
-              </button>
-              <button
-                onClick={handleStart}
-                className="py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
-              >
-                查看抓取预览 →
-              </button>
-            </div>
-            
-            <p className="text-xs text-slate-400 text-center">
-              💡 建议先点击"探测板块"，了解哪些 Reddit 板块正在讨论你的产品
-            </p>
-          </div>
-          
-          {/* 探测结果展示 */}
-          {discoveredSubreddits.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-slate-200">
-              <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                📍 发现的活跃板块
-                <span className="text-xs font-normal text-slate-400">（基于品牌词全站搜索）</span>
-              </h3>
-              <div className="space-y-2">
-                {discoveredSubreddits.map((sub, index) => (
-                  <div key={sub.name} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-800">r/{sub.name}</span>
-                        <span className="text-sm text-slate-500">{sub.count} 帖子</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full"
-                          style={{ width: `${sub.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-xs font-semibold text-slate-400 w-12 text-right">
-                      {sub.percentage.toFixed(1)}%
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-slate-400 mt-3">
-                这些板块被用于验证和补充 P1 的 subreddit 推荐。实际抓取时会优先从这些板块获取数据。
-              </p>
+              {getTotalKeywords(selectedProject) === 0 && getTotalSubreddits(selectedProject) === 0 && (
+                <div className="mt-2 text-sm text-orange-600">
+                  ⚠️ 该项目尚未配置关键词和 Subreddit，请先完成 P1 配置
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
-      
-      {status === 'discovering' && (
-        <div className="glass-card flex flex-col items-center justify-center py-16">
-          <div className="w-16 h-16 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-6" />
-          <p className="text-lg font-bold text-slate-700">正在探测板块...</p>
-          <p className="text-sm text-slate-400 mt-2">用品牌词全站搜索，分析实际讨论分布</p>
-        </div>
-      )}
 
-      {status === 'preview' && (
-        <div className="space-y-6">
-          <div className="glass-card">
-            <h2 className="text-xl font-black text-slate-900 mb-4">抓取预览</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs font-bold text-slate-400 uppercase mb-2">搜索词</div>
-                {previewData.searchQueries.map((q, i) => (
-                  <div key={i} className="text-sm text-slate-700 py-1">• {q}</div>
+        {/* 参数设置面板 */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">抓取参数设置</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 时间范围 */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                时间范围
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: '24h', label: '最近 24 小时' },
+                  { value: '7d', label: '最近 7 天' },
+                  { value: '30d', label: '最近 30 天' }
+                ].map(option => (
+                  <label key={option.value} className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="timeRange"
+                      value={option.value}
+                      checked={timeRange === option.value}
+                      onChange={(e) => setTimeRange(e.target.value as any)}
+                      className="mr-2 text-blue-600 focus:ring-blue-500"
+                      disabled={scrapingStatus === 'running' || scrapingStatus === 'pending'}
+                    />
+                    <span className="text-sm text-slate-700">{option.label}</span>
+                  </label>
                 ))}
               </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs font-bold text-slate-400 uppercase mb-2">目标板块</div>
-                {previewData.subreddits.map((s, i) => (
-                  <div key={i} className="text-sm text-slate-700 py-1">• {s}</div>
-                ))}
-              </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs font-bold text-slate-400 uppercase mb-2">预估数量</div>
-                <div className="text-2xl font-black text-slate-900">{previewData.estimatedPosts}</div>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs font-bold text-slate-400 uppercase mb-2">时间范围</div>
-                <div className="text-2xl font-black text-slate-900">{previewData.timeRange}</div>
-              </div>
             </div>
-          </div>
 
-          <div className="flex gap-4">
-            <button
-              onClick={() => setStatus('idle')}
-              className="flex-1 py-3 border-2 border-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-colors"
-            >
-              返回
-            </button>
-            <button
-              onClick={handleConfirm}
-              className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
-            >
-              开始抓取 {mode === 'mock' ? '(Mock)' : '(真实)'} →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {status === 'running' && (
-        <div className="glass-card flex flex-col items-center justify-center py-20">
-          <div className="w-full max-w-md">
-            <div className="flex justify-between text-sm font-semibold text-slate-600 mb-2">
-              <span>正在抓取...</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-slate-900 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
+            {/* 最大抓取数量 */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                最大抓取数量
+              </label>
+              <input
+                type="number"
+                value={maxPosts}
+                onChange={(e) => setMaxPosts(Math.max(10, Math.min(500, parseInt(e.target.value) || 100)))}
+                min={10}
+                max={500}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={scrapingStatus === 'running' || scrapingStatus === 'pending'}
               />
+              <p className="text-xs text-slate-500 mt-1">范围：10 - 500</p>
             </div>
-            <p className="text-sm text-slate-400 mt-4 text-center">
-              {progress < 30 ? '正在连接 APIFY...' : progress < 60 ? '正在抓取帖子...' : progress < 90 ? '正在解析数据...' : '即将完成...'}
-            </p>
-          </div>
-        </div>
-      )}
 
-      {status === 'completed' && (
-        <div className="space-y-6">
-          <div className="glass-card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-black text-slate-900">抓取结果</h2>
-              <span className="badge bg-green-100 text-green-700">✅ 完成</span>
-            </div>
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              <div className="bg-slate-50 rounded-xl p-4 text-center">
-                <div className="text-3xl font-black text-slate-900">{stats.total}</div>
-                <div className="text-xs text-slate-500 font-medium mt-1">总帖子数</div>
+            {/* 排序方式 */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                排序方式
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: 'hot', label: '热门 (Hot)' },
+                  { value: 'new', label: '最新 (New)' },
+                  { value: 'top', label: '最佳 (Top)' }
+                ].map(option => (
+                  <label key={option.value} className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="sortBy"
+                      value={option.value}
+                      checked={sortBy === option.value}
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="mr-2 text-blue-600 focus:ring-blue-500"
+                      disabled={scrapingStatus === 'running' || scrapingStatus === 'pending'}
+                    />
+                    <span className="text-sm text-slate-700">{option.label}</span>
+                  </label>
+                ))}
               </div>
-              {Object.entries(stats.bySubreddit).map(([sub, count]) => (
-                <div key={sub} className="bg-slate-50 rounded-xl p-4 text-center">
-                  <div className="text-2xl font-black text-slate-900">{count}</div>
-                  <div className="text-xs text-slate-500 font-medium mt-1">r/{sub}</div>
-                </div>
-              ))}
             </div>
           </div>
-
-          <div className="glass-card">
-            <h2 className="text-xl font-black text-slate-900 mb-4">Top 帖子预览</h2>
-            <div className="space-y-3">
-              {mockResults.topPosts.map((post) => (
-                <div key={post.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-slate-800">{post.title}</div>
-                    <div className="text-xs text-slate-400 mt-1">r/{post.subreddit} · 👍 {post.upvotes} · 💬 {post.comments}</div>
-                  </div>
-                  <div className={`ml-4 px-3 py-1 rounded-full text-xs font-bold ${
-                    post.score >= 0.8 ? 'bg-green-100 text-green-700' :
-                    post.score >= 0.6 ? 'bg-blue-100 text-blue-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {(post.score * 100).toFixed(0)}分
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={() => showToast('数据已确认，进入 P3 分析', 'success')}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
-          >
-            确认并进入 P3 分析 →
-          </button>
         </div>
-      )}
+
+        {/* 抓取状态展示 */}
+        {scrapingStatus !== 'idle' && (
+          <div className={`${getStatusBg(scrapingStatus)} rounded-xl border border-slate-200 p-6 mb-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-semibold ${getStatusColor(scrapingStatus)}`}>
+                抓取状态
+              </h2>
+              {(scrapingStatus === 'running' || scrapingStatus === 'pending') && (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              )}
+            </div>
+            
+            <p className="text-slate-700 mb-2">{statusMessage}</p>
+            
+            {runId && (
+              <p className="text-xs text-slate-500 font-mono">
+                Run ID: {runId}
+              </p>
+            )}
+
+            {/* 进度条 */}
+            {(scrapingStatus === 'running' || scrapingStatus === 'pending') && (
+              <div className="mt-4">
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">正在抓取数据，每 10 秒自动刷新状态...</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 结果展示 */}
+        {results && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">抓取结果</h2>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-slate-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-slate-900">{results.total}</div>
+                <div className="text-sm text-slate-500">抓取总数</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-green-600">{results.inserted}</div>
+                <div className="text-sm text-green-600">新增帖子</div>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-slate-600">{results.skipped}</div>
+                <div className="text-sm text-slate-500">已存在（跳过）</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 操作按钮 */}
+        <div className="flex gap-4">
+          <button
+            onClick={startScraping}
+            disabled={!selectedProject || loading || scrapingStatus === 'running' || scrapingStatus === 'pending'}
+            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
+          >
+            {loading || scrapingStatus === 'running' || scrapingStatus === 'pending' ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                {scrapingStatus === 'pending' ? '启动中...' : '抓取中...'}
+              </>
+            ) : (
+              '🚀 开始抓取'
+            )}
+          </button>
+
+          {results && (
+            <button
+              onClick={() => window.location.href = '/workflow/analysis'}
+              className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all flex items-center gap-2 shadow-lg"
+            >
+              下一步：分析筛选 →
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
