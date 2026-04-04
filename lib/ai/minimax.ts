@@ -1,0 +1,693 @@
+/**
+ * AI API Client
+ * 主模型: Qwen3.6 Plus Free (OpenCode)
+ * 备用模型: MiniMax-M2.7-Highspeed
+ */
+
+import {
+  ExtractedProductInfo,
+  KeywordCategories,
+  SubredditCategories,
+  ApifySearchConfig,
+} from '@/lib/types/p1';
+
+const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY || 'sk-8dxSo4bl8P3TyEY59AFu15usvmIHN8nDF7Iiv885IpSR4WZQb9exallyxcwAxoC5';
+const OPENCODE_API_URL = 'https://api.opencode.ai/v1/chat/completions';
+const OPENCODE_MODEL = 'opencode/qwen3.6-plus-free';
+
+const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
+const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimaxi.chat/v1/text/chatcompletion_v2';
+const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7-Highspeed';
+
+interface MiniMaxMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface MiniMaxResponse {
+  choices: {
+    message: {
+      content: string;
+    };
+  }[];
+}
+
+/**
+ * 尝试调用 Qwen3.6 Plus Free，失败时使用 MiniMax-M2.7-Highspeed
+ */
+async function callAIWithFallback(messages: MiniMaxMessage[]): Promise<string> {
+  try {
+    // Try Qwen3.6 Plus Free first (primary)
+    console.log('Trying Qwen3.6 Plus Free (OpenCode)...');
+    const result = await callOpenCodeZen(messages);
+    console.log('Qwen3.6 Plus Free success');
+    return result;
+  } catch (error) {
+    console.error('Qwen3.6 Plus Free failed:', error);
+  }
+
+  // Fallback to MiniMax
+  console.log('Falling back to MiniMax-M2.7-Highspeed...');
+  try {
+    if (!MINIMAX_API_KEY) {
+      throw new Error('MINIMAX_API_KEY not configured');
+    }
+    const result = await callMiniMax(messages);
+    console.log('MiniMax API success');
+    return result;
+  } catch (error) {
+    console.error('MiniMax API also failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * 调用 MiniMax API
+ */
+async function callMiniMax(messages: MiniMaxMessage[]): Promise<string> {
+  if (!MINIMAX_API_KEY) {
+    throw new Error('MINIMAX_API_KEY not configured');
+  }
+
+  const response = await fetch(MINIMAX_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MINIMAX_MODEL,
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`MiniMax API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data: MiniMaxResponse = await response.json();
+  return data.choices[0]?.message?.content || '';
+}
+
+/**
+ * 调用 OpenCode Zen API (Qwen3.6 Plus Free)
+ */
+async function callOpenCodeZen(messages: MiniMaxMessage[]): Promise<string> {
+  const response = await fetch(OPENCODE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENCODE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: OPENCODE_MODEL,
+      messages,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenCode Zen API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data: MiniMaxResponse = await response.json();
+  return data.choices[0]?.message?.content || '';
+}
+
+/**
+ * Round 1: 分析产品描述，提取结构化信息
+ * 支持：文字描述、网站内容、文件内容
+ */
+export async function analyzeProductWithAI(
+  description: string
+): Promise<ExtractedProductInfo> {
+  // 检测是否包含网站内容
+  const isWebsiteContent = description.includes('网站标题:') && description.includes('网站内容:');
+  
+  const sourceType = isWebsiteContent ? '网站内容' : '产品描述';
+  
+  const prompt = `你是一个产品分析专家。Based on the following ${sourceType}, extract structured product information:
+
+${sourceType}:
+${description}
+
+请分析并提取以下信息（以 JSON 格式输出）:
+{
+    "productType": "产品类型（如：开放式耳机、SaaS工具、护肤品等）",
+    "productName": "产品名称（包括品牌名，如果有）",
+    "sellingPoints": ["核心卖点1", "核心卖点2", "核心卖点3"],
+    "targetAudience": ["目标人群1", "目标人群2"],
+    "competitors": ["竞品品牌1", "竞品品牌2", "竞品品牌3"],
+    "priceRange": "价格区间（如：$99-$149，如果没有则不填）",
+    "seedKeywords": ["产品名本身", "品牌名", "品类关键词1", "品类关键词2", "品类关键词3"]
+}
+
+Instructions:
+1. 从${sourceType}中识别产品类型和关键特性
+2. 提取所有提及的卖点（selling points）
+3. 识别目标使用人群
+4. 找出提到的或隐含的竞品品牌
+5. 提取价格信息
+6. **种子关键词生成规则**（非常重要）：
+   - 第1个必须是"产品名+品牌名"组合（如 "Shokz OpenRun", "Oladance OWS"）
+   - 第2个必须是品牌名本身（如 "Shokz", "Oladance"）
+   - 后面3-5个是英文品类关键词（如 "open ear headphones", "bone conduction"）
+
+注意：
+- 如果是网站内容，请从网站页面标题、产品描述、功能介绍、关于我们等部分提取信息
+- 如果某些信息无法确定，可以留空或填"未知"
+- 种子关键词应该是英文，适合在 Reddit 上搜索`;
+
+  try {
+    const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
+    
+    // 尝试解析 JSON
+    try {
+      const result = JSON.parse(content);
+      return {
+        productType: result.productType || '',
+        productName: result.productName,
+        sellingPoints: result.sellingPoints || [],
+        targetAudience: result.targetAudience || [],
+        competitors: result.competitors || [],
+        priceRange: result.priceRange,
+        seedKeywords: result.seedKeywords || [],
+      };
+    } catch {
+      // 如果 JSON 解析失败，使用备用提取逻辑
+      return extractProductInfoFromText(content, description);
+    }
+  } catch (error) {
+    console.error('AI analysis failed:', error);
+    // 返回基于描述的简单提取
+    return fallbackProductExtraction(description);
+  }
+}
+
+/**
+ * 竞品推断：基于产品类型推断常见竞品品牌
+ */
+function inferCompetitorsByProductType(productType: string, existingCompetitors: string[]): string[] {
+  if (existingCompetitors.length >= 3) return existingCompetitors.slice(0, 5);
+
+  const type = productType.toLowerCase();
+  const inferred: string[] = [];
+
+  // 开放式耳机 / 骨传导耳机
+  if (type.includes('open ear') || type.includes('骨传导') || type.includes('开放式') || type.includes('bone conduction')) {
+    inferred.push('Shokz', 'Oladance', 'Bose', 'Sony', 'Aftershokz', 'Soundcore', 'JBL');
+  }
+  // 降噪耳机
+  else if (type.includes('降噪') || type.includes('noise cancel')) {
+    inferred.push('Sony WH-1000XM5', 'Bose QC45', 'AirPods Pro', 'Sennheiser', 'JBL');
+  }
+  // 运动耳机
+  else if (type.includes('运动') || type.includes('sport') || type.includes('running')) {
+    inferred.push('Shokz', 'Jaybird', 'Beats Fit Pro', 'Jabra Elite', 'Soundcore');
+  }
+  // TWS / 真无线耳机
+  else if (type.includes('tws') || type.includes('真无线') || type.includes('wireless earbud')) {
+    inferred.push('AirPods Pro', 'Sony WF-1000XM5', 'Samsung Galaxy Buds', 'Bose', 'Jabra');
+  }
+  // SaaS / 软件工具
+  else if (type.includes('saas') || type.includes('软件') || type.includes('tool') || type.includes('platform')) {
+    inferred.push('competitor alternative', 'vs comparison', 'best software');
+  }
+  // 护肤品 / 美妆
+  else if (type.includes('护肤') || type.includes('skincare') || type.includes('beauty') || type.includes('cosmetic')) {
+    inferred.push('CeraVe', 'The Ordinary', 'La Roche-Posay', 'Neutrogena', 'Olay');
+  }
+  // 健身 / 运动装备
+  else if (type.includes('fitness') || type.includes('健身') || type.includes('workout')) {
+    inferred.push('competitor review', 'best fitness gear', 'vs comparison');
+  }
+  // 默认：通用推断
+  else {
+    inferred.push('competitor alternative', 'vs comparison', 'best alternative');
+  }
+
+  // 合并已有竞品和推断竞品，去重
+  const allCompetitors = Array.from(new Set([...existingCompetitors, ...inferred]));
+  return allCompetitors.slice(0, 5);
+}
+
+/**
+ * Round 1: 生成关键词扩展（多步推理策略）
+ * 步骤1: 推断竞品品牌
+ * 步骤2: 基于竞品生成对比词
+ * 步骤3: 生成核心+长尾+场景词
+ * 步骤4: 合并去重
+ */
+export async function generateKeywordsWithAI(
+  productInfo: ExtractedProductInfo,
+  feedback?: string
+): Promise<KeywordCategories> {
+  const feedbackSection = feedback ? `\n\n用户反馈: ${feedback}\n请根据用户反馈调整关键词生成策略。` : '';
+
+  // 步骤1: 推断竞品
+  const competitors = inferCompetitorsByProductType(productInfo.productType, productInfo.competitors);
+  const brandName = productInfo.productName || productInfo.seedKeywords[0] || 'this product';
+  const shortBrand = productInfo.productName?.split(' ')[0] || brandName;
+
+  // 步骤2: 一次性生成所有关键词（但使用推断后的竞品列表）
+  const prompt = `你是一个 Reddit 营销专家和关键词研究专家。Based on the following product information, generate comprehensive keyword suggestions optimized for Reddit search behavior.
+
+产品信息:
+- 产品类型: ${productInfo.productType}
+- 产品名称: ${productInfo.productName || 'N/A'}
+- 品牌名/简称: ${shortBrand}
+- 核心卖点: ${productInfo.sellingPoints.join(', ')}
+- 目标人群: ${productInfo.targetAudience.join(', ')}
+- 竞品品牌（已推断）: ${competitors.join(', ')}
+- 种子关键词: ${productInfo.seedKeywords.join(', ')}${feedbackSection}
+
+请生成以下6类关键词（以 JSON 格式输出）:
+{
+    "brand": ["品牌词1", "品牌词2", "品牌词3", "品牌词4", "品牌词5"],
+    "product": ["型号词1", "型号词2", "型号词3", "型号词4", "型号词5"],
+    "category": ["品类词1", "品类词2", "品类词3", "品类词4", "品类词5"],
+    "comparison": ["对比词1", "对比词2", "对比词3", "对比词4", "对比词5"],
+    "scenario": ["场景词1", "场景词2", "场景词3", "场景词4", "场景词5"],
+    "problem": ["问题词1", "问题词2", "问题词3", "问题词4", "问题词5"]
+}
+
+Requirements:
+
+1. **Brand Keywords (品牌关键词): 5-8个**
+   - 必须包含品牌名/产品名！
+   - 格式: "品牌名", "品牌+型号"
+   - 示例（产品是 Shokz OpenRun）:
+     * "Shokz OpenRun" (产品全名)
+     * "Shokz" (品牌名)
+     * "Shokz headphones"
+
+2. **Product Keywords (型号关键词): 5-8个**
+   - 具体型号名
+   - 示例:
+     * "Shokz OpenRun pro"
+     * "Shokz OpenMove"
+
+3. **Category Keywords (品类关键词): 5-8个**
+   - 品类通用词
+   - 格式: "品类词", "品类 + 场景词"
+   - 示例:
+     * "open ear headphones"
+     * "bone conduction earbuds"
+     * "sports headphones"
+
+4. **Comparison Keywords (对比关键词): 5-8个** - **绝对不能为空！**
+   - 使用上面推断的竞品品牌生成对比词
+   - 格式: "品牌 vs 竞品", "品牌 alternative", "竞品 review", "best alternative to 品牌"
+   - 示例（产品是 Shokz，竞品是 Oladance/Bose）:
+     * "Shokz vs Oladance"
+     * "Shokz vs Bose"
+     * "Shokz alternative"
+     * "best alternative to Shokz"
+
+5. **Scenario Keywords (场景关键词): 5-8个**
+   - 使用场景词
+   - 格式: "品类 + for + 场景", "场景 + 需求"
+   - 示例:
+     * "running headphones"
+     * "headphones for cycling"
+     * "safe for running earbuds"
+
+6. **Problem Keywords (问题关键词): 5-8个**
+   - 用户痛点/问题词
+   - 格式: "品牌 + problem", "品类 + issue", "品牌 + not working"
+   - 示例:
+     * "Shokz not charging"
+     * "headphones broke"
+     * "open ear headphones uncomfortable"
+
+**强制规则**:
+- 品牌关键词必须包含品牌名/产品名
+- 对比关键词必须使用推断的竞品品牌生成，绝对不能为空
+- 所有关键词用英文，匹配 Reddit 用户搜索习惯
+- 不要生成重复或过于相似的关键词`;
+
+  try {
+    const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
+    
+    try {
+      const result = JSON.parse(content);
+      const keywords: KeywordCategories = {
+        brand: result.brand || result.brand_keywords || [],
+        product: result.product || result.product_keywords || [],
+        category: result.category || result.category_keywords || [],
+        comparison: result.comparison || result.comparison_keywords || [],
+        scenario: result.scenario || result.scenario_keywords || [],
+        problem: result.problem || result.problem_keywords || [],
+      };
+
+      // 确保对比关键词不为空
+      if (keywords.comparison.length === 0) {
+        console.warn('Comparison keywords empty, generating from inferred competitors');
+        keywords.comparison = generateComparisonKeywords(shortBrand, competitors);
+      }
+
+      return keywords;
+    } catch {
+      return extractKeywordsFromText(content);
+    }
+  } catch (error) {
+    console.error('Keyword generation failed:', error);
+    return fallbackKeywordGeneration(productInfo);
+  }
+}
+
+/**
+ * 基于推断的竞品品牌生成对比关键词
+ */
+function generateComparisonKeywords(brandName: string, competitors: string[]): string[] {
+  const keywords: string[] = [];
+  
+  for (const competitor of competitors.slice(0, 4)) {
+    keywords.push(`${brandName} vs ${competitor}`);
+    keywords.push(`${competitor} vs ${brandName}`);
+  }
+  
+  keywords.push(`${brandName} alternative`);
+  keywords.push(`best alternative to ${brandName}`);
+  keywords.push(`${brandName} or ${competitors[0] || 'competitor'}`);
+  
+  return Array.from(new Set(keywords)).slice(0, 8);
+}
+
+/**
+ * Round 2: 推荐 Subreddits 和 Filter Keywords
+ */
+export async function generateSubredditsWithAI(
+  productInfo: ExtractedProductInfo,
+  keywords: KeywordCategories,
+  feedback?: string
+): Promise<{ subreddits: SubredditCategories; filterKeywords: string[] }> {
+  const feedbackSection = feedback ? `
+
+用户反馈: ${feedback}
+请根据用户反馈调整推荐策略。` : '';
+
+  const allKeywords = [
+    ...productInfo.seedKeywords,
+    ...keywords.brand,
+    ...keywords.category,
+    ...keywords.scenario,
+  ].slice(0, 15);
+
+  const prompt = `你是一个 Reddit 社区专家。Based on the following information, recommend relevant Subreddits and filter keywords:
+
+目标人群: ${productInfo.targetAudience.join(', ')}
+相关关键词: ${allKeywords.join(', ')}
+产品类型: ${productInfo.productType}${feedbackSection}
+
+请推荐（以 JSON 格式输出）:
+{
+    "highRelevance": [
+        {"name": "subreddit_name", "reason": "推荐理由（中文）", "estimatedPosts": "daily"}
+    ],
+    "mediumRelevance": [
+        {"name": "subreddit_name", "reason": "推荐理由（中文）", "estimatedPosts": "daily/weekly"}
+    ],
+    "filterKeywords": ["filter1", "filter2", "filter3", "filter4", "filter5"]
+}
+
+Requirements:
+1. High Relevance Subreddits (高相关度): 5-8个，直接相关的板块，如 headphones, running
+2. Medium Relevance Subreddits (中相关度): 3-5个，间接相关的板块，如 gadgets, audiophile
+3. Filter Keywords: 5-10个用于过滤帖子内容的关键词，如 "comfortable", "review", "running", "workout", "vs", "comparison"
+
+注意事项:
+- Subreddit names should NOT include "r/" prefix
+- estimatedPosts should be "daily" or "weekly"
+- Filter keywords help ensure content relevance for scraping`;
+
+  try {
+    const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
+    
+    try {
+      const result = JSON.parse(content);
+      return {
+        subreddits: {
+          high: result.highRelevance || result.high_relevance || [],
+          medium: result.mediumRelevance || result.medium_relevance || [],
+        },
+        filterKeywords: result.filterKeywords || [],
+      };
+    } catch {
+      return extractSubredditsFromText(content);
+    }
+  } catch (error) {
+    console.error('Subreddit generation failed:', error);
+    return fallbackSubredditGeneration();
+  }
+}
+
+/**
+ * Round 3: 生成 APIFY 搜索策略
+ */
+export async function generateSearchStrategyWithAI(
+  productInfo: ExtractedProductInfo,
+  keywords: KeywordCategories,
+  subreddits: SubredditCategories,
+  filterKeywords: string[],
+  feedback?: string
+): Promise<ApifySearchConfig> {
+  const feedbackSection = feedback ? `
+
+用户反馈: ${feedback}
+请根据用户反馈调整搜索策略。` : '';
+
+  const highRelevanceSubreddits = subreddits.high.map(s => s.name).slice(0, 5);
+  const allKeywords = [
+    ...keywords.brand.slice(0, 3),
+    ...keywords.category.slice(0, 2),
+  ];
+
+  const prompt = `你是一个 APIFY 搜索策略专家。Based on the following information, generate a comprehensive Reddit scraping strategy:
+
+产品信息:
+- 类型: ${productInfo.productType}
+- 竞品: ${productInfo.competitors.join(', ')}
+- 品牌关键词: ${keywords.brand.join(', ')}
+- 品类关键词: ${keywords.category.join(', ')}
+- 场景关键词: ${keywords.scenario.join(', ')}
+- 高相关Subreddits: ${highRelevanceSubreddits.join(', ')}
+- Filter Keywords: ${filterKeywords.join(', ')}${feedbackSection}
+
+请生成 APIFY 配置（以 JSON 格式输出）:
+{
+    "searches": [
+        {
+            "searchQuery": "搜索词",
+            "searchSubreddit": "板块名",
+            "filterKeywords": ["filter1", "filter2"],
+            "sortOrder": "relevance|hot|top|new",
+            "timeFilter": "hour|day|week|month|year|all",
+            "maxPosts": 100
+        }
+    ],
+    "comments": {
+        "includeComments": true,
+        "maxCommentsPerPost": 30,
+        "commentDepth": 3
+    },
+    "filtering": {
+        "deduplicatePosts": true,
+        "keywordMatchMode": "title + body"
+    }
+}
+
+Requirements:
+1. Generate 4-6 search tasks with different combinations of keywords and subreddits
+2. Each search task should have 2-4 relevant filter keywords
+3. Vary timeFilter and maxPosts based on search type:
+   - Core product searches: timeFilter="week", maxPosts=100
+   - Competitor comparison: timeFilter="month", maxPosts=50
+   - Technical discussions: sortOrder="hot", maxPosts=60
+4. Include comments configuration (30 comments per post, depth 3)
+5. Enable deduplication and keyword matching in title+body
+
+Example search tasks:
+- Task 1: "open ear earbuds" + headphones + [comfortable, review]
+- Task 2: "running headphones" + running + [workout, comfortable]
+- Task 3: "Shokz vs Oladance" + headphones + [comparison, vs]`;
+
+  try {
+    const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
+    
+    try {
+      const result = JSON.parse(content);
+      return {
+        searches: result.searches || [],
+        comments: result.comments || {
+          includeComments: true,
+          maxCommentsPerPost: 30,
+          commentDepth: 3,
+        },
+        filtering: result.filtering || {
+          deduplicatePosts: true,
+          keywordMatchMode: 'title + body',
+        },
+      };
+    } catch {
+      return fallbackSearchStrategy(productInfo, keywords, subreddits);
+    }
+  } catch (error) {
+    console.error('Search strategy generation failed:', error);
+    return fallbackSearchStrategy(productInfo, keywords, subreddits);
+  }
+}
+
+// Helper functions for fallback extraction
+
+function extractProductInfoFromText(text: string, originalDescription: string): ExtractedProductInfo {
+  // Simple regex-based extraction as fallback
+  const productTypeMatch = text.match(/productType["']?\s*:\s*["']([^"']+)["']/);
+  const seedKeywords: string[] = [];
+  
+  // Extract English words that look like keywords
+  const words = originalDescription.match(/\b[a-zA-Z]{3,}\b/g) || [];
+  const uniqueWords = Array.from(new Set(words)).slice(0, 5);
+  
+  return {
+    productType: productTypeMatch?.[1] || 'Product',
+    sellingPoints: [],
+    targetAudience: [],
+    competitors: [],
+    seedKeywords: uniqueWords.length > 0 ? uniqueWords : ['product', 'review'],
+  };
+}
+
+function fallbackProductExtraction(description: string): ExtractedProductInfo {
+  const words = description.toLowerCase().match(/\b[a-zA-Z]{4,}\b/g) || [];
+  const uniqueWords = Array.from(new Set(words)).slice(0, 5);
+  
+  return {
+    productType: 'Product',
+    sellingPoints: [],
+    targetAudience: [],
+    competitors: [],
+    seedKeywords: uniqueWords.length > 0 ? uniqueWords : ['product', 'review', 'best'],
+  };
+}
+
+function extractKeywordsFromText(text: string): KeywordCategories {
+  // Extract quoted strings as keywords
+  const matches = text.match(/["']([^"']+)["']/g) || [];
+  const keywords = matches.map(m => m.replace(/["']/g, '')).filter(k => k.length > 2);
+  
+  return {
+    brand: keywords.slice(0, 5),
+    product: keywords.slice(5, 10),
+    category: keywords.slice(10, 15),
+    comparison: keywords.slice(15, 20),
+    scenario: keywords.slice(20, 25),
+    problem: keywords.slice(25, 30),
+  };
+}
+
+function fallbackKeywordGeneration(productInfo: ExtractedProductInfo): KeywordCategories {
+  const seedKeywords = productInfo.seedKeywords;
+  const brand = seedKeywords.slice(0, 5);
+  const product: string[] = [];
+  const category: string[] = [];
+  const scenario: string[] = [];
+  const problem: string[] = [];
+  
+  // 推断竞品
+  const competitors = inferCompetitorsByProductType(productInfo.productType, productInfo.competitors);
+  const brandName = productInfo.productName || seedKeywords[0] || 'product';
+  const shortBrand = brandName.split(' ')[0];
+  
+  // 生成型号词、品类词、场景词、问题词
+  for (const kw of seedKeywords.slice(0, 5)) {
+    product.push(`${kw} 2`, `${kw} pro`);
+    category.push(`best ${kw}`, `${kw} review`, `${kw} worth it`, `${kw} alternative`);
+    scenario.push(`${kw} help`, `${kw} advice`, `${kw} experience`);
+    problem.push(`${kw} problem`, `${kw} issue`, `${kw} not working`);
+  }
+  
+  // 生成对比词（使用推断的竞品）
+  const comparison = generateComparisonKeywords(shortBrand, competitors);
+  
+  return {
+    brand: brand.length > 0 ? brand : ['product'],
+    product: Array.from(new Set(product)).slice(0, 6),
+    category: Array.from(new Set(category)).slice(0, 6),
+    comparison: comparison.length > 0 ? comparison : [`${shortBrand} alternative`, `${shortBrand} vs`, `best ${shortBrand} alternative`],
+    scenario: Array.from(new Set(scenario)).slice(0, 6),
+    problem: Array.from(new Set(problem)).slice(0, 6),
+  };
+}
+
+function extractSubredditsFromText(text: string): { subreddits: SubredditCategories; filterKeywords: string[] } {
+  const subredditMatches = text.match(/r\/(\w+)|["'](\w+)["']/g) || [];
+  const subreddits = subredditMatches
+    .map(m => m.replace(/r\//, '').replace(/["']/g, ''))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 8);
+  
+  return {
+    subreddits: {
+      high: subreddits.slice(0, 4).map(name => ({ name, reason: 'AI推荐', estimatedPosts: 'daily' as const })),
+      medium: subreddits.slice(4).map(name => ({ name, reason: 'AI推荐', estimatedPosts: 'weekly' as const })),
+    },
+    filterKeywords: ['review', 'best', 'vs'],
+  };
+}
+
+function fallbackSubredditGeneration(): { subreddits: SubredditCategories; filterKeywords: string[] } {
+  return {
+    subreddits: {
+      high: [
+        { name: 'headphones', reason: '耳机讨论主社区', estimatedPosts: 'daily' },
+        { name: 'running', reason: '运动场景', estimatedPosts: 'daily' },
+        { name: 'earbuds', reason: '耳塞专门讨论区', estimatedPosts: 'daily' },
+      ],
+      medium: [
+        { name: 'gadgets', reason: '科技产品讨论', estimatedPosts: 'daily' },
+        { name: 'audiophile', reason: '音质发烧友', estimatedPosts: 'daily' },
+      ],
+    },
+    filterKeywords: ['review', 'comfortable', 'best'],
+  };
+}
+
+function fallbackSearchStrategy(
+  productInfo: ExtractedProductInfo,
+  keywords: KeywordCategories,
+  subreddits: SubredditCategories
+): ApifySearchConfig {
+  const highSubreddits = subreddits.high.map(s => s.name).slice(0, 3);
+  const brandKws = keywords.brand.slice(0, 3);
+  
+  return {
+    searches: [
+      {
+        searchQuery: brandKws[0] || 'product',
+        searchSubreddit: highSubreddits[0] || 'headphones',
+        filterKeywords: ['review', 'best'],
+        sortOrder: 'relevance',
+        timeFilter: 'week',
+        maxPosts: 100,
+      },
+      {
+        searchQuery: brandKws[1] || brandKws[0] || 'product review',
+        searchSubreddit: highSubreddits[1] || highSubreddits[0] || 'headphones',
+        filterKeywords: ['comparison', 'vs'],
+        sortOrder: 'relevance',
+        timeFilter: 'month',
+        maxPosts: 50,
+      },
+    ],
+    comments: {
+      includeComments: true,
+      maxCommentsPerPost: 30,
+      commentDepth: 3,
+    },
+    filtering: {
+      deduplicatePosts: true,
+      keywordMatchMode: 'title + body',
+    },
+  };
+}

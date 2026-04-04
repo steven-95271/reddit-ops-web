@@ -1,20 +1,47 @@
 import { sql } from '@vercel/postgres'
 
 export async function initDb() {
+  // 1. projects 表 - 项目配置
   await sql`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      background_info TEXT,
-      search_query TEXT,
+      product_name TEXT,
+      product_description TEXT,
+      target_audience TEXT,
+      brand_names TEXT,
+      competitor_brands TEXT,
+      keywords TEXT,
       subreddits TEXT,
-      auto_scrape_enabled INTEGER DEFAULT 0,
-      scrape_schedule_time TEXT DEFAULT '09:00',
-      scrape_schedule_timezone TEXT DEFAULT 'Asia/Shanghai',
-      created_at TEXT
+      status TEXT DEFAULT 'draft',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `
 
+  // 2. posts 表 - 抓取的 Reddit 帖子
+  await sql`
+    CREATE TABLE IF NOT EXISTS posts (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      subreddit TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      author TEXT,
+      url TEXT,
+      score INTEGER DEFAULT 0,
+      num_comments INTEGER DEFAULT 0,
+      created_utc TIMESTAMP,
+      hot_score REAL DEFAULT 0,
+      composite_score REAL DEFAULT 0,
+      category TEXT,
+      is_candidate BOOLEAN DEFAULT FALSE,
+      scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `
+
+  // 3. personas 表 - 人设管理
   await sql`
     CREATE TABLE IF NOT EXISTS personas (
       id TEXT PRIMARY KEY,
@@ -31,8 +58,45 @@ export async function initDb() {
       writing_style TEXT,
       post_types TEXT,
       platform TEXT DEFAULT 'Reddit',
-      created_at TEXT,
+      is_default BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `
+
+  // 4. contents 表 - 生成的内容
+  await sql`
+    CREATE TABLE IF NOT EXISTS contents (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      post_id TEXT NOT NULL,
+      persona_id TEXT,
+      content_type TEXT DEFAULT 'comment',
+      title TEXT,
+      body TEXT NOT NULL,
+      body_edited TEXT,
+      status TEXT DEFAULT 'draft',
+      brand_mention TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      published_at TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY(persona_id) REFERENCES personas(id) ON DELETE SET NULL
+    )
+  `
+
+  // 5. publish_log 表 - 发布记录
+  await sql`
+    CREATE TABLE IF NOT EXISTS publish_log (
+      id TEXT PRIMARY KEY,
+      content_id TEXT NOT NULL,
+      published_url TEXT,
+      upvotes INTEGER DEFAULT 0,
+      replies INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'published',
+      published_at TIMESTAMP,
+      last_tracked_at TIMESTAMP,
+      FOREIGN KEY(content_id) REFERENCES contents(id) ON DELETE CASCADE
     )
   `
 }

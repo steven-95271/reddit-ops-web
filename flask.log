@@ -1,0 +1,166 @@
+2026-04-01 14:43:42,320 [INFO] __main__: Initializing DB...
+2026-04-01 14:43:42,324 [INFO] __main__: Starting Reddit Ops System...
+2026-04-01 14:43:42,342 [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-01 14:43:42,343 [INFO] apscheduler.scheduler: Added job "Daily Reddit Pipeline (Global)" to job store "default"
+2026-04-01 14:43:42,343 [INFO] apscheduler.scheduler: Scheduler started
+2026-04-01 14:43:42,343 [INFO] scheduler: Scheduler started with 0 project jobs + 1 global job
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-04-01 14:43:42,357 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.8.99:5001
+2026-04-01 14:43:42,357 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-04-01 14:43:46,918 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:43:46] "GET /workflow?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:44:52,225 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:44:52] "GET /workflow HTTP/1.1" 200 -
+2026-04-01 14:44:52,325 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:44:52] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:44:52,330 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:44:52] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:44:52,334 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:44:52] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-04-01 14:44:52,584 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:44:52] "GET /api/workflow/status?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:45:01,591 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:45:01] "GET /workflow/p1?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:45:01,609 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:45:01] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:45:01,609 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:45:01] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:45:01,665 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:45:01] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 14:49:45,847 [INFO] p1_config_generator: P1: 开始第一轮对话 - 扩展种子关键词
+2026-04-01 14:49:47,402 [INFO] httpx: HTTP Request: POST https://api.minimaxi.chat/v1/text/chatcompletion_v2 "HTTP/1.1 200 OK"
+2026-04-01 14:49:47,404 [INFO] p1_config_generator: P1: 开始第二轮对话 - 推荐 Subreddits
+2026-04-01 14:49:48,807 [INFO] httpx: HTTP Request: POST https://api.minimaxi.chat/v1/text/chatcompletion_v2 "HTTP/1.1 200 OK"
+2026-04-01 14:49:48,809 [INFO] p1_config_generator: P1: 开始第三轮对话 - 生成搜索策略
+2026-04-01 14:49:48,819 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:49:48] "POST /api/workflow/p1/generate HTTP/1.1" 200 -
+2026-04-01 14:49:48,829 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:49:48] "GET /api/product-cards/card_default-project-1_P1_ce09dc01 HTTP/1.1" 200 -
+2026-04-01 14:51:21,644 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:21] "POST /api/product-cards/card_default-project-1_P1_ce09dc01/confirm HTTP/1.1" 200 -
+2026-04-01 14:51:21,665 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:21] "GET /workflow/p2?project_id=default-project-1&parent_card_id=card_default-project-1_P1_ce09dc01 HTTP/1.1" 200 -
+2026-04-01 14:51:21,772 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:21] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:51:21,772 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:21] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:51:21,848 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:21] "GET /api/product-cards/card_default-project-1_P1_ce09dc01 HTTP/1.1" 200 -
+2026-04-01 14:51:22,060 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:22] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 14:51:25,272 [INFO] reddit_scraper: Apify client initialized
+2026-04-01 14:51:25,279 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:25] "POST /api/workflow/p2/create HTTP/1.1" 200 -
+2026-04-01 14:51:25,787 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:51:25] "GET /api/product-cards/card_default-project-1_P2_1418a162 HTTP/1.1" 200 -
+2026-04-01 14:52:04,031 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:52:04] "GET /workflow?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:52:04,059 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:52:04] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:52:04,060 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:52:04] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:52:04,153 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:52:04] "GET /api/workflow/status?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:59:15,609 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:15] "GET /workflow/p1?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:59:15,633 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:15] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:59:15,634 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:15] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:59:15,800 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:15] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 14:59:22,970 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:22] "GET /workflow?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:59:22,992 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:22] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:59:22,993 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:22] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:59:23,101 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:23] "GET /api/workflow/status?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:59:30,807 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:30] "[33mGET /workflow/mock-run?project_id=default-project-1 HTTP/1.1[0m" 404 -
+2026-04-01 14:59:35,812 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:35] "GET /workflow/p2?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 14:59:35,836 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:35] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 14:59:35,838 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:35] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 14:59:35,898 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:35] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 14:59:35,927 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 14:59:35] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 15:00:00,287 [INFO] reddit_scraper: Apify client initialized
+2026-04-01 15:00:00,289 [ERROR] __main__: P2 create failed: P1 card not found: None
+2026-04-01 15:00:00,290 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:00] "[35m[1mPOST /api/workflow/p2/create HTTP/1.1[0m" 500 -
+2026-04-01 15:00:12,515 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:12] "GET /workflow/p1?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:00:12,535 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:12] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:00:12,536 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:12] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:00:12,637 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:12] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 15:00:33,630 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:33] "GET /dashboard?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:00:33,651 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:33] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:00:33,651 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:33] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:00:33,738 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:33] "GET /api/stats?project_id=default-project-1&date=2026-04-01 HTTP/1.1" 200 -
+2026-04-01 15:00:33,739 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:33] "GET /api/projects/default-project-1/keyword-config HTTP/1.1" 200 -
+2026-04-01 15:00:33,767 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:33] "GET /api/content?project_id=default-project-1&date=2026-04-01 HTTP/1.1" 200 -
+2026-04-01 15:00:37,208 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:37] "GET /workflow?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:00:37,229 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:37] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:00:37,230 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:37] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:00:37,308 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:37] "GET /api/workflow/status?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:00:42,678 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:42] "GET /workflow/p1?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:00:42,704 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:42] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:00:42,705 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:42] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:00:42,757 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:00:42] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 15:01:16,105 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:01:16] "GET /workflow?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:01:16,219 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:01:16] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:01:16,221 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:01:16] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:01:16,329 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:01:16] "GET /api/workflow/status?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 15:01:55,787 [INFO] p1_config_generator: P1: 开始第一轮对话 - 扩展种子关键词
+2026-04-01 15:01:57,380 [INFO] httpx: HTTP Request: POST https://api.minimaxi.chat/v1/text/chatcompletion_v2 "HTTP/1.1 200 OK"
+2026-04-01 15:01:57,382 [INFO] p1_config_generator: P1: 开始第二轮对话 - 推荐 Subreddits
+2026-04-01 15:01:58,892 [INFO] httpx: HTTP Request: POST https://api.minimaxi.chat/v1/text/chatcompletion_v2 "HTTP/1.1 200 OK"
+2026-04-01 15:01:58,894 [INFO] p1_config_generator: P1: 开始第三轮对话 - 生成搜索策略
+2026-04-01 15:01:58,902 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:01:58] "POST /api/workflow/p1/generate HTTP/1.1" 200 -
+2026-04-01 15:01:58,910 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:01:58] "GET /api/product-cards/card_default-project-1_P1_43dd5640 HTTP/1.1" 200 -
+2026-04-01 15:21:04,459 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:04] "POST /api/product-cards/card_default-project-1_P1_43dd5640/confirm HTTP/1.1" 200 -
+2026-04-01 15:21:04,482 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:04] "GET /workflow/p2?project_id=default-project-1&parent_card_id=card_default-project-1_P1_43dd5640 HTTP/1.1" 200 -
+2026-04-01 15:21:04,514 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:04] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:21:04,515 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:04] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:21:04,661 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:04] "GET /api/product-cards/card_default-project-1_P1_43dd5640 HTTP/1.1" 200 -
+2026-04-01 15:21:04,816 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:04] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 15:21:08,773 [INFO] reddit_scraper: Apify client initialized
+2026-04-01 15:21:08,783 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:08] "POST /api/workflow/p2/create HTTP/1.1" 200 -
+2026-04-01 15:21:09,304 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:21:09] "GET /api/product-cards/card_default-project-1_P2_dafc4000 HTTP/1.1" 200 -
+2026-04-01 15:23:46,502 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:23:46] "GET /workflow/p3?project_id=default-project-1&parent_card_id=card_default-project-1_P2_dafc4000 HTTP/1.1" 200 -
+2026-04-01 15:23:46,523 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:23:46] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:23:46,525 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:23:46] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:23:46,582 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:23:46] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 15:24:10,283 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:24:10] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 15:24:11,741 [INFO] reddit_scraper: Apify client initialized
+2026-04-01 15:24:11,753 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:24:11] "POST /api/workflow/p2/create HTTP/1.1" 200 -
+2026-04-01 15:24:12,266 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:24:12] "GET /api/product-cards/card_default-project-1_P2_5b9ccad8 HTTP/1.1" 200 -
+2026-04-01 15:40:14,637 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:40:14] "GET /workflow/p3?project_id=default-project-1&parent_card_id=card_default-project-1_P2_5b9ccad8 HTTP/1.1" 200 -
+2026-04-01 15:40:14,658 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:40:14] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 15:40:14,660 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:40:14] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 15:40:14,785 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 15:40:14] "[33mGET /api/product-cards/None HTTP/1.1[0m" 404 -
+2026-04-01 16:10:41,561 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 16:10:41] "GET /workflow?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-01 16:10:41,581 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 16:10:41] "[36mGET /static/js/app.js HTTP/1.1[0m" 304 -
+2026-04-01 16:10:41,582 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 16:10:41] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2026-04-01 16:10:41,798 [INFO] werkzeug: 127.0.0.1 - - [01/Apr/2026 16:10:41] "GET /api/workflow/status?project_id=default-project-1 HTTP/1.1" 200 -
+2026-04-02 09:00:00,592 [INFO] apscheduler.executors.default: Running job "Daily Reddit Pipeline (Global) (trigger: cron[hour='9', minute='0'], next run at: 2026-04-02 09:00:00 CST)" (scheduled at 2026-04-02 09:00:00+08:00)
+2026-04-02 09:00:00,601 [ERROR] apscheduler.executors.default: Job "Daily Reddit Pipeline (Global) (trigger: cron[hour='9', minute='0'], next run at: 2026-04-03 09:00:00 CST)" raised an exception
+Traceback (most recent call last):
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/apscheduler/executors/base.py", line 125, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/scheduler.py", line 24, in run_daily_pipeline
+ModuleNotFoundError: No module named 'data_cleaner'
+2026-04-02 19:42:12,727 [ERROR] app: Exception on /workflow [GET]
+Traceback (most recent call last):
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/app.py", line 147, in workflow_overview
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/app.py", line 39, in get_current_project
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/models.py", line 280, in get_projects
+sqlite3.OperationalError: no such table: projects
+2026-04-02 19:42:12,741 [INFO] werkzeug: 127.0.0.1 - - [02/Apr/2026 19:42:12] "[35m[1mGET /workflow?project_id=default-project-1 HTTP/1.1[0m" 500 -
+2026-04-03 09:00:00,014 [INFO] apscheduler.executors.default: Running job "Daily Reddit Pipeline (Global) (trigger: cron[hour='9', minute='0'], next run at: 2026-04-04 09:00:00 CST)" (scheduled at 2026-04-03 09:00:00+08:00)
+2026-04-03 09:00:00,024 [ERROR] apscheduler.executors.default: Job "Daily Reddit Pipeline (Global) (trigger: cron[hour='9', minute='0'], next run at: 2026-04-04 09:00:00 CST)" raised an exception
+Traceback (most recent call last):
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/apscheduler/executors/base.py", line 125, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/scheduler.py", line 24, in run_daily_pipeline
+ModuleNotFoundError: No module named 'data_cleaner'
+2026-04-03 21:41:00,658 [INFO] werkzeug: 127.0.0.1 - - [03/Apr/2026 21:41:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-04-03 21:41:02,979 [ERROR] app: Exception on /workflow [GET]
+Traceback (most recent call last):
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/app.py", line 147, in workflow_overview
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/app.py", line 39, in get_current_project
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/models.py", line 280, in get_projects
+sqlite3.OperationalError: no such table: projects
+2026-04-03 21:41:02,981 [INFO] werkzeug: 127.0.0.1 - - [03/Apr/2026 21:41:02] "[35m[1mGET /workflow?project_id=default-project-1 HTTP/1.1[0m" 500 -
+2026-04-04 09:00:00,011 [INFO] apscheduler.executors.default: Running job "Daily Reddit Pipeline (Global) (trigger: cron[hour='9', minute='0'], next run at: 2026-04-05 09:00:00 CST)" (scheduled at 2026-04-04 09:00:00+08:00)
+2026-04-04 09:00:00,024 [ERROR] apscheduler.executors.default: Job "Daily Reddit Pipeline (Global) (trigger: cron[hour='9', minute='0'], next run at: 2026-04-05 09:00:00 CST)" raised an exception
+Traceback (most recent call last):
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/venv/lib/python3.9/site-packages/apscheduler/executors/base.py", line 125, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "/Users/steven/.gemini/antigravity/scratch/reddit-ops/scheduler.py", line 24, in run_daily_pipeline
+ModuleNotFoundError: No module named 'data_cleaner'

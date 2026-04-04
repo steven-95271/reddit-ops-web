@@ -13,6 +13,16 @@
     "minimax": {
       "options": {
         "timeout": 600000
+      },
+      "models": {
+        "MiniMax-M2.7-highspeed": {
+          "name": "MiniMax-M2.7-highspeed",
+          "attachment": true,
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
       }
     },
     "opencode": {

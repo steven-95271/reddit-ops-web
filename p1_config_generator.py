@@ -6,7 +6,7 @@ P1 项目配置卡生成器
 
 import json
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 import config
 
@@ -128,12 +128,12 @@ class P1ConfigGenerator:
             import httpx
 
             project_context = input_data.get("project_background", "")
-            seed_keywords = input_data.get("seed_keywords", [])
+            seed_keywords_for_category = input_data.get("seed_keywords", [])
 
             prompt = f"""请根据以下产品信息，判断它最可能属于哪个品类：
 
 项目背景: {project_context}
-种子关键词: {", ".join(seed_keywords)}
+种子关键词: {", ".join(seed_keywords_for_category)}
 
 可选品类：
 - consumer_electronics: 消费电子产品（耳机、音箱、智能设备等）
@@ -186,6 +186,9 @@ class P1ConfigGenerator:
         brand_names = input_data.get("brand_names", [])
         competitor_brands = input_data.get("competitor_brands", [])
 
+        # 保存 competitor_brands 供 fallback 使用
+        self._competitor_brands = competitor_brands
+
         # 获取品类模板信息
         category_template = input_data.get(
             "_category_template", CATEGORY_TEMPLATES["general"]
@@ -196,7 +199,7 @@ class P1ConfigGenerator:
 
         if not self.api_key:
             # 如果没有 API key，返回基础建议
-            return self._generate_fallback_keywords(seed_keywords)
+            return self._generate_fallback_keywords(seed_keywords, competitor_brands)
 
         try:
             import httpx
@@ -258,11 +261,13 @@ class P1ConfigGenerator:
                     return self._extract_keywords_from_text(content, seed_keywords)
             else:
                 logger.warning(f"MiniMax API 调用失败: {response.status_code}")
-                return self._generate_fallback_keywords(seed_keywords)
+                return self._generate_fallback_keywords(
+                    seed_keywords, competitor_brands
+                )
 
         except Exception as e:
             logger.error(f"关键词生成失败: {e}")
-            return self._generate_fallback_keywords(seed_keywords)
+            return self._generate_fallback_keywords(seed_keywords, competitor_brands)
 
     def _generate_subreddits(self, input_data: Dict, keyword_suggestions: Dict) -> Dict:
         """第二轮：推荐 Subreddits"""
@@ -681,41 +686,65 @@ class P1ConfigGenerator:
 
         return card_data
 
-    def _generate_fallback_keywords(self, seed_keywords: List[str]) -> Dict:
+    def _generate_fallback_keywords(
+        self, seed_keywords: List[str], competitor_brands: Optional[List[str]] = None
+    ) -> Dict:
         """当 API 不可用时生成基础关键词建议
 
         基于 seed_keywords 做简单扩展，使用通用模式：
-        best {kw}, {kw} review, {kw} vs, {kw} worth it, {kw} alternative, {kw} problem
+        - 核心关键词：保持种子词完整，直接使用原始词组
+        - 对比词：使用真实竞品品牌名进行对比
+        - 品类词：使用种子词 + 品类通用修饰词
         """
         if not seed_keywords:
             seed_keywords = ["product"]
+        if competitor_brands is None:
+            competitor_brands = []
 
+        # 1. brand_keywords: 直接使用原始种子关键词（保持词组完整）
         brand = seed_keywords[:3]
 
-        product = []
+        # 2. product_keywords: 保持原始种子词，不做拆分
+        # 只添加一些通用变体（如果种子词本身就是品牌+型号的组合，不应再添加 2/pro 等后缀）
+        product = list(seed_keywords[:5])  # 直接使用原始种子词
+
+        # 3. category_keywords: 种子词 + 品类通用词（保持种子词完整）
         category = []
+        category_suffixes = [
+            "review",
+            "alternative",
+            "worth it",
+            "for kids",
+            "audio player",
+        ]
+        for kw in seed_keywords[:5]:
+            for suffix in category_suffixes:
+                category.append(f"{kw} {suffix}")
+
+        # 4. comparison_keywords: 使用真实竞品品牌名进行对比（如果种子词是词组，保持完整）
         comparison = []
+        if competitor_brands:
+            for kw in seed_keywords[:3]:
+                for competitor in competitor_brands[:3]:
+                    comparison.append(f"{kw} vs {competitor}")
+        else:
+            # 没有竞品时，生成通用对比模式
+            for kw in seed_keywords[:3]:
+                comparison.append(f"{kw} vs other")
+
+        # 5. scenario_keywords: 保持种子词完整，添加通用场景词
         scenario = []
+        scenario_suffixes = ["help", "advice", "experience", "tips", "recommendation"]
+        for kw in seed_keywords[:5]:
+            for suffix in scenario_suffixes:
+                scenario.append(f"{kw} {suffix}")
+
+        # 6. problem_keywords: 保持种子词完整，添加问题词
         problem = []
-
-        # 基于每个种子关键词生成通用扩展
-        for kw in seed_keywords[:5]:  # 限制前5个种子词
-            # product_keywords: 型号类（如 {kw} 2, {kw} pro）
-            product.extend([f"{kw} 2", f"{kw} pro"])
-
-            # category_keywords: 通用搜索模式
-            category.extend(
-                [f"best {kw}", f"{kw} review", f"{kw} worth it", f"{kw} alternative"]
-            )
-
-            # comparison_keywords: 对比词
-            comparison.append(f"{kw} vs")
-
-            # scenario_keywords: 场景词（通用模式，不依赖特定场景如 running/workout）
-            scenario.extend([f"{kw} help", f"{kw} advice", f"{kw} experience"])
-
-            # problem_keywords: 问题词
-            problem.extend([f"{kw} problem", f"{kw} issue", f"{kw} not working"])
+        problem_suffixes = ["problem", "issue", "not working", "broken", "review"]
+        for kw in seed_keywords[:5]:
+            for suffix in problem_suffixes:
+                problem.append(f"{kw} {suffix}")
 
         return {
             "brand_keywords": list(set(brand))[:5],
@@ -724,7 +753,7 @@ class P1ConfigGenerator:
             "comparison_keywords": list(set(comparison))[:5],
             "scenario_keywords": list(set(scenario))[:5],
             "problem_keywords": list(set(problem))[:6],
-            "reasoning": "这是基于种子关键词的通用扩展（best/review/vs/worth it/alternative/problem/issue 等模式），建议配置 API 后重新生成更精准的关键词",
+            "reasoning": "基于种子关键词和竞品生成的通用扩展，保持种子词完整，建议配置 API 后重新生成更精准的关键词",
         }
 
     def _generate_fallback_subreddits(self, seed_keywords: List[str]) -> Dict:
@@ -791,6 +820,7 @@ class P1ConfigGenerator:
             新的关键词建议
         """
         seed_keywords = input_data.get("seed_keywords", [])
+        competitor_brands = input_data.get("competitor_brands", [])
 
         # 获取品类模板信息
         category_template = input_data.get(
@@ -801,7 +831,7 @@ class P1ConfigGenerator:
         )
 
         if not self.api_key:
-            return self._generate_fallback_keywords(seed_keywords)
+            return self._generate_fallback_keywords(seed_keywords, competitor_brands)
 
         try:
             import httpx
@@ -861,4 +891,4 @@ class P1ConfigGenerator:
         except Exception as e:
             logger.error(f"重新生成关键词失败: {e}")
 
-        return self._generate_fallback_keywords(seed_keywords)
+        return self._generate_fallback_keywords(seed_keywords, competitor_brands)
