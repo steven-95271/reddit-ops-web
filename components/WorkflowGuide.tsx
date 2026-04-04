@@ -11,10 +11,12 @@ interface WorkflowGuideProps {
   title: string
   description: string
   steps: Step[]
+  details?: string
 }
 
-export default function WorkflowGuide({ title, description, steps }: WorkflowGuideProps) {
+export default function WorkflowGuide({ title, description, steps, details }: WorkflowGuideProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   return (
     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 overflow-hidden">
@@ -67,6 +69,32 @@ export default function WorkflowGuide({ title, description, steps }: WorkflowGui
                 </div>
               ))}
             </div>
+
+            {/* 运作原理折叠区域 */}
+            {details && (
+              <div className="mt-6 pt-4 border-t border-blue-200">
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  <svg 
+                    className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-90' : ''}`}
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  {showDetails ? '收起运作原理' : '查看运作原理'}
+                </button>
+
+                {showDetails && (
+                  <div className="mt-3 text-sm text-slate-500 leading-relaxed whitespace-pre-line">
+                    {details}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

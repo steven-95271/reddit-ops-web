@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { showToast } from '@/components/Toast'
+import WorkflowGuide from '@/components/WorkflowGuide'
 
 interface Project {
   id: string
@@ -231,6 +232,45 @@ export default function ScrapingPage() {
           <p className="text-slate-600 mt-2">
             根据项目配置的关键词和 Subreddit，从 Reddit 抓取帖子数据
           </p>
+        </div>
+
+        {/* 工作流说明 */}
+        <div className="mb-6">
+          <WorkflowGuide
+            title="P2 内容抓取"
+            description="根据 P1 配置的关键词和 Subreddit，使用 Apify 服务从 Reddit 抓取帖子数据"
+            steps={[
+              {
+                title: '选择要抓取的项目',
+                description: '从 P1 已配置的项目中选择，系统会显示该项目的关键词和板块数量'
+              },
+              {
+                title: '设置抓取参数',
+                description: '选择时间范围、最大抓取数量和排序方式'
+              },
+              {
+                title: '开始抓取',
+                description: '系统自动调用 Apify 抓取，每 10 秒轮询状态'
+              },
+              {
+                title: '查看结果并进入 P3',
+                description: '抓取完成后自动保存数据，显示统计结果'
+              }
+            ]}
+            details={`【数据抓取逻辑】
+系统使用 Apify Reddit Scraper 服务，根据 P1 配置的关键词和 Subreddit 组合构建搜索查询，批量抓取符合条件的 Reddit 帖子。
+
+【抓取参数说明】
+• 时间范围：决定抓取多久以内的帖子。24小时适合追踪热点，7天适合日常运营，30天适合初次调研
+• 最大数量：单次抓取的帖子上限，建议首次设 50-100 条测试效果
+• 排序方式：hot（当前热门）、new（最新发布）、top（历史最高赞）
+
+【数据去重】
+如果同一帖子已经抓取过（根据 Reddit 帖子 ID 判断），系统会自动跳过，不会重复存储。
+
+【抓取流程】
+点击开始 → 发送任务到 Apify → 每 10 秒检查一次状态 → 完成后自动将帖子数据存入数据库 → 显示结果统计`}
+          />
         </div>
 
         {/* 项目选择器 */}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { showToast } from '@/components/Toast'
+import WorkflowGuide from '@/components/WorkflowGuide'
 
 interface PublishItem {
   id: string
@@ -62,6 +63,39 @@ export default function PublishPage() {
 
   return (
     <div className="space-y-6">
+      {/* 工作流说明 */}
+      <WorkflowGuide
+        title="P5 发布追踪"
+        description="管理已审核通过的内容的发布状态和效果追踪"
+        steps={[
+          {
+            title: '查看待发布队列',
+            description: '从审核通过的内容中选择要发布的'
+          },
+          {
+            title: '复制内容并手动发布',
+            description: '复制回复文本，打开 Reddit 对应帖子手动粘贴发布'
+          },
+          {
+            title: '粘贴发布链接',
+            description: '发布后回来粘贴帖子链接，系统开始追踪'
+          },
+          {
+            title: '查看效果数据',
+            description: '定期检查互动数据，判断哪些人设和风格效果最好'
+          }
+        ]}
+        details={`【当前发布方式】
+MVP 阶段采用半自动方式：系统帮你生成和管理内容，但发布动作需要手动完成。
+1. 从待发布队列选择内容
+2. 点击复制按钮，复制回复文本
+3. 打开 Reddit 对应帖子，手动粘贴发布
+4. 发布后回来粘贴帖子链接
+
+【效果追踪】
+发布后系统会定期检查链接的互动数据（点赞数、回复数），帮你判断哪些人设和回复风格效果最好，为下一轮运营提供数据支持。`}
+      />
+
       <div className="grid grid-cols-3 gap-6">
         <div className="glass-card text-center">
           <div className="text-3xl font-black text-yellow-600">{stats.pending}</div>

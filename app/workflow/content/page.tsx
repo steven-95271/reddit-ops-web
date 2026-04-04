@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { showToast } from '@/components/Toast'
+import WorkflowGuide from '@/components/WorkflowGuide'
 
 interface ContentItem {
   id: string
@@ -85,6 +86,45 @@ export default function ContentPage() {
 
   return (
     <div className="space-y-6">
+      {/* 工作流说明 */}
+      <WorkflowGuide
+        title="P4-2 内容创作"
+        description="AI 扮演选定的人设，针对候选帖子自动生成回复内容"
+        steps={[
+          {
+            title: '选择项目和候选帖',
+            description: '从 P3 筛选出的候选热帖中选择'
+          },
+          {
+            title: '选择人设',
+            description: '选择适合该帖子的人设来生成内容'
+          },
+          {
+            title: 'AI 生成回复',
+            description: 'AI 根据人设和原帖内容生成自然回复'
+          },
+          {
+            title: '审核和发布',
+            description: '通过/编辑/拒绝/重新生成，确认后进入 P5 发布'
+          }
+        ]}
+        details={`【AI 生成逻辑】
+系统将以下信息组合成 prompt 发送给 AI：
+1. 人设描述（你是谁、什么语气、什么风格）
+2. 原帖内容（帖子标题和正文）
+3. 产品信息（来自 P1 配置）
+4. 生成要求（自然提及品牌、不要硬广、符合 Reddit 社区规范）
+
+AI 会根据原帖内容和人设风格，生成一条看起来像真实用户回复的内容，在合适的地方自然提及你的产品。
+
+【审核流程】
+每条 AI 生成的内容都需要人工审核：
+• 通过：内容质量OK，可以发布
+• 编辑后通过：需要微调措辞后再发布
+• 拒绝：内容不好，可以换个人设或重新生成
+• 重新生成：让 AI 再写一版`}
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-900">内容创作</h2>

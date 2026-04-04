@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { showToast } from '@/components/Toast'
+import WorkflowGuide from '@/components/WorkflowGuide'
 
 const mockCandidates = [
   { id: 1, title: 'Best open ear earbuds for running in 2024?', subreddit: 'running', upvotes: 234, comments: 67, score: 0.89, level: 'S', category: 'A', categoryName: '深度测评' },
@@ -57,6 +58,50 @@ export default function AnalysisPage() {
 
   return (
     <div className="space-y-6">
+      {/* 工作流说明 */}
+      <WorkflowGuide
+        title="P3 分析筛选"
+        description="对抓取到的帖子进行多维评分和分类，筛选出高价值候选帖"
+        steps={[
+          {
+            title: '选择项目加载帖子',
+            description: '系统自动加载该项目的抓取数据'
+          },
+          {
+            title: '自动评分和分类',
+            description: '系统计算 Hot Score 和 Composite Score，并归入五维分类'
+          },
+          {
+            title: '筛选和排序',
+            description: '按评级、分类、Subreddit 筛选，按评分/点赞/评论排序'
+          },
+          {
+            title: '标记候选并进入 P4',
+            description: '确认候选列表后进入人设设计'
+          }
+        ]}
+        details={`【热帖评分逻辑】
+系统用两个维度给每个帖子打分：
+
+1. Hot Score（热度分 0-100）：基于帖子的 upvotes（点赞数）、评论数、发帖时间三个因素计算。越新、互动越多的帖子分数越高。
+
+2. Composite Score（综合分 0-1）：综合热度、与你产品的相关性、互动质量（评论深度vs灌水）的加权分数。
+
+【自动分级】
+S 级（≥0.8）：最高价值帖，优先回复
+A 级（≥0.6）：高价值帖，建议回复
+B 级（≥0.4）：中等价值，可选择性回复
+C 级（<0.4）：低价值，一般跳过
+
+【五维分类】
+每个帖子被归入一个最匹配的类型：
+• A 类 - 结构型测评帖：如 "Best XX for YY"，最适合植入产品推荐
+• B 类 - 场景痛点帖：用户在抱怨某个问题，适合以解决方案的角度回复
+• C 类 - 观点争议帖：对比讨论，适合提供客观对比信息
+• D 类 - 竞品/KOL 帖：提到竞品的帖子，适合展示差异化优势
+• E 类 - 平台趋势帖：社区热门话题，适合蹭热度提升曝光`}
+      />
+
       <div className="grid grid-cols-3 gap-6">
         <div className="glass-card">
           <h3 className="text-sm font-bold text-slate-400 uppercase mb-4">评分分布</h3>

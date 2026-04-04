@@ -429,6 +429,21 @@ export default function ConfigPage() {
                 description: '配置完成后保存，即可进入下一步抓取 Reddit 帖子'
               }
             ]}
+            details={`【AI 关键词扩展逻辑】
+系统将你填写的产品信息（名称、描述、受众、品牌、竞品）发送给 AI，要求它扮演 Reddit 运营专家，生成四类关键词：
+• 核心词：产品直接相关的搜索词，如 "open ear earbuds"
+• 长尾词：用户可能搜索的完整短语，如 "best open ear earbuds for running 2024"
+• 竞品词：竞品品牌名和产品名，用于监控竞品讨论
+• 场景词：使用场景相关的词，如 "running"、"commuting"
+
+【Subreddit 推荐逻辑】
+AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
+• 相关度等级（高/中/低）
+• 推荐理由（为什么这个社区适合推广你的产品）
+• 发帖活跃度参考
+
+【URL 提取逻辑】
+粘贴产品链接后，系统会抓取网页内容，AI 自动提取产品名称、描述、目标受众、品牌信息，免去手动填写。支持 Amazon、品牌官网等主流电商页面。`}
           />
         </div>
 

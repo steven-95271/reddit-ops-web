@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { showToast } from '@/components/Toast'
+import WorkflowGuide from '@/components/WorkflowGuide'
 
 interface Persona {
   id: string
@@ -127,6 +128,45 @@ export default function PersonaPage() {
 
   return (
     <div className="space-y-6">
+      {/* 工作流说明 */}
+      <WorkflowGuide
+        title="P4-1 人设管理"
+        description="管理 Reddit 回复时使用的虚拟人设，每个人设有独立的性格、语气和专业背景"
+        steps={[
+          {
+            title: '查看现有人设列表',
+            description: '系统内置 3 个人设，也可以创建自定义人设'
+          },
+          {
+            title: '创建或编辑人设',
+            description: '填写性格描述、语气风格、关注领域等'
+          },
+          {
+            title: '预览人设语气',
+            description: '查看该人设会用什么风格回复'
+          },
+          {
+            title: '进入 P4-2 内容创作',
+            description: '人设准备好后，进入内容创作页面'
+          }
+        ]}
+        details={`【为什么需要人设？】
+直接用品牌账号在 Reddit 发广告会被社区排斥甚至封号。通过人设，AI 生成的内容更像真实用户的分享，而非广告。不同人设可以从不同角度推荐产品，更自然可信。
+
+【人设设计逻辑】
+每个人设包含以下维度：
+• 背景故事：这个"人"是做什么的、什么生活方式
+• 语气风格：热情/专业/随意/幽默等
+• 关注领域：这个人平时会关注什么话题
+• 写作风格：长文分析型 / 简短点评型 / 经验分享型
+
+【系统内置 3 种人设】
+运动达人 Alex：跑步爱好者视角，适合运动场景帖
+音频极客 Sam：技术发烧友视角，适合测评和对比帖
+通勤白领 Jordan：日常使用者视角，适合性价比和便利性话题
+你也可以根据产品特点创建自定义人设。`}
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-900">人设库</h2>
