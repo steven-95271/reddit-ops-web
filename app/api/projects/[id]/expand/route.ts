@@ -22,9 +22,9 @@ interface ExpandResult {
   }
 }
 
-const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY || 'sk-8dxSo4bl8P3TyEY59AFu15usvmIHN8nDF7Iiv885IpSR4WZQb9exallyxcwAxoC5'
-const OPENCODE_API_URL = 'https://api.opencode.ai/v1/chat/completions'
-const OPENCODE_MODEL = 'opencode/qwen3.6-plus-free'
+const KIMI_API_KEY = process.env.KIMI_API_KEY || ''
+const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions'
+const KIMI_MODEL = 'kimi-k2-5'
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY
 const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimaxi.chat/v1/text/chatcompletion_v2'
@@ -32,12 +32,12 @@ const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7-Highspeed'
 
 async function callAIWithFallback(prompt: string): Promise<string> {
   try {
-    console.log('Trying Qwen3.6 Plus Free (OpenCode)...')
-    const result = await callOpenCodeZen(prompt)
-    console.log('Qwen3.6 Plus Free success')
+    console.log('Trying Kimi K2.5...')
+    const result = await callKimi(prompt)
+    console.log('Kimi K2.5 success')
     return result
   } catch (error) {
-    console.error('Qwen3.6 Plus Free failed:', error)
+    console.error('Kimi K2.5 failed:', error)
   }
 
   console.log('Falling back to MiniMax-M2.7-Highspeed...')
@@ -75,21 +75,25 @@ async function callMiniMax(prompt: string): Promise<string> {
   return data.choices[0]?.message?.content || ''
 }
 
-async function callOpenCodeZen(prompt: string): Promise<string> {
-  const response = await fetch(OPENCODE_API_URL, {
+async function callKimi(prompt: string): Promise<string> {
+  if (!KIMI_API_KEY) {
+    throw new Error('KIMI_API_KEY not configured')
+  }
+
+  const response = await fetch(KIMI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENCODE_API_KEY}`,
+      'Authorization': `Bearer ${KIMI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: OPENCODE_MODEL,
+      model: KIMI_MODEL,
       messages: [{ role: 'user', content: prompt }],
     }),
   })
 
   if (!response.ok) {
-    throw new Error(`OpenCode API error: ${response.status} ${response.statusText}`)
+    throw new Error(`Kimi API error: ${response.status} ${response.statusText}`)
   }
 
   const data = await response.json()
