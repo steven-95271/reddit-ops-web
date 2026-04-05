@@ -41,7 +41,7 @@ export async function initDb() {
     )
   `
 
-  // 3. personas 表 - 人设管理
+  // 3. personas 表 - 人设管理（增强版）
   await sql`
     CREATE TABLE IF NOT EXISTS personas (
       id TEXT PRIMARY KEY,
@@ -59,7 +59,14 @@ export async function initDb() {
       post_types TEXT,
       platform TEXT DEFAULT 'Reddit',
       is_default BOOLEAN DEFAULT FALSE,
+      -- 新增字段
+      reddit_habits TEXT,       -- JSON: Reddit使用习惯
+      writing_traits TEXT,      -- JSON: 写作特征
+      brand_strategy TEXT,      -- 品牌提及策略
+      flaws TEXT,               -- 人设的不完美点
+      sample_comments TEXT,     -- JSON: 示例评论
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
     )
   `

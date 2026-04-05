@@ -1,438 +1,841 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
+import Link from 'next/link'
+
+interface Project {
+  id: string
+  name: string
+}
 
 interface Persona {
   id: string
+  project_id: string
   name: string
   username: string
-  emoji: string
-  color: string
+  avatar_emoji: string
+  avatar_color: string
+  description: string
+  description_en: string
   background: string
   tone: string
-  writingStyle: string
   focus: string[]
-  subreddits: string[]
-  isCustom: boolean
+  post_types: string[]
+  reddit_habits: {
+    subreddits: string[]
+    posting_frequency: string
+    interaction_style: string
+  } | null
+  writing_traits: {
+    sentence_style: string
+    abbreviations: string[]
+    emoji_usage: string
+    reddit_expressions: string[]
+  } | null
+  brand_strategy: string
+  flaws: string
+  sample_comments: string[] | null
+  created_at: string
+  updated_at: string
 }
 
-const defaultPersonas: Persona[] = [
-  {
-    id: 'persona_1',
-    name: 'SportyRunner',
-    username: 'u/sporty_runner_mike',
-    emoji: '🏃',
-    color: '#22c55e',
-    background: '热爱跑步和户外运动，马拉松爱好者，每周跑量50km+，关注运动耳机和装备评测',
-    tone: '活泼/第一人称',
-    writingStyle: '分享个人运动体验，语气活泼，喜欢用清单和干货内容',
-    focus: ['running', 'workout', 'sports', 'fitness', 'marathon'],
-    subreddits: ['r/running', 'r/Fitness', 'r/runningshoes'],
-    isCustom: false,
-  },
-  {
-    id: 'persona_2',
-    name: 'AudioGeek',
-    username: 'u/audio_beats_mike',
-    emoji: '🎧',
-    color: '#8b5cf6',
-    background: '音频发烧友，对音质有追求，熟悉各类音频设备参数，喜欢对比评测',
-    tone: '专业/分析型',
-    writingStyle: '技术分析风格，擅长参数对比，测评深入',
-    focus: ['audiophile', 'headphones', 'earbuds', 'sound_quality', 'audio_tech'],
-    subreddits: ['r/audiophile', 'r/headphones', 'r/earbuds'],
-    isCustom: false,
-  },
-  {
-    id: 'persona_3',
-    name: 'CommuterLife',
-    username: 'u/commuter_daily',
-    emoji: '🚇',
-    color: '#3b82f6',
-    background: '朝九晚五的上班族，每天通勤1-2小时，注重实用性和性价比',
-    tone: '务实/生活化',
-    writingStyle: '分享通勤日常，推荐实用好物，贴近普通人生活',
-    focus: ['commuting', 'work', 'daily_life', 'productivity', 'budget'],
-    subreddits: ['r/commuting', 'r/gadgets', 'r/BudgetAudiophile'],
-    isCustom: false,
-  },
+const avatarColors = [
+  'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
+  'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-red-500',
 ]
 
 export default function PersonaPage() {
-  const [personas, setPersonas] = useState<Persona[]>(defaultPersonas)
-  const [editingPersona, setEditingPersona] = useState<Persona | null>(null)
-  const [showNewForm, setShowNewForm] = useState(false)
-  const [newPersona, setNewPersona] = useState<Partial<Persona>>({
-    name: '',
-    username: '',
-    emoji: '👤',
-    color: '#6366f1',
-    background: '',
-    tone: '',
-    writingStyle: '',
-    focus: [],
-    subreddits: [],
-    isCustom: true,
-  })
-  const [focusInput, setFocusInput] = useState('')
-  const [subredditInput, setSubredditInput] = useState('')
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [personas, setPersonas] = useState<Persona[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  const handleSaveEdit = (updated: Persona) => {
-    setPersonas(prev => prev.map(p => p.id === updated.id ? updated : p))
-    setEditingPersona(null)
-    showToast('人设已更新', 'success')
+  // Modals
+  const [showPreview, setShowPreview] = useState<string | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState<string | null>(null)
+
+  // Fetch projects on mount
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('/api/projects')
+      const result = await response.json()
+      if (result.success) {
+        setProjects(result.data)
+      } else {
+        showToast(result.error || '加载项目失败', 'error')
+      }
+    } catch (error) {
+      showToast('加载项目失败', 'error')
+    }
   }
 
-  const handleCreatePersona = () => {
-    if (!newPersona.name || !newPersona.background) {
-      showToast('请填写名称和背景', 'error')
+  const fetchPersonas = useCallback(async (projectId: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/personas?project_id=${projectId}`)
+      const result = await response.json()
+      if (result.success) {
+        setPersonas(result.data)
+      } else {
+        showToast(result.error || '加载人设失败', 'error')
+      }
+    } catch (error) {
+      showToast('加载人设失败', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId)
+    if (projectId) {
+      fetchPersonas(projectId)
+    } else {
+      setPersonas([])
+    }
+  }
+
+  const handleGeneratePersonas = async () => {
+    if (!selectedProjectId) {
+      showToast('请先选择项目', 'error')
       return
     }
-    const persona: Persona = {
-      id: `persona_${Date.now()}`,
-      name: newPersona.name || '',
-      username: newPersona.username || `u/${(newPersona.name || '').toLowerCase().replace(/\s/g, '_')}`,
-      emoji: newPersona.emoji || '👤',
-      color: newPersona.color || '#6366f1',
-      background: newPersona.background || '',
-      tone: newPersona.tone || '',
-      writingStyle: newPersona.writingStyle || '',
-      focus: newPersona.focus || [],
-      subreddits: newPersona.subreddits || [],
-      isCustom: true,
-    }
-    setPersonas(prev => [...prev, persona])
-    setShowNewForm(false)
-    setNewPersona({ name: '', username: '', emoji: '👤', color: '#6366f1', background: '', tone: '', writingStyle: '', focus: [], subreddits: [], isCustom: true })
-    setFocusInput('')
-    setSubredditInput('')
-    showToast('新人设已创建', 'success')
-  }
 
-  const addFocus = () => {
-    if (focusInput.trim()) {
-      setNewPersona(prev => ({ ...prev, focus: [...(prev.focus || []), focusInput.trim()] }))
-      setFocusInput('')
+    setIsGenerating(true)
+    try {
+      const response = await fetch('/api/personas/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: selectedProjectId }),
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        setPersonas(result.data)
+        showToast(`成功生成 ${result.data.length} 个人设`, 'success')
+      } else {
+        showToast(result.error || '生成人设失败', 'error')
+      }
+    } catch (error) {
+      showToast('生成人设过程出错', 'error')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
-  const addSubreddit = () => {
-    if (subredditInput.trim()) {
-      const sub = subredditInput.trim().replace('r/', '')
-      setNewPersona(prev => ({ ...prev, subreddits: [...(prev.subreddits || []), `r/${sub}`] }))
-      setSubredditInput('')
+  const handleDeletePersona = async (id: string) => {
+    if (!confirm('确定要删除这个人设吗？')) return
+
+    try {
+      const response = await fetch(`/api/personas/${id}`, {
+        method: 'DELETE',
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        setPersonas(prev => prev.filter(p => p.id !== id))
+        showToast('人设已删除', 'success')
+      } else {
+        showToast(result.error || '删除失败', 'error')
+      }
+    } catch (error) {
+      showToast('删除人设失败', 'error')
     }
+  }
+
+  const handleRegenerateAll = async () => {
+    if (!confirm('重新生成将清除现有 AI 生成的人设，确定继续吗？')) return
+    await handleGeneratePersonas()
   }
 
   return (
     <div className="space-y-6">
-      {/* 工作流说明 */}
       <WorkflowGuide
         title="P4-1 人设管理"
-        description="管理 Reddit 回复时使用的虚拟人设，每个人设有独立的性格、语气和专业背景"
+        description="AI 根据项目信息智能生成虚拟用户人设，让内容更像真实 Reddit 用户的分享"
         steps={[
-          {
-            title: '查看现有人设列表',
-            description: '系统内置 3 个人设，也可以创建自定义人设'
-          },
-          {
-            title: '创建或编辑人设',
-            description: '填写性格描述、语气风格、关注领域等'
-          },
-          {
-            title: '预览人设语气',
-            description: '查看该人设会用什么风格回复'
-          },
-          {
-            title: '进入 P4-2 内容创作',
-            description: '人设准备好后，进入内容创作页面'
-          }
+          { title: '选择项目', description: '系统读取 P1 配置的产品信息' },
+          { title: 'AI 生成人设', description: '根据产品自动生成 3-5 个针对性人设' },
+          { title: '预览和编辑', description: '查看示例回复，编辑不满意的人设' },
+          { title: '进入 P4-2 内容创作', description: '人设准备好后开始创作内容' },
         ]}
-        details={`【为什么需要人设？】
-直接用品牌账号在 Reddit 发广告会被社区排斥甚至封号。通过人设，AI 生成的内容更像真实用户的分享，而非广告。不同人设可以从不同角度推荐产品，更自然可信。
+        details={`【AI 人设生成逻辑】
+系统会读取你的产品信息（产品名、描述、目标受众、竞品），调用 AI 生成一组适合该产品的人设。
 
-【人设设计逻辑】
-每个人设包含以下维度：
-• 背景故事：这个"人"是做什么的、什么生活方式
-• 语气风格：热情/专业/随意/幽默等
-• 关注领域：这个人平时会关注什么话题
-• 写作风格：长文分析型 / 简短点评型 / 经验分享型
-
-【系统内置 3 种人设】
-运动达人 Alex：跑步爱好者视角，适合运动场景帖
-音频极客 Sam：技术发烧友视角，适合测评和对比帖
-通勤白领 Jordan：日常使用者视角，适合性价比和便利性话题
-你也可以根据产品特点创建自定义人设。`}
+每个人设包含：
+• 名字和背景故事：像真实 Reddit 用户
+• Reddit 使用习惯：常逛哪些板块、发帖频率
+• 写作特征：句式偏好、缩写习惯、emoji 使用
+• 品牌提及策略：如何自然地提到产品
+• 不完美点：增加真实感的小缺点
+• 示例评论：展示说话方式`}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-slate-900">人设库</h2>
-          <p className="text-sm text-slate-500 mt-1">{personas.length} 个人设 · {personas.filter(p => p.isCustom).length} 个自定义</p>
+      {/* Project Selector */}
+      <div className="glass-card">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-semibold text-slate-600">选择项目：</label>
+          <select
+            value={selectedProjectId}
+            onChange={(e) => handleProjectChange(e.target.value)}
+            className="flex-1 bg-white/80 border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
+          >
+            <option value="">请选择一个项目...</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
         </div>
-        <button
-          onClick={() => setShowNewForm(true)}
-          className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors"
-        >
-          + 新建人设
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {personas.map(persona => (
-          <div key={persona.id} className="glass-card hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ backgroundColor: persona.color + '20' }}>
-                  {persona.emoji}
-                </div>
-                <div>
-                  <div className="text-sm font-black text-slate-900">{persona.name}</div>
-                  <div className="text-xs text-slate-400">{persona.username}</div>
-                </div>
-              </div>
+      {selectedProjectId && (
+        <>
+          {/* Action Bar */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">人设库</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {personas.length} 个人设
+              </p>
+            </div>
+            <div className="flex gap-3">
+              {personas.length > 0 && (
+                <button
+                  onClick={handleRegenerateAll}
+                  disabled={isGenerating}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors disabled:opacity-50"
+                >
+                  {isGenerating ? '生成中...' : '重新生成全部'}
+                </button>
+              )}
               <button
-                onClick={() => setEditingPersona(persona)}
-                className="text-xs text-slate-400 hover:text-slate-700 transition-colors"
+                onClick={() => setShowCreateForm(true)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors"
               >
-                编辑
+                + 自定义人设
               </button>
             </div>
-
-            <p className="text-xs text-slate-600 mb-4 line-clamp-2">{persona.background}</p>
-
-            <div className="space-y-3">
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">语气</div>
-                <div className="text-xs text-slate-700">{persona.tone}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">写作风格</div>
-                <div className="text-xs text-slate-700 line-clamp-2">{persona.writingStyle}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">关注领域</div>
-                <div className="flex flex-wrap gap-1">
-                  {persona.focus.slice(0, 3).map((f, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-medium text-slate-600">
-                      {f}
-                    </span>
-                  ))}
-                  {persona.focus.length > 3 && (
-                    <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-medium text-slate-400">
-                      +{persona.focus.length - 3}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">目标板块</div>
-                <div className="flex flex-wrap gap-1">
-                  {persona.subreddits.map((s, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-medium text-slate-600">
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
-        ))}
-      </div>
 
-      {editingPersona && (
-        <EditPersonaModal
-          persona={editingPersona}
-          onSave={handleSaveEdit}
-          onClose={() => setEditingPersona(null)}
+          {/* Loading State */}
+          {isLoading && (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-sm text-slate-500">加载人设中...</p>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && personas.length === 0 && (
+            <div className="glass-card text-center py-16">
+              <div className="text-6xl mb-4">🤖</div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">还没有人设</h3>
+              <p className="text-sm text-slate-500 mb-8 max-w-md mx-auto">
+                AI 会根据你的产品信息（产品名、描述、目标受众、竞品）自动生成 3-5 个适合在 Reddit 上推广的虚拟用户人设
+              </p>
+              <button
+                onClick={handleGeneratePersonas}
+                disabled={isGenerating}
+                className="px-8 py-4 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors disabled:opacity-50 text-lg"
+              >
+                {isGenerating ? (
+                  <span className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    AI 正在根据你的产品信息设计人设...
+                  </span>
+                ) : (
+                  '✨ AI 智能生成人设'
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Persona Cards */}
+          {!isLoading && personas.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {personas.map((persona) => (
+                <PersonaCard
+                  key={persona.id}
+                  persona={persona}
+                  onDelete={handleDeletePersona}
+                  onPreview={() => setShowPreview(persona.id)}
+                  onEdit={() => setShowEditForm(persona.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Next Step Button */}
+          <Link href="/workflow/content">
+            <button className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors">
+              下一步：内容创作 →
+            </button>
+          </Link>
+        </>
+      )}
+
+      {/* Modals */}
+      {showPreview && (
+        <PreviewModal
+          personaId={showPreview}
+          onClose={() => setShowPreview(null)}
         />
       )}
 
-      {showNewForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowNewForm(false)}>
-          <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-slate-900 mb-6">新建人设</h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">名称</label>
-                  <input
-                    type="text"
-                    value={newPersona.name || ''}
-                    onChange={e => setNewPersona(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="TechRunner"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">用户名</label>
-                  <input
-                    type="text"
-                    value={newPersona.username || ''}
-                    onChange={e => setNewPersona(prev => ({ ...prev, username: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="u/tech_runner"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Emoji</label>
-                  <input
-                    type="text"
-                    value={newPersona.emoji || ''}
-                    onChange={e => setNewPersona(prev => ({ ...prev, emoji: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="🏃"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">背景故事</label>
-                <textarea
-                  value={newPersona.background || ''}
-                  onChange={e => setNewPersona(prev => ({ ...prev, background: e.target.value }))}
-                  rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                  placeholder="描述这个人物的背景..."
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">语气风格</label>
-                  <input
-                    type="text"
-                    value={newPersona.tone || ''}
-                    onChange={e => setNewPersona(prev => ({ ...prev, tone: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="专业/分析型"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">写作风格</label>
-                  <input
-                    type="text"
-                    value={newPersona.writingStyle || ''}
-                    onChange={e => setNewPersona(prev => ({ ...prev, writingStyle: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="技术分析，参数对比"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">关注领域</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={focusInput}
-                    onChange={e => setFocusInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addFocus())}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="输入后回车添加"
-                  />
-                  <button onClick={addFocus} className="px-3 py-2 bg-slate-100 rounded-lg text-sm font-semibold hover:bg-slate-200">+</button>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {(newPersona.focus || []).map((f, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-slate-100 rounded-full text-xs text-slate-600">{f}</span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">目标板块</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={subredditInput}
-                    onChange={e => setSubredditInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubreddit())}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="输入板块名后回车"
-                  />
-                  <button onClick={addSubreddit} className="px-3 py-2 bg-slate-100 rounded-lg text-sm font-semibold hover:bg-slate-200">+</button>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {(newPersona.subreddits || []).map((s, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-slate-100 rounded-full text-xs text-slate-600">{s}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowNewForm(false)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50">
-                取消
-              </button>
-              <button onClick={handleCreatePersona} className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800">
-                创建
-              </button>
-            </div>
-          </div>
-        </div>
+      {showCreateForm && (
+        <CreatePersonaModal
+          projectId={selectedProjectId}
+          onClose={() => setShowCreateForm(false)}
+          onSuccess={() => fetchPersonas(selectedProjectId)}
+        />
       )}
 
-      <button
-        onClick={() => showToast('人设已确认，进入 P4-2 内容创作', 'success')}
-        className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
-      >
-        确认并进入 P4-2 内容创作 →
-      </button>
+      {showEditForm && (
+        <EditPersonaModal
+          personaId={showEditForm}
+          onClose={() => setShowEditForm(null)}
+          onSuccess={() => fetchPersonas(selectedProjectId)}
+        />
+      )}
     </div>
   )
 }
 
-function EditPersonaModal({ persona, onSave, onClose }: { persona: Persona; onSave: (p: Persona) => void; onClose: () => void }) {
-  const [edited, setEdited] = useState<Persona>({ ...persona })
+// Persona Card Component
+function PersonaCard({
+  persona,
+  onDelete,
+  onPreview,
+  onEdit,
+}: {
+  persona: Persona
+  onDelete: (id: string) => void
+  onPreview: () => void
+  onEdit: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  const writingTraitsText = persona.writing_traits
+    ? [
+        persona.writing_traits.sentence_style && `${persona.writing_traits.sentence_style}`,
+        persona.writing_traits.abbreviations?.length > 0 && `使用缩写`,
+        persona.writing_traits.emoji_usage && `${persona.writing_traits.emoji_usage}用 emoji`,
+      ].filter(Boolean).join(' / ')
+    : ''
+
+  return (
+    <div className="glass-card hover:shadow-md transition-shadow">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${persona.avatar_color || 'bg-slate-500'} bg-opacity-20`}>
+            {persona.avatar_emoji || '👤'}
+          </div>
+          <div>
+            <div className="text-sm font-black text-slate-900">{persona.name}</div>
+            <div className="text-xs text-slate-400">{persona.username}</div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onEdit} className="text-xs text-slate-400 hover:text-slate-700 transition-colors">编辑</button>
+          <button onClick={onDelete.bind(null, persona.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">删除</button>
+        </div>
+      </div>
+
+      {/* Background */}
+      <p className="text-xs text-slate-600 mb-4 line-clamp-2">{persona.background}</p>
+
+      {/* Tags */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {persona.tone && (
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold">
+            {persona.tone}
+          </span>
+        )}
+        {persona.brand_strategy && (
+          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">
+            {persona.brand_strategy}
+          </span>
+        )}
+      </div>
+
+      {/* Writing Traits */}
+      {writingTraitsText && (
+        <div className="mb-3">
+          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">写作特征</div>
+          <div className="text-xs text-slate-600">{writingTraitsText}</div>
+        </div>
+      )}
+
+      {/* Flaws */}
+      {persona.flaws && (
+        <div className="mb-3">
+          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">不完美点</div>
+          <div className="text-xs text-slate-500 italic">"{persona.flaws}"</div>
+        </div>
+      )}
+
+      {/* Sample Comments */}
+      {persona.sample_comments && persona.sample_comments.length > 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+          >
+            {expanded ? '收起示例评论' : `查看示例评论 (${persona.sample_comments.length})`}
+          </button>
+          {expanded && (
+            <div className="mt-2 space-y-2">
+              {persona.sample_comments.map((comment, i) => (
+                <div key={i} className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">
+                  "{comment}"
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={onPreview}
+          className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition-colors"
+        >
+          预览效果
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Preview Modal
+function PreviewModal({ personaId, onClose }: { personaId: string; onClose: () => void }) {
+  const [postTitle, setPostTitle] = useState('')
+  const [postBody, setPostBody] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [personaName, setPersonaName] = useState('')
+
+  const handlePreview = async () => {
+    if (!postTitle.trim()) {
+      showToast('请输入帖子标题', 'error')
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const response = await fetch(`/api/personas/${personaId}/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sample_post_title: postTitle, sample_post_body: postBody }),
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        setPreview(result.data.preview)
+        setPersonaName(result.data.persona_name)
+      } else {
+        showToast(result.error || '生成预览失败', 'error')
+      }
+    } catch (error) {
+      showToast('生成预览过程出错', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h3 className="text-xl font-black text-slate-900 mb-6">编辑人设</h3>
+      <div className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-xl font-black text-slate-900 mb-6">预览人设说话方式</h3>
+
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">名称</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">帖子标题</label>
             <input
               type="text"
-              value={edited.name}
-              onChange={e => setEdited({ ...edited, name: e.target.value })}
+              value={postTitle}
+              onChange={(e) => setPostTitle(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="例如：Best open ear earbuds for running?"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">帖子内容（可选）</label>
+            <textarea
+              value={postBody}
+              onChange={(e) => setPostBody(e.target.value)}
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="粘贴帖子正文内容..."
+            />
+          </div>
+          <button
+            onClick={handlePreview}
+            disabled={isGenerating}
+            className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50"
+          >
+            {isGenerating ? '生成中...' : '生成示例回复'}
+          </button>
+        </div>
+
+        {preview && (
+          <div className="mt-6 p-4 bg-slate-50 rounded-xl">
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">{personaName} 的回复：</div>
+            <div className="text-sm text-slate-700 whitespace-pre-wrap">{preview}</div>
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Create Persona Modal
+function CreatePersonaModal({ projectId, onClose, onSuccess }: { projectId: string; onClose: () => void; onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    username: '',
+    avatar_emoji: '👤',
+    avatar_color: 'bg-blue-500',
+    background: '',
+    tone: '',
+    brand_strategy: '',
+    flaws: '',
+    description: '',
+    description_en: '',
+    reddit_habits: { subreddits: [], posting_frequency: '', interaction_style: '' },
+    writing_traits: { sentence_style: '', abbreviations: [], emoji_usage: '', reddit_expressions: [] },
+    sample_comments: [] as string[],
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.background) {
+      showToast('请填写名称和背景', 'error')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch('/api/personas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, project_id: projectId }),
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        showToast('人设已创建', 'success')
+        onSuccess()
+        onClose()
+      } else {
+        showToast(result.error || '创建失败', 'error')
+      }
+    } catch (error) {
+      showToast('创建人设失败', 'error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-xl font-black text-slate-900 mb-6">创建自定义人设</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">名称</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="TechRunner"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">用户名</label>
+              <input
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="u/tech_runner"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Emoji</label>
+              <input
+                type="text"
+                value={formData.avatar_emoji}
+                onChange={(e) => setFormData({ ...formData, avatar_emoji: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">背景故事</label>
             <textarea
-              value={edited.background}
-              onChange={e => setEdited({ ...edited, background: e.target.value })}
+              value={formData.background}
+              onChange={(e) => setFormData({ ...formData, background: e.target.value })}
               rows={2}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="描述这个人物的背景..."
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">语气</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">语气风格</label>
               <input
                 type="text"
-                value={edited.tone}
-                onChange={e => setEdited({ ...edited, tone: e.target.value })}
+                value={formData.tone}
+                onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="casual / nerdy / enthusiastic"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">写作风格</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">品牌提及策略</label>
               <input
                 type="text"
-                value={edited.writingStyle}
-                onChange={e => setEdited({ ...edited, writingStyle: e.target.value })}
+                value={formData.brand_strategy}
+                onChange={(e) => setFormData({ ...formData, brand_strategy: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="亲身体验分享 / 朋友推荐"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">不完美点（增加真实感）</label>
+            <input
+              type="text"
+              value={formData.flaws}
+              onChange={(e) => setFormData({ ...formData, flaws: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="唯一不满意的是价格有点贵..."
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">英文人设描述（用于内容生成）</label>
+            <textarea
+              value={formData.description_en}
+              onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="Full English persona description for AI content generation..."
+            />
           </div>
         </div>
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50">
             取消
           </button>
-          <button onClick={() => onSave(edited)} className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800">
-            保存
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50"
+          >
+            {isSubmitting ? '创建中...' : '创建'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Edit Persona Modal
+function EditPersonaModal({ personaId, onClose, onSuccess }: { personaId: string; onClose: () => void; onSuccess: () => void }) {
+  const [persona, setPersona] = useState<Persona | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    username: '',
+    avatar_emoji: '',
+    avatar_color: '',
+    background: '',
+    tone: '',
+    brand_strategy: '',
+    flaws: '',
+    description: '',
+    description_en: '',
+  })
+
+  useEffect(() => {
+    fetch(`/api/personas/${personaId}`)
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          setPersona(result.data)
+          setFormData({
+            name: result.data.name || '',
+            username: result.data.username || '',
+            avatar_emoji: result.data.avatar_emoji || '',
+            avatar_color: result.data.avatar_color || '',
+            background: result.data.background || '',
+            tone: result.data.tone || '',
+            brand_strategy: result.data.brand_strategy || '',
+            flaws: result.data.flaws || '',
+            description: result.data.description || '',
+            description_en: result.data.description_en || '',
+          })
+        }
+        setIsLoading(false)
+      })
+  }, [personaId])
+
+  const handleSubmit = async () => {
+    if (!formData.name) {
+      showToast('名称不能为空', 'error')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch(`/api/personas/${personaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        showToast('人设已更新', 'success')
+        onSuccess()
+        onClose()
+      } else {
+        showToast(result.error || '更新失败', 'error')
+      }
+    } catch (error) {
+      showToast('更新人设失败', 'error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-slate-500">加载人设中...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-xl font-black text-slate-900 mb-6">编辑人设</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">名称</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">用户名</label>
+              <input
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Emoji</label>
+              <input
+                type="text"
+                value={formData.avatar_emoji}
+                onChange={(e) => setFormData({ ...formData, avatar_emoji: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">背景故事</label>
+            <textarea
+              value={formData.background}
+              onChange={(e) => setFormData({ ...formData, background: e.target.value })}
+              rows={2}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">语气风格</label>
+              <input
+                type="text"
+                value={formData.tone}
+                onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">品牌提及策略</label>
+              <input
+                type="text"
+                value={formData.brand_strategy}
+                onChange={(e) => setFormData({ ...formData, brand_strategy: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">不完美点</label>
+            <input
+              type="text"
+              value={formData.flaws}
+              onChange={(e) => setFormData({ ...formData, flaws: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">英文人设描述</label>
+            <textarea
+              value={formData.description_en}
+              onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50">
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50"
+          >
+            {isSubmitting ? '保存中...' : '保存'}
           </button>
         </div>
       </div>
