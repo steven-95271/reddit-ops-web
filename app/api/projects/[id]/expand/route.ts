@@ -72,7 +72,14 @@ async function callMiniMax(prompt: string): Promise<string> {
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ''
+  console.log('[MiniMax Response]', JSON.stringify(data, null, 2))
+  
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('[MiniMax Error] Invalid response structure:', data)
+    throw new Error('MiniMax API returned invalid response structure')
+  }
+  
+  return data.choices[0].message.content || ''
 }
 
 async function callKimi(prompt: string): Promise<string> {
@@ -97,7 +104,14 @@ async function callKimi(prompt: string): Promise<string> {
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ''
+  console.log('[Kimi Response]', JSON.stringify(data, null, 2))
+  
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('[Kimi Error] Invalid response structure:', data)
+    throw new Error('Kimi API returned invalid response structure')
+  }
+  
+  return data.choices[0].message.content || ''
 }
 
 export async function POST(

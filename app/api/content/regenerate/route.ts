@@ -28,7 +28,14 @@ async function callKimi(messages: Array<{ role: string; content: string }>): Pro
   }
 
   const data = await response.json()
-  return data.choices[0].message.content
+  console.log('[Kimi Response]', JSON.stringify(data, null, 2))
+  
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('[Kimi Error] Invalid response structure:', data)
+    throw new Error('Kimi API returned invalid response structure')
+  }
+  
+  return data.choices[0].message.content || ''
 }
 
 // 调用 MiniMax API (fallback)
@@ -57,7 +64,14 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
   }
 
   const data = await response.json()
-  return data.choices[0].message.content
+  console.log('[MiniMax Response]', JSON.stringify(data, null, 2))
+  
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('[MiniMax Error] Invalid response structure:', data)
+    throw new Error('MiniMax API returned invalid response structure')
+  }
+  
+  return data.choices[0].message.content || ''
 }
 
 // POST /api/content/regenerate
