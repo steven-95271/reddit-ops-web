@@ -71,12 +71,12 @@ export async function initDb() {
     )
   `
 
-  // 4. contents 表 - 生成的内容
+  // 4. contents 表 - 生成的内容（增强版）
   await sql`
     CREATE TABLE IF NOT EXISTS contents (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
-      post_id TEXT NOT NULL,
+      post_id TEXT,
       persona_id TEXT,
       content_type TEXT DEFAULT 'comment',
       title TEXT,
@@ -84,10 +84,21 @@ export async function initDb() {
       body_edited TEXT,
       status TEXT DEFAULT 'draft',
       brand_mention TEXT,
+      -- 新增字段
+      content_mode TEXT,          -- reply_post / reply_comment / free_compose
+      target_comment TEXT,        -- 模式二：被回复的评论原文
+      user_idea TEXT,             -- 模式三：用户输入的想法/主题
+      target_subreddit TEXT,      -- 模式三：目标 Subreddit
+      post_type TEXT,             -- 模式三：帖子类型
+      quality_score INTEGER,      -- 自动质量评分（0-100）
+      quality_issues TEXT,        -- 质量问题列表（JSON）
+      ai_model_used TEXT,         -- 使用的 AI 模型
+      generation_prompt TEXT,     -- 完整的生成 prompt（方便调试）
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       published_at TIMESTAMP,
       FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
-      FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE SET NULL,
       FOREIGN KEY(persona_id) REFERENCES personas(id) ON DELETE SET NULL
     )
   `
