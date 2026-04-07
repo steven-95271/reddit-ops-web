@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { getScrapingResults } from '@/lib/apify'
 
 // POST /api/scraping/[runId]/results - 获取抓取结果并保存到数据库
@@ -8,6 +8,7 @@ export async function POST(
   { params }: { params: { runId: string } }
 ) {
   try {
+    await initDb()
     const { runId } = params
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')

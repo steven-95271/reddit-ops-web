@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { checkContentQuality } from '@/lib/quality-check'
 
 // 调用 Kimi API
@@ -154,6 +154,7 @@ ${params.post_title ? `原帖标题：${params.post_title}` : ''}
 // POST /api/content/generate
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const {
       project_id,

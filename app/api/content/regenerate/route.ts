@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { checkContentQuality } from '@/lib/quality-check'
 
 // 调用 Kimi API
@@ -77,6 +77,7 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
 // POST /api/content/regenerate
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { content_id, feedback } = body
 

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/stats?project_id=xxx（project_id 可选）
 export async function GET(request: NextRequest) {
   try {
+    await initDb()
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
 

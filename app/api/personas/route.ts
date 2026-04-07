@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/personas?project_id=xxx — 返回该项目的所有人设
 export async function GET(request: NextRequest) {
   try {
+    await initDb()
     const projectId = request.nextUrl.searchParams.get('project_id')
     
     if (!projectId) {
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
 // POST /api/personas — 手动创建自定义人设
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const {
       project_id,

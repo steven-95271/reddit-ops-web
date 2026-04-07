@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 // PUT /api/publish/[id] — 更新发布记录
 export async function PUT(
@@ -7,6 +7,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
     const body = await request.json()
     const { upvotes, replies, status, published_url } = body
@@ -73,6 +74,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
 
     // 获取 content_id 以便更新内容状态

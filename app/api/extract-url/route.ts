@@ -277,6 +277,7 @@ async function callMiniMax(prompt: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { url } = body
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { calculateHotScore, calculateCompositeScore, classifyGrade, classifyCategory } from '@/lib/scoring'
 
 interface PostRow {
@@ -23,6 +23,7 @@ interface PostRow {
 // POST /api/analysis - 对项目的帖子跑评分算法
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { project_id } = body
 
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
 // GET /api/analysis?project_id=xxx - 返回已评分的帖子列表
 export async function GET(request: NextRequest) {
   try {
+    await initDb()
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
     const gradeFilter = searchParams.get('grade')

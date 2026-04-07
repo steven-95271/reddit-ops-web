@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 // GET /api/personas/[id] — 单个人设详情
 export async function GET(
@@ -7,6 +7,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
 
     const result = await sql`SELECT * FROM personas WHERE id = ${id}`
@@ -47,6 +48,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
     const body = await request.json()
     const {
@@ -182,6 +184,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
 
     const result = await sql`

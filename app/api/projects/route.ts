@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { randomUUID } from 'crypto'
 
 // GET /api/projects - 返回所有项目列表
 export async function GET() {
   try {
+    await initDb()  // 确保表存在
     const result = await sql`SELECT * FROM projects ORDER BY created_at DESC`
     
     // 解析 JSON 字段
@@ -32,6 +33,7 @@ export async function GET() {
 // POST /api/projects - 创建新项目
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { 
       name, 

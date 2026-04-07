@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { checkContentQuality } from '@/lib/quality-check'
 
 export const dynamic = 'force-dynamic'
@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 // GET /api/content?project_id=xxx&status=draft&mode=reply_post
 export async function GET(request: NextRequest) {
   try {
+    await initDb()
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
     const status = searchParams.get('status')
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
 // POST /api/content — 创建内容（手动）
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const {
       project_id,

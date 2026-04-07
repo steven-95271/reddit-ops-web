@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { startScraping } from '@/lib/apify'
 
 // POST /api/scraping - 启动抓取任务
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { project_id, time_range, max_posts, sort_by } = body
 

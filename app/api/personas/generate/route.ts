@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 // 调用 Kimi API
 async function callKimi(prompt: string): Promise<string> {
@@ -135,6 +135,7 @@ function buildPersonaPrompt(project: any): string {
 // POST /api/personas/generate — AI 生成人设
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { project_id } = body
 

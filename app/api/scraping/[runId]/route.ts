@@ -7,6 +7,7 @@ export async function GET(
   { params }: { params: { runId: string } }
 ) {
   try {
+    await initDb()
     const { runId } = params
 
     if (!runId) {

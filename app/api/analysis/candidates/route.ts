@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 // PUT /api/analysis/candidates - 批量更新候选状态
 export async function PUT(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { post_ids, is_candidate } = body
 

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/publish?project_id=xxx
 export async function GET(request: NextRequest) {
   try {
+    await initDb()
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
 
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
 // POST /api/publish — 标记内容为已发布
 export async function POST(request: NextRequest) {
   try {
+    await initDb()
     const body = await request.json()
     const { content_id, published_url } = body
 

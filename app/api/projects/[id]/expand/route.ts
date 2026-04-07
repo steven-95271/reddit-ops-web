@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 interface SubredditItem {
   name: string
@@ -119,6 +119,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
 
     if (!id) {

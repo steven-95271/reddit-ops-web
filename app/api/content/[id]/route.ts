@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 import { checkContentQuality } from '@/lib/quality-check'
 
 // PUT /api/content/[id] — 更新内容（编辑后自动重新跑质量评分）
@@ -8,6 +8,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
     const body = await request.json()
     const { body_edited, status, title } = body
@@ -96,6 +97,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
 
     const result = await sql`
@@ -139,6 +141,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
 
     const result = await sql`

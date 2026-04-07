@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { initDb, sql } from '@/lib/db'
 
 // 调用 Kimi API
 async function callKimi(prompt: string): Promise<string> {
@@ -71,6 +71,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    await initDb()
     const { id } = params
     const body = await request.json()
     const { sample_post_title, sample_post_body } = body
