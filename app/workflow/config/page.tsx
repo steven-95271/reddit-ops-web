@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
 
-interface KeywordItem {
-  keyword: string
-  reason: string
+interface KeywordsReasoning {
+  core?: string
+  longTail?: string
+  competitor?: string
+  scenario?: string
 }
 
 interface Project {
@@ -19,11 +21,12 @@ interface Project {
   competitor_brands?: string[]
   keywords?: {
     seed?: string[]
-    core?: KeywordItem[]
-    longTail?: KeywordItem[]
-    competitor?: KeywordItem[]
-    scenario?: KeywordItem[]
+    core?: string[]
+    longTail?: string[]
+    competitor?: string[]
+    scenario?: string[]
   }
+  keywordsReasoning?: KeywordsReasoning
   subreddits?: {
     high?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
     medium?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
@@ -43,10 +46,19 @@ export default function ConfigPage() {
   const [viewingProject, setViewingProject] = useState<Project | null>(null)
   const [expanding, setExpanding] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [expandedKeywords, setExpandedKeywords] = useState<Record<string, boolean>>({})
   
   // URL 提取
   const [productUrl, setProductUrl] = useState('')
   const [extracting, setExtracting] = useState(false)
+  
+  // 切换关键词分类展开/折叠
+  const toggleKeywordsExpand = (category: string) => {
+    setExpandedKeywords(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }))
+  }
   
   // 表单状态
   const [formData, setFormData] = useState({
@@ -223,7 +235,7 @@ export default function ConfigPage() {
         ...prev,
         keywords: {
           ...prev.keywords,
-          [category]: prev.keywords?.[category]?.filter(k => k.keyword !== keyword) || []
+          [category]: prev.keywords?.[category]?.filter(k => k !== keyword) || []
         }
       }
     })
@@ -636,49 +648,76 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                 </button>
               </div>
 
-              {/* 关键词展示 */}
+              {/* 关键词展示 - 可折叠面板 */}
               {viewingProject.keywords?.core && viewingProject.keywords.core.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">关键词策略</h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {(['core', 'longTail', 'competitor', 'scenario'] as const).map(category => {
                       const keywords = viewingProject.keywords?.[category] || []
                       if (keywords.length === 0) return null
+                      const reasoning = viewingProject.keywordsReasoning?.[category]
+                      const isExpanded = expandedKeywords[category]
                       return (
-                        <div key={category} className="bg-white border border-slate-200 rounded-xl p-4">
-                          <div className="flex justify-between items-center mb-3">
-                            <h4 className="font-medium text-slate-700">
-                              {getKeywordCategoryLabel(category)}
-                              <span className="ml-2 text-sm text-slate-500">({keywords.length}个)</span>
-                            </h4>
-                            <span className="text-xs text-slate-400">💡 hover 查看理由</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {keywords.map((item: any, idx: number) => (
-                              <div key={idx} className="relative group">
-                                <span
-                                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getKeywordCategoryColor(category)} cursor-help`}
-                                  title={item.reason || '无理由说明'}
-                                >
-                                  {item.keyword}
-                                  <button
-                                    onClick={() => removeKeyword(category, item.keyword)}
-                                    className="ml-1 hover:text-red-500 transition-colors"
-                                  >
-                                    ×
-                                  </button>
+                        <div key={category} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                          {/* 分类 Header - 可点击展开 */}
+                          <button
+                            onClick={() => toggleKeywordsExpand(category)}
+                            className="w-full px-4 py-3 flex justify-between items-center hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-medium text-slate-700">
+                                {getKeywordCategoryLabel(category)}
+                                <span className="ml-2 text-sm text-slate-500">({keywords.length}个)</span>
+                              </h4>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {reasoning && (
+                                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                                  💡 有生成逻辑
                                 </span>
-                                {/* Tooltip 显示理由 */}
-                                {item.reason && (
-                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis">
-                                    <div className="text-white/60 mb-1">💡 选择理由:</div>
-                                    <div className="text-white">{item.reason}</div>
-                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
-                                  </div>
-                                )}
+                              )}
+                              <svg
+                                className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </button>
+
+                          {/* 展开内容 */}
+                          {isExpanded && (
+                            <div className="px-4 pb-4 border-t border-slate-100">
+                              {/* 生成逻辑说明 */}
+                              {reasoning && (
+                                <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100">
+                                  <div className="text-xs font-medium text-purple-700 mb-1">AI 生成逻辑</div>
+                                  <div className="text-sm text-slate-700">{reasoning}</div>
+                                </div>
+                              )}
+
+                              {/* 关键词标签 */}
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {keywords.map((keyword: string, idx: number) => (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getKeywordCategoryColor(category)}`}
+                                  >
+                                    {keyword}
+                                    <button
+                                      onClick={() => removeKeyword(category, keyword)}
+                                      className="ml-1 hover:text-red-500 transition-colors"
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}

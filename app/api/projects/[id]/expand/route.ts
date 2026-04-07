@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 
-interface KeywordItem {
-  keyword: string
-  reason: string
+interface KeywordReasoning {
+  core: string
+  longTail: string
+  competitor: string
+  scenario: string
 }
 
 interface SubredditItem {
@@ -15,11 +17,12 @@ interface SubredditItem {
 
 interface ExpandResult {
   keywords: {
-    core: KeywordItem[]
-    longTail: KeywordItem[]
-    competitor: KeywordItem[]
-    scenario: KeywordItem[]
+    core: string[]
+    longTail: string[]
+    competitor: string[]
+    scenario: string[]
   }
+  keywordsReasoning: KeywordReasoning
   subreddits: {
     high: SubredditItem[]
     medium: SubredditItem[]
@@ -183,13 +186,18 @@ Please generate the following in JSON format:
    - competitor: Competitor comparison keywords ("vs", "alternative", "comparison")
    - scenario: Scenario/use case keywords (running, commuting, workout, etc.)
 
-2. **Subreddits** (5-10 subreddits with relevance levels):
+2. **Keywords Reasoning** - Brief explanation for EACH category's generation logic:
+   - core: Why these core keywords were chosen based on product info
+   - longTail: Why these long-tail keywords were selected
+   - competitor: Why these competitor comparison keywords make sense
+   - scenario: Why these scenario/use-case keywords are relevant
+
+3. **Subreddits** (5-10 subreddits with relevance levels):
    - high: High relevance subreddits (directly related to product/category)
    - medium: Medium relevance subreddits (indirectly related)
    - low: Low relevance subreddits (broad interest but still relevant)
 
-Each keyword MUST include a "reason" field explaining WHY this keyword was chosen.
-Each subreddit already includes:
+Each subreddit should include:
    - name: Subreddit name (without r/ prefix)
    - reason: Brief reason in English why this subreddit is relevant
    - estimatedPosts: Either "daily" or "weekly"
@@ -197,19 +205,16 @@ Each subreddit already includes:
 Return ONLY valid JSON in this exact format:
 {
   "keywords": {
-    "core": [
-      {"keyword": "open ear earbuds", "reason": "Directly describes product type, high Reddit search volume"},
-      {"keyword": "Shokz OpenRun", "reason": "Your main competitor, users often compare with Shokz products"}
-    ],
-    "longTail": [
-      {"keyword": "best open ear headphones for running 2024", "reason": "Long-tail search phrase with high purchase intent"}
-    ],
-    "competitor": [
-      {"keyword": "Shokz vs Oladance", "reason": "Common comparison search pattern in this category"}
-    ],
-    "scenario": [
-      {"keyword": "headphones for cycling", "reason": "Primary use case, safety-conscious cyclists prefer open-ear design"}
-    ]
+    "core": ["open ear earbuds", "bone conduction headphones"],
+    "longTail": ["best open ear headphones for running 2024", "safe headphones for cycling commute"],
+    "competitor": ["Shokz vs Oladance", "best alternative to Shokz"],
+    "scenario": ["headphones for cycling", "workout earbuds no ear canal"]
+  },
+  "keywordsReasoning": {
+    "core": "These are the primary search terms users would use when looking for this type of product. 'Open ear earbuds' directly describes the product type, while 'bone conduction headphones' targets users familiar with the technology.",
+    "longTail": "Long-tail keywords capture users with specific needs or search intents. 'Best open ear headphones for running 2024' targets users actively researching before purchase.",
+    "competitor": "Users often search for comparisons before buying. Including competitor brand names helps capture this high-intent traffic and position against alternatives.",
+    "scenario": "Open-ear headphones excel in specific scenarios like cycling and workouts where safety and awareness matter. These keywords target users in these use cases."
   },
   "subreddits": {
     "high": [
@@ -221,12 +226,12 @@ Return ONLY valid JSON in this exact format:
 }
 
 Important:
-- Each keyword MUST have a "reason" field - this is critical for user review
+- Keywords should be simple strings, not objects
+- keywordsReasoning should be 2-3 sentences per category explaining the overall selection strategy
 - Use English keywords optimized for Reddit search
 - Ensure competitor keywords include actual competitor brand names
 - Subreddit names should NOT include "r/" prefix
-- Make keywords specific and searchable on Reddit
-- Reasons should be 1-2 sentences explaining the selection logic`
+- Make keywords specific and searchable on Reddit`
 
     // 调用 AI API
     const aiResponse = await callAIWithFallback(prompt)
@@ -262,6 +267,14 @@ Important:
       low: expandResult.subreddits.low || []
     }
 
+    // keywordsReasoning 只在 API 返回中传递，不保存到数据库
+    const keywordsReasoning = expandResult.keywordsReasoning || {
+      core: '',
+      longTail: '',
+      competitor: '',
+      scenario: ''
+    }
+
     // 更新数据库
     const now = new Date().toISOString()
     await sql`
@@ -273,11 +286,12 @@ Important:
       WHERE id = ${id}
     `
 
-    // 返回扩展结果
+    // 返回扩展结果（包含 keywordsReasoning 用于前端展示）
     return NextResponse.json({
       success: true,
       data: {
         keywords: updatedKeywords,
+        keywordsReasoning,
         subreddits: updatedSubreddits
       }
     })
