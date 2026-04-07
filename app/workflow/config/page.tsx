@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
 
+interface KeywordItem {
+  keyword: string
+  reason: string
+}
+
 interface Project {
   id: string
   name: string
@@ -14,10 +19,10 @@ interface Project {
   competitor_brands?: string[]
   keywords?: {
     seed?: string[]
-    core?: string[]
-    longTail?: string[]
-    competitor?: string[]
-    scenario?: string[]
+    core?: KeywordItem[]
+    longTail?: KeywordItem[]
+    competitor?: KeywordItem[]
+    scenario?: KeywordItem[]
   }
   subreddits?: {
     high?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
@@ -218,7 +223,7 @@ export default function ConfigPage() {
         ...prev,
         keywords: {
           ...prev.keywords,
-          [category]: prev.keywords?.[category]?.filter(k => k !== keyword) || []
+          [category]: prev.keywords?.[category]?.filter(k => k.keyword !== keyword) || []
         }
       }
     })
@@ -646,21 +651,32 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                               {getKeywordCategoryLabel(category)}
                               <span className="ml-2 text-sm text-slate-500">({keywords.length}个)</span>
                             </h4>
+                            <span className="text-xs text-slate-400">💡 hover 查看理由</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {keywords.map((keyword, idx) => (
-                              <span
-                                key={idx}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getKeywordCategoryColor(category)}`}
-                              >
-                                {keyword}
-                                <button
-                                  onClick={() => removeKeyword(category, keyword)}
-                                  className="ml-1 hover:text-red-500 transition-colors"
+                            {keywords.map((item: any, idx: number) => (
+                              <div key={idx} className="relative group">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getKeywordCategoryColor(category)} cursor-help`}
+                                  title={item.reason || '无理由说明'}
                                 >
-                                  ×
-                                </button>
-                              </span>
+                                  {item.keyword}
+                                  <button
+                                    onClick={() => removeKeyword(category, item.keyword)}
+                                    className="ml-1 hover:text-red-500 transition-colors"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                                {/* Tooltip 显示理由 */}
+                                {item.reason && (
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis">
+                                    <div className="text-white/60 mb-1">💡 选择理由:</div>
+                                    <div className="text-white">{item.reason}</div>
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                                  </div>
+                                )}
+                              </div>
                             ))}
                           </div>
                         </div>

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 
+interface KeywordItem {
+  keyword: string
+  reason: string
+}
+
 interface SubredditItem {
   name: string
   reason: string
@@ -10,10 +15,10 @@ interface SubredditItem {
 
 interface ExpandResult {
   keywords: {
-    core: string[]
-    longTail: string[]
-    competitor: string[]
-    scenario: string[]
+    core: KeywordItem[]
+    longTail: KeywordItem[]
+    competitor: KeywordItem[]
+    scenario: KeywordItem[]
   }
   subreddits: {
     high: SubredditItem[]
@@ -183,7 +188,8 @@ Please generate the following in JSON format:
    - medium: Medium relevance subreddits (indirectly related)
    - low: Low relevance subreddits (broad interest but still relevant)
 
-Each subreddit should include:
+Each keyword MUST include a "reason" field explaining WHY this keyword was chosen.
+Each subreddit already includes:
    - name: Subreddit name (without r/ prefix)
    - reason: Brief reason in English why this subreddit is relevant
    - estimatedPosts: Either "daily" or "weekly"
@@ -191,14 +197,23 @@ Each subreddit should include:
 Return ONLY valid JSON in this exact format:
 {
   "keywords": {
-    "core": ["keyword1", "keyword2", ...],
-    "longTail": ["keyword1", "keyword2", ...],
-    "competitor": ["keyword1", "keyword2", ...],
-    "scenario": ["keyword1", "keyword2", ...]
+    "core": [
+      {"keyword": "open ear earbuds", "reason": "Directly describes product type, high Reddit search volume"},
+      {"keyword": "Shokz OpenRun", "reason": "Your main competitor, users often compare with Shokz products"}
+    ],
+    "longTail": [
+      {"keyword": "best open ear headphones for running 2024", "reason": "Long-tail search phrase with high purchase intent"}
+    ],
+    "competitor": [
+      {"keyword": "Shokz vs Oladance", "reason": "Common comparison search pattern in this category"}
+    ],
+    "scenario": [
+      {"keyword": "headphones for cycling", "reason": "Primary use case, safety-conscious cyclists prefer open-ear design"}
+    ]
   },
   "subreddits": {
     "high": [
-      {"name": "subreddit_name", "reason": "relevance reason", "estimatedPosts": "daily"}
+      {"name": "headphones", "reason": "Directly related to audio products, high engagement", "estimatedPosts": "daily"}
     ],
     "medium": [...],
     "low": [...]
@@ -206,10 +221,12 @@ Return ONLY valid JSON in this exact format:
 }
 
 Important:
+- Each keyword MUST have a "reason" field - this is critical for user review
 - Use English keywords optimized for Reddit search
 - Ensure competitor keywords include actual competitor brand names
 - Subreddit names should NOT include "r/" prefix
-- Make keywords specific and searchable on Reddit`
+- Make keywords specific and searchable on Reddit
+- Reasons should be 1-2 sentences explaining the selection logic`
 
     // 调用 AI API
     const aiResponse = await callAIWithFallback(prompt)
