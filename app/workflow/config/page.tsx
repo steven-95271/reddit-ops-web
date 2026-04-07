@@ -581,6 +581,14 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                 <h3 className="text-lg font-semibold text-slate-900 mb-3">产品信息</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
+                    <span className="text-slate-500">项目名称：</span>
+                    <span className="text-slate-700">{viewingProject.name || '暂无'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">产品名称：</span>
+                    <span className="text-slate-700">{viewingProject.product_name || '暂无'}</span>
+                  </div>
+                  <div>
                     <span className="text-slate-500">产品描述：</span>
                     <span className="text-slate-700">{viewingProject.product_description || '暂无'}</span>
                   </div>
@@ -589,12 +597,16 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                     <span className="text-slate-700">{viewingProject.target_audience || '暂无'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500">品牌：</span>
+                    <span className="text-slate-500">自有品牌：</span>
                     <span className="text-slate-700">{viewingProject.brand_names?.join(', ') || '暂无'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500">竞品：</span>
+                    <span className="text-slate-500">竞品品牌：</span>
                     <span className="text-slate-700">{viewingProject.competitor_brands?.join(', ') || '暂无'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500">种子关键词：</span>
+                    <span className="text-slate-700">{viewingProject.keywords?.seed?.join(', ') || '暂无'}</span>
                   </div>
                 </div>
               </div>
