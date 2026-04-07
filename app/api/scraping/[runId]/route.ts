@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getScrapingStatus } from '@/lib/apify'
+import { initDb } from '@/lib/db'
 
 // GET /api/scraping/[runId] - 查询抓取任务状态
 export async function GET(

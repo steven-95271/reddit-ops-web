@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { initDb } from '@/lib/db'
 
 const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
 const KIMI_API_KEY = process.env.KIMI_API_KEY || ''
