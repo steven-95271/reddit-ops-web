@@ -712,11 +712,18 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">四阶段搜索策略</h3>
                   <div className="space-y-4">
                     {(['phase1', 'phase2', 'phase3', 'phase4'] as const).map(phase => {
-                      const phaseData = viewingProject.keywords?.[phase as keyof typeof viewingProject.keywords]
+                      const phaseMap: Record<string, 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain' | 'phase4_subreddits'> = {
+                        phase1: 'phase1_brand',
+                        phase2: 'phase2_competitor',
+                        phase3: 'phase3_scene_pain',
+                        phase4: 'phase4_subreddits'
+                      }
+                      const fullPhase = phaseMap[phase]
+                      const phaseData = viewingProject.keywords?.[fullPhase]
                       if (!phaseData) return null
-                      
+
                       const isExpanded = expandedPhases[phase]
-                      const hasQueries = phase === 'phase4' 
+                      const hasQueries = fullPhase === 'phase4_subreddits'
                         ? (phaseData as any)?.targets?.length > 0
                         : (phaseData as any)?.queries?.length > 0
                       
