@@ -27,8 +27,8 @@ const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions'
 const KIMI_MODEL = 'kimi-k2-5'
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY
-const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimaxi.chat/v1/text/chatcompletion_v2'
-const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7-Highspeed'
+const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimax.chat/v1/text/chatcompletion_v2'
+const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-Text-01'
 
 async function callAIWithFallback(prompt: string): Promise<string> {
   try {

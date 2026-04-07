@@ -52,7 +52,7 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'MiniMax-Text-01',
+      model: 'abab6.5s-chat',
       messages,
       temperature: 0.8,
       max_tokens: 2000,
@@ -60,7 +60,8 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
   })
 
   if (!response.ok) {
-    throw new Error(`MiniMax API error: ${response.status}`)
+    const errorText = await response.text()
+    throw new Error(`MiniMax API error: ${response.status} - ${errorText}`)
   }
 
   const data = await response.json()
@@ -74,8 +75,8 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
                   data.text
   
   if (!content) {
-    console.error('[MiniMax Error] Invalid response structure:', data)
-    throw new Error('MiniMax API returned invalid response structure')
+    console.error('[MiniMax Error] Invalid response structure:', JSON.stringify(data, null, 2))
+    throw new Error(`MiniMax API returned invalid response structure. Full response: ${JSON.stringify(data)}`)
   }
   
   return content
