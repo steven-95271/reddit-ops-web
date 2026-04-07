@@ -149,6 +149,36 @@ export async function initDb() {
       throw err
     }
 
+    // 6. scraping_runs 表 - 每个查询词的运行记录
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS scraping_runs (
+          id TEXT PRIMARY KEY,
+          batch_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          phase TEXT NOT NULL,
+          query TEXT NOT NULL,
+          subreddit TEXT,
+          apify_run_id TEXT,
+          apify_dataset_id TEXT,
+          status TEXT DEFAULT 'pending',
+          params TEXT,
+          total_posts INTEGER DEFAULT 0,
+          inserted_posts INTEGER DEFAULT 0,
+          skipped_posts INTEGER DEFAULT 0,
+          error_message TEXT,
+          started_at TIMESTAMP,
+          completed_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `
+      console.log('[initDb] scraping_runs table created/verified')
+    } catch (err) {
+      console.error('[initDb] Error creating scraping_runs table:', err)
+      throw err
+    }
+
     console.log('[initDb] All tables created successfully')
   } catch (error) {
     console.error('[initDb] Fatal error during database initialization:', error)

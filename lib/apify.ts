@@ -7,7 +7,7 @@ const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
 const APIFY_BASE_URL = 'https://api.apify.com/v2'
 
 // Actor ID for Reddit Scraper
-const REDDIT_SCRAPER_ACTOR_ID = 'trudax/reddit-scraper'
+const REDDIT_SCRAPER_ACTOR_ID = 'automation-lab/reddit-scraper'
 
 interface ScrapingParams {
   subreddits: string[]
@@ -254,18 +254,158 @@ export async function waitForScrapingCompletion(
 }
 
 /**
- * 获取默认抓取参数
- * @returns 默认参数
+ * 启动单个 Apify Reddit Scraper 抓取任务
+ * @param params 抓取参数（单个查询）
+ * @returns run_id 任务ID
  */
-export function getDefaultScrapingParams(): ScrapingParams {
-  return {
-    subreddits: [],
-    keywords: [],
-    time_range: '7d',
-    max_posts: 100,
-    sort_by: 'hot'
+export async function startScrapingSingle(params: ScrapingParams): Promise<string> {
+  if (!APIFY_API_TOKEN) {
+    throw new Error('APIFY_API_TOKEN not configured')
+  }
+
+  try {
+    // 转换时间范围为 Apify 格式
+    const timeFilterMap: Record<string, string> = {
+      '24h': 'day',
+      '7d': 'week',
+      '30d': 'month',
+      'year': 'year',
+      'all': 'all'
+    }
+
+    // 使用 searchQuery 或构建 Reddit URL
+    let searchQuery = ''
+    let searchSubreddit = ''
+    
+    if (params.keywords.length > 0) {
+      // 单个查询词
+      searchQuery = params.keywords[0]
+    }
+    
+    if (params.subreddits.length > 0) {
+      // 如果指定了 subreddit
+      searchSubreddit = params.subreddits[0]
+    }
+
+    // 构建 Apify Actor 输入
+    const actorInput = {
+      searchQuery,
+      searchSubreddit,
+      sort: params.sort_by,
+      timeFilter: timeFilterMap[params.time_range] || 'week',
+      maxPostsPerSource: Math.min(params.max_posts, 1000),
+      includeComments: true,
+      maxCommentsPerPost: 50,
+      commentDepth: 2,
+      deduplicatePosts: true,
+      maxRetries: 5,
+      proxyConfiguration: {
+        useApifyProxy: true,
+        apifyProxyGroups: ['RESIDENTIAL']
+      }
+    }
+
+    console.log('Starting Apify scraping with input:', JSON.stringify(actorInput, null, 2))
+
+    // 调用 Apify API 启动 Actor
+    const response = await fetch(
+      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
+        },
+        body: JSON.stringify(actorInput),
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Apify API error: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    const runId = data.data?.id
+
+    if (!runId) {
+      throw new Error('Failed to get run ID from Apify response')
+    }
+
+    console.log(`Apify scraping started, run ID: ${runId}`)
+    return runId
+
+  } catch (error) {
+    console.error('Error starting Apify scraping:', error)
+    throw error
   }
 }
 
-// 导出类型
-export type { ScrapingParams, ScrapingResult, RunStatus }
+/**
+ * 获取 Apify Run 的 Dataset ID
+ * @param run_id 任务ID
+ * @returns Dataset ID
+ */
+export async function getRunDatasetId(run_id: string): Promise<string | null> {
+  if (!APIFY_API_TOKEN) {
+    throw new Error('APIFY_API_TOKEN not configured')
+  }
+
+  try {
+    const response = await fetch(
+      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs/${run_id}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Apify API error: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    return data.data?.defaultDatasetId || null
+
+  } catch (error) {
+    console.error('Error getting run dataset ID:', error)
+    throw error
+  }
+}
+
+/**
+ * 下载 Dataset 为 CSV 格式
+ * @param dataset_id Dataset ID
+ * @returns CSV 内容
+ */
+export async function downloadDatasetAsCsv(dataset_id: string): Promise<string> {
+  if (!APIFY_API_TOKEN) {
+    throw new Error('APIFY_API_TOKEN not configured')
+  }
+
+  try {
+    const response = await fetch(
+      `${APIFY_BASE_URL}/datasets/${dataset_id}/items?format=csv`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Apify API error: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+
+    return await response.text()
+
+  } catch (error) {
+    console.error('Error downloading dataset:', error)
+    throw error
+  }
+}
