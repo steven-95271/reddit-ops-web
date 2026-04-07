@@ -28,7 +28,7 @@ const KIMI_MODEL = 'kimi-k2-5'
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY
 const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimax.chat/v1/text/chatcompletion_v2'
-const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-Text-01'
+const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7-Highspeed'
 
 async function callAIWithFallback(prompt: string): Promise<string> {
   try {
