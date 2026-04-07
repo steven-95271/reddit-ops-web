@@ -5,10 +5,13 @@ import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
 
 interface KeywordsReasoning {
-  core?: string
-  longTail?: string
-  competitor?: string
+  brand?: string
+  painPoints?: string
+  voice?: string
   scenario?: string
+  comparison?: string
+  questions?: string
+  redditSyntax?: string
 }
 
 interface Project {
@@ -21,10 +24,13 @@ interface Project {
   competitor_brands?: string[]
   keywords?: {
     seed?: string[]
-    core?: string[]
-    longTail?: string[]
-    competitor?: string[]
+    brand?: string[]
+    painPoints?: string[]
+    voice?: string[]
     scenario?: string[]
+    comparison?: string[]
+    questions?: string[]
+    redditSyntax?: string[]
   }
   keywordsReasoning?: KeywordsReasoning
   subreddits?: {
@@ -228,7 +234,7 @@ export default function ConfigPage() {
   }
 
   // 删除关键词
-  const removeKeyword = (category: 'core' | 'longTail' | 'competitor' | 'scenario', keyword: string) => {
+  const removeKeyword = (category: 'brand' | 'painPoints' | 'voice' | 'scenario' | 'comparison' | 'questions' | 'redditSyntax', keyword: string) => {
     setViewingProject(prev => {
       if (!prev) return null
       return {
@@ -394,20 +400,26 @@ export default function ConfigPage() {
 
   const getKeywordCategoryColor = (category: string) => {
     switch (category) {
-      case 'core': return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'longTail': return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'competitor': return 'bg-orange-100 text-orange-700 border-orange-200'
-      case 'scenario': return 'bg-green-100 text-green-700 border-green-200'
+      case 'brand': return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'painPoints': return 'bg-red-100 text-red-700 border-red-200'
+      case 'voice': return 'bg-green-100 text-green-700 border-green-200'
+      case 'scenario': return 'bg-purple-100 text-purple-700 border-purple-200'
+      case 'comparison': return 'bg-orange-100 text-orange-700 border-orange-200'
+      case 'questions': return 'bg-cyan-100 text-cyan-700 border-cyan-200'
+      case 'redditSyntax': return 'bg-indigo-100 text-indigo-700 border-indigo-200'
       default: return 'bg-slate-100 text-slate-600 border-slate-200'
     }
   }
 
   const getKeywordCategoryLabel = (category: string) => {
     switch (category) {
-      case 'core': return '核心词'
-      case 'longTail': return '长尾词'
-      case 'competitor': return '竞品词'
+      case 'brand': return '品牌词'
+      case 'painPoints': return '痛点词'
+      case 'voice': return '用户声音'
       case 'scenario': return '场景词'
+      case 'comparison': return '对比词'
+      case 'questions': return '问题词'
+      case 'redditSyntax': return 'Reddit语法'
       default: return category
     }
   }
@@ -523,7 +535,7 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
 
                 {/* 显示关键词配置状态 */}
                 <div className="flex items-center gap-2 mb-4">
-                  {project.keywords?.core && project.keywords.core.length > 0 ? (
+                  {project.keywords?.brand && project.keywords.brand.length > 0 ? (
                     <span className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded flex items-center gap-1">
                       ✅ 已配置关键词
                     </span>
@@ -649,11 +661,11 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
               </div>
 
               {/* 关键词展示 - 可折叠面板 */}
-              {viewingProject.keywords?.core && viewingProject.keywords.core.length > 0 && (
+              {viewingProject.keywords?.brand && viewingProject.keywords.brand.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">关键词策略</h3>
                   <div className="space-y-3">
-                    {(['core', 'longTail', 'competitor', 'scenario'] as const).map(category => {
+                    {(['brand', 'painPoints', 'voice', 'scenario', 'comparison', 'questions', 'redditSyntax'] as const).map(category => {
                       const keywords = viewingProject.keywords?.[category] || []
                       if (keywords.length === 0) return null
                       const reasoning = viewingProject.keywordsReasoning?.[category]
@@ -769,7 +781,7 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
               )}
 
               {/* 保存按钮 */}
-              {viewingProject.keywords?.core && viewingProject.keywords.core.length > 0 && (
+              {viewingProject.keywords?.brand && viewingProject.keywords.brand.length > 0 && (
                 <div className="flex justify-end pt-4 border-t border-slate-200">
                   <button
                     onClick={handleSaveConfig}

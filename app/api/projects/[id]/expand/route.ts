@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 
 interface KeywordReasoning {
-  core: string
-  longTail: string
-  competitor: string
+  brand: string
+  painPoints: string
+  voice: string
   scenario: string
+  comparison: string
+  questions: string
+  redditSyntax: string
 }
 
 interface SubredditItem {
@@ -17,10 +20,13 @@ interface SubredditItem {
 
 interface ExpandResult {
   keywords: {
-    core: string[]
-    longTail: string[]
-    competitor: string[]
+    brand: string[]
+    painPoints: string[]
+    voice: string[]
     scenario: string[]
+    comparison: string[]
+    questions: string[]
+    redditSyntax: string[]
   }
   keywordsReasoning: KeywordReasoning
   subreddits: {
@@ -84,7 +90,6 @@ async function callMiniMax(prompt: string): Promise<string> {
   const data = await response.json()
   console.log('[MiniMax Response]', JSON.stringify(data, null, 2))
   
-  // MiniMax M2.7 模型可能将内容放在 reasoning_content 或 content 中
   const message = data.choices?.[0]?.message || {}
   const content = message.content || 
                   message.reasoning_content || 
@@ -149,7 +154,6 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // 从数据库读取项目信息
     const result = await sql`SELECT * FROM projects WHERE id = ${id}`
 
     if (result.rows.length === 0) {
@@ -161,14 +165,12 @@ export async function POST(
 
     const project = result.rows[0]
 
-    // 解析 JSON 字段
     const brandNames = project.brand_names ? JSON.parse(project.brand_names) : []
     const competitorBrands = project.competitor_brands ? JSON.parse(project.competitor_brands) : []
     const existingKeywords = project.keywords ? JSON.parse(project.keywords) : {}
     const seedKeywords = existingKeywords.seed || []
 
-    // 构建 AI prompt
-    const prompt = `You are a Reddit marketing expert. Based on the following product information, generate keyword suggestions and Subreddit recommendations for Reddit marketing campaigns.
+    const prompt = `You are a Reddit marketing expert. Generate keywords optimized for Apify Reddit scraping.
 
 Product Information:
 - Product Name: ${project.product_name || 'N/A'}
@@ -178,68 +180,101 @@ Product Information:
 - Competitor Brands: ${competitorBrands.join(', ') || 'N/A'}
 - Seed Keywords: ${seedKeywords.join(', ') || 'N/A'}
 
-Please generate the following in JSON format:
+Generate 7 keyword categories for Reddit scraping. These will be used with Apify to find relevant posts.
 
-1. **Keywords** (4 categories, 5-10 keywords each):
-   - core: Core product keywords (product name, brand, category terms)
-   - longTail: Long-tail keywords (specific use cases, detailed queries)
-   - competitor: Competitor comparison keywords ("vs", "alternative", "comparison")
-   - scenario: Scenario/use case keywords (running, commuting, workout, etc.)
+**KEYWORD CATEGORIES:**
 
-2. **Keywords Reasoning** - Brief explanation for EACH category's generation logic:
-   - core: Why these core keywords were chosen based on product info
-   - longTail: Why these long-tail keywords were selected
-   - competitor: Why these competitor comparison keywords make sense
-   - scenario: Why these scenario/use-case keywords are relevant
+1. **brand** (3-5 keywords)
+   - Brand names, product names, model numbers
+   - Example: "Shokz", "OpenRun Pro", "bone conduction headphones"
+   - Purpose: Monitor brand mentions and reputation
 
-3. **Subreddits** (5-10 subreddits with relevance levels):
-   - high: High relevance subreddits (directly related to product/category)
-   - medium: Medium relevance subreddits (indirectly related)
-   - low: Low relevance subreddits (broad interest but still relevant)
+2. **painPoints** (8-12 keywords)
+   - User complaints, frustrations, problems
+   - Include emotion words: "hate", "frustrated", "annoying", "broken", "doesn't work", "disappointed", "terrible", "worst", "regret buying", "waste of money", "returning", "issues with"
+   - Example: "Shokz stopped working", "headphones hurt my ears", "frustrated with battery life"
+   - Purpose: Find unhappy users to understand problems or identify opportunities
 
-Each subreddit should include:
-   - name: Subreddit name (without r/ prefix)
-   - reason: Brief reason in English why this subreddit is relevant
-   - estimatedPosts: Either "daily" or "weekly"
+3. **voice** (8-12 keywords)
+   - Positive user expressions, recommendations, praise
+   - Include sentiment words: "love", "recommend", "best", "game changer", "amazing", "worth it", "lifesaver", "must have", "incredible", "perfect for", "obsessed with", "can't live without"
+   - Example: "love my Shokz", "best headphones for running", "game changer for cycling"
+   - Purpose: Find authentic user testimonials and advocates
 
-Return ONLY valid JSON in this exact format:
+4. **scenario** (6-8 keywords)
+   - Specific use cases and contexts
+   - Include: "for work", "for travel", "for gym", "for running", "for cycling", "for commute", "for office", "for outdoors", "while driving", "at home"
+   - Example: "headphones for running", "earbuds for cycling commute", "best for workout"
+   - Purpose: Find users discussing product in specific contexts
+
+5. **comparison** (5-8 keywords)
+   - Brand comparisons, alternatives, competitors
+   - Include: "vs", "versus", "alternative to", "better than", "compared to", "or", "like", "similar to"
+   - Example: "Shokz vs Bose", "alternative to AirPods", "better than bone conduction"
+   - Purpose: Find users in decision-making phase
+
+6. **questions** (8-12 keywords)
+   - User questions and help-seeking phrases
+   - Include: "how to", "what's the best", "which", "should I buy", "is it worth", "can I", "does it", "why", "help me", "looking for", "need advice", "anyone tried"
+   - Example: "how to connect Shokz", "which bone conduction headphones", "is Shokz worth it"
+   - Purpose: Find users actively seeking recommendations
+
+7. **redditSyntax** (3-5 keywords)
+   - Reddit-specific search patterns
+   - Include: "[brand] review", "is [product] worth it", "[product] experience", "thoughts on [brand]", "[brand] vs alternatives"
+   - Example: "Shokz review", "is OpenRun worth it", "bone conduction headphones experience"
+   - Purpose: Optimize for Reddit's search behavior
+
+**SUBREDDITS:**
+Generate 8-15 subreddits across 3 relevance levels:
+- high: 3-5 subreddits directly related to the product category
+- medium: 3-5 subreddits for related interests or broader topics
+- low: 2-5 subreddits with broad but relevant audiences
+
+Return ONLY valid JSON:
 {
   "keywords": {
-    "core": ["open ear earbuds", "bone conduction headphones"],
-    "longTail": ["best open ear headphones for running 2024", "safe headphones for cycling commute"],
-    "competitor": ["Shokz vs Oladance", "best alternative to Shokz"],
-    "scenario": ["headphones for cycling", "workout earbuds no ear canal"]
+    "brand": ["keyword1", "keyword2"],
+    "painPoints": ["keyword1", "keyword2"],
+    "voice": ["keyword1", "keyword2"],
+    "scenario": ["keyword1", "keyword2"],
+    "comparison": ["keyword1", "keyword2"],
+    "questions": ["keyword1", "keyword2"],
+    "redditSyntax": ["keyword1", "keyword2"]
   },
   "keywordsReasoning": {
-    "core": "These are the primary search terms users would use when looking for this type of product. 'Open ear earbuds' directly describes the product type, while 'bone conduction headphones' targets users familiar with the technology.",
-    "longTail": "Long-tail keywords capture users with specific needs or search intents. 'Best open ear headphones for running 2024' targets users actively researching before purchase.",
-    "competitor": "Users often search for comparisons before buying. Including competitor brand names helps capture this high-intent traffic and position against alternatives.",
-    "scenario": "Open-ear headphones excel in specific scenarios like cycling and workouts where safety and awareness matter. These keywords target users in these use cases."
+    "brand": "Brief explanation of brand keyword selection strategy",
+    "painPoints": "Brief explanation of pain point keyword selection strategy",
+    "voice": "Brief explanation of user voice keyword selection strategy",
+    "scenario": "Brief explanation of scenario keyword selection strategy",
+    "comparison": "Brief explanation of comparison keyword selection strategy",
+    "questions": "Brief explanation of question keyword selection strategy",
+    "redditSyntax": "Brief explanation of Reddit-specific syntax selection strategy"
   },
   "subreddits": {
     "high": [
-      {"name": "headphones", "reason": "Directly related to audio products, high engagement", "estimatedPosts": "daily"}
+      {"name": "headphones", "reason": "Direct product category", "estimatedPosts": "daily"}
     ],
-    "medium": [...],
-    "low": [...]
+    "medium": [
+      {"name": "running", "reason": "Target audience activity", "estimatedPosts": "daily"}
+    ],
+    "low": [
+      {"name": "gadgets", "reason": "Broad tech interest", "estimatedPosts": "weekly"}
+    ]
   }
 }
 
-Important:
-- Keywords should be simple strings, not objects
-- keywordsReasoning should be 2-3 sentences per category explaining the overall selection strategy
-- Use English keywords optimized for Reddit search
-- Ensure competitor keywords include actual competitor brand names
-- Subreddit names should NOT include "r/" prefix
-- Make keywords specific and searchable on Reddit`
+IMPORTANT:
+- Keywords must be simple strings optimized for Reddit/Apify search
+- Include actual competitor brand names in comparison keywords
+- Subreddit names WITHOUT "r/" prefix
+- All keywords in English
+- Total keywords: 45-60 across all categories`
 
-    // 调用 AI API
     const aiResponse = await callAIWithFallback(prompt)
 
-    // 解析 AI 返回的 JSON
     let expandResult: ExpandResult
     try {
-      // 尝试提取 JSON 部分（AI 有时会在 JSON 外包裹其他文字）
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
       const jsonStr = jsonMatch ? jsonMatch[0] : aiResponse
       expandResult = JSON.parse(jsonStr)
@@ -251,31 +286,33 @@ Important:
       }, { status: 500 })
     }
 
-    // 构建新的 keywords 对象
     const updatedKeywords = {
       ...existingKeywords,
-      core: expandResult.keywords.core || [],
-      longTail: expandResult.keywords.longTail || [],
-      competitor: expandResult.keywords.competitor || [],
-      scenario: expandResult.keywords.scenario || []
+      brand: expandResult.keywords.brand || [],
+      painPoints: expandResult.keywords.painPoints || [],
+      voice: expandResult.keywords.voice || [],
+      scenario: expandResult.keywords.scenario || [],
+      comparison: expandResult.keywords.comparison || [],
+      questions: expandResult.keywords.questions || [],
+      redditSyntax: expandResult.keywords.redditSyntax || []
     }
 
-    // 构建 subreddits 对象
     const updatedSubreddits = {
       high: expandResult.subreddits.high || [],
       medium: expandResult.subreddits.medium || [],
       low: expandResult.subreddits.low || []
     }
 
-    // keywordsReasoning 只在 API 返回中传递，不保存到数据库
     const keywordsReasoning = expandResult.keywordsReasoning || {
-      core: '',
-      longTail: '',
-      competitor: '',
-      scenario: ''
+      brand: '',
+      painPoints: '',
+      voice: '',
+      scenario: '',
+      comparison: '',
+      questions: '',
+      redditSyntax: ''
     }
 
-    // 更新数据库
     const now = new Date().toISOString()
     await sql`
       UPDATE projects 
@@ -286,7 +323,6 @@ Important:
       WHERE id = ${id}
     `
 
-    // 返回扩展结果（包含 keywordsReasoning 用于前端展示）
     return NextResponse.json({
       success: true,
       data: {
