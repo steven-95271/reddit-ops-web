@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
 const KIMI_API_KEY = process.env.KIMI_API_KEY || ''
 const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions'
 const KIMI_MODEL = 'kimi-k2-5'
@@ -15,6 +16,175 @@ interface ExtractedInfo {
   brand_names: string[]
   competitor_brands: string[]
   suggested_keywords: string[]
+}
+
+/**
+ * 调用 Apify Web Scraper 抓取页面内容
+ */
+async function scrapeWithApify(url: string): Promise<string | null> {
+  if (!APIFY_API_TOKEN) {
+    console.log('Apify API token not configured')
+    return null
+  }
+
+  console.log('[Apify] Trying to scrape:', url)
+  
+  try {
+    const APIFY_BASE_URL = 'https://api.apify.com/v2'
+    const ACTOR_ID = 'apify/web-scraper'  // 使用 Apify 官方的 Web Scraper
+    
+    // 构建 Actor 输入
+    const actorInput = {
+      startUrls: [{ url }],
+      useRequestQueue: true,
+      pageFunction: `
+        async function pageFunction(context) {
+          const { page, request } = context;
+          const html = await page.evaluate(() => document.documentElement.innerHTML);
+          const text = await page.evaluate(() => document.body.innerText);
+          return {
+            url: request.url,
+            title: await page.title(),
+            html: html,
+            text: text
+          };
+        }
+      `,
+      proxyConfiguration: {
+        useApifyProxy: true,
+        apifyProxyGroups: ['RESIDENTIAL']
+      },
+      maxRequestRetries: 3,
+      maxPagesPerCrawl: 1,
+      maxCrawlDepth: 0
+    }
+
+    // 启动 Actor 任务
+    const runResponse = await fetch(
+      `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
+        },
+        body: JSON.stringify(actorInput),
+      }
+    )
+
+    if (!runResponse.ok) {
+      const errorText = await runResponse.text()
+      console.error('[Apify] Failed to start scraper:', runResponse.status, errorText)
+      return null
+    }
+
+    const runData = await runResponse.json()
+    const runId = runData.data?.id
+
+    if (!runId) {
+      console.error('[Apify] No run ID returned')
+      return null
+    }
+
+    console.log(`[Apify] Scraper started, run ID: ${runId}`)
+
+    // 等待任务完成（最多等待 60 秒）
+    let attempts = 0
+    const maxAttempts = 30
+    const pollInterval = 2000  // 2秒检查一次
+    
+    while (attempts < maxAttempts) {
+      const statusResponse = await fetch(
+        `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs/${runId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${APIFY_API_TOKEN}`,
+          },
+        }
+      )
+
+      if (!statusResponse.ok) {
+        console.error('[Apify] Status check failed:', statusResponse.status)
+        break
+      }
+
+      const statusData = await statusResponse.json()
+      const status = statusData.data?.status
+
+      console.log(`[Apify] Run ${runId} status: ${status} (attempt ${attempts + 1}/${maxAttempts})`)
+
+      if (['SUCCEEDED', 'FINISHED'].includes(status)) {
+        // 任务完成，获取结果
+        const itemsResponse = await fetch(
+          `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs/${runId}/dataset/items`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${APIFY_API_TOKEN}`,
+            },
+          }
+        )
+
+        if (!itemsResponse.ok) {
+          console.error('[Apify] Failed to get results:', itemsResponse.status)
+          return null
+        }
+
+        const items = await itemsResponse.json()
+        console.log(`[Apify] Retrieved ${items.length} items`)
+        
+        if (items.length > 0 && items[0].text) {
+          return items[0].text
+        }
+        
+        // 如果没有 text 字段，尝试从 html 中提取
+        if (items.length > 0 && items[0].html) {
+          return extractTextFromHtml(items[0].html)
+        }
+        
+        return null
+      }
+
+      if (['FAILED', 'TIMED_OUT', 'ABORTED'].includes(status)) {
+        console.error(`[Apify] Run failed with status: ${status}`)
+        return null
+      }
+
+      // 继续等待
+      await new Promise(resolve => setTimeout(resolve, pollInterval))
+      attempts++
+    }
+
+    console.error('[Apify] Timed out waiting for completion')
+    return null
+
+  } catch (error) {
+    console.error('[Apify] Error scraping with Apify:', error)
+    return null
+  }
+}
+
+/**
+ * 从 HTML 中提取纯文本内容
+ */
+function extractTextFromHtml(html: string): string {
+  // 移除 script, style, nav, footer 等标签
+  const cleanHtml = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+
+  // 提取文本
+  const textContent = cleanHtml
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return textContent
 }
 
 async function callAIWithFallback(prompt: string): Promise<string> {
@@ -128,54 +298,50 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 获取网页内容
-    let html: string
+    let pageContent = ''
+
+    // 方案一：直接 fetch
     try {
+      console.log('[Direct Fetch] Trying to fetch:', url)
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
         },
-        timeout: 15000
-      } as any)
+      })
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status}`)
+      if (response.ok) {
+        const html = await response.text()
+        pageContent = extractTextFromHtml(html)
+        console.log(`[Direct Fetch] Success, extracted ${pageContent.length} characters`)
+      } else {
+        console.log(`[Direct Fetch] Failed with status: ${response.status}`)
       }
-
-      html = await response.text()
     } catch (fetchError) {
-      console.error('Error fetching URL:', fetchError)
-      return NextResponse.json({
-        success: false,
-        error: '无法访问该 URL，请检查链接是否有效'
-      }, { status: 400 })
+      console.log('[Direct Fetch] Failed:', fetchError)
     }
 
-    // 提取纯文本内容
-    // 移除 script, style, nav, footer 等标签
-    const cleanHtml = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-      .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+    // 方案二：Apify fallback
+    if (!pageContent || pageContent.length < 100) {
+      console.log('[Fallback] Trying Apify...')
+      const apifyContent = await scrapeWithApify(url)
+      if (apifyContent) {
+        pageContent = apifyContent
+        console.log(`[Apify] Success, extracted ${pageContent.length} characters`)
+      }
+    }
 
-    // 提取文本
-    const textContent = cleanHtml
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
+    // 检查是否成功获取内容
+    if (!pageContent || pageContent.length < 100) {
+      return NextResponse.json({
+        success: false,
+        error: '无法访问该页面，请检查链接是否有效或手动填写产品信息'
+      }, { status: 400 })
+    }
 
     // 截取前 5000 字符避免 token 超限
-    const truncatedText = textContent.slice(0, 5000)
-
-    if (truncatedText.length < 100) {
-      return NextResponse.json({
-        success: false,
-        error: '页面内容过少，无法提取有效信息'
-      }, { status: 400 })
-    }
+    const truncatedText = pageContent.slice(0, 5000)
 
     // 构建 AI prompt
     const prompt = `You are a product information extraction expert. Analyze the following webpage content and extract key product information.
