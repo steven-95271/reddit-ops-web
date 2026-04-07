@@ -4,14 +4,31 @@ import { useState, useEffect } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
 
-interface KeywordsReasoning {
-  brand?: string
-  painPoints?: string
-  voice?: string
-  scenario?: string
-  comparison?: string
-  questions?: string
-  redditSyntax?: string
+interface SubredditTarget {
+  subreddit: string
+  reason: string
+  relevance: 'high' | 'medium'
+  search_within: string[]
+}
+
+interface PhaseKeywords {
+  seed?: string[]
+  phase1_brand?: {
+    description: string
+    queries: string[]
+  }
+  phase2_competitor?: {
+    description: string
+    queries: string[]
+  }
+  phase3_scene_pain?: {
+    description: string
+    queries: string[]
+  }
+  phase4_subreddits?: {
+    description?: string
+    targets: SubredditTarget[]
+  }
 }
 
 interface Project {
@@ -22,22 +39,7 @@ interface Project {
   target_audience?: string
   brand_names?: string[]
   competitor_brands?: string[]
-  keywords?: {
-    seed?: string[]
-    brand?: string[]
-    painPoints?: string[]
-    voice?: string[]
-    scenario?: string[]
-    comparison?: string[]
-    questions?: string[]
-    redditSyntax?: string[]
-  }
-  keywordsReasoning?: KeywordsReasoning
-  subreddits?: {
-    high?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
-    medium?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
-    low?: Array<{ name: string; reason: string; estimatedPosts: string; relevance?: string }>
-  }
+  keywords?: PhaseKeywords
   status: string
   created_at: string
   updated_at: string
@@ -52,17 +54,17 @@ export default function ConfigPage() {
   const [viewingProject, setViewingProject] = useState<Project | null>(null)
   const [expanding, setExpanding] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [expandedKeywords, setExpandedKeywords] = useState<Record<string, boolean>>({})
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
   
   // URL 提取
   const [productUrl, setProductUrl] = useState('')
   const [extracting, setExtracting] = useState(false)
   
   // 切换关键词分类展开/折叠
-  const toggleKeywordsExpand = (category: string) => {
-    setExpandedKeywords(prev => ({
+  const togglePhaseExpand = (phase: string) => {
+    setExpandedPhases(prev => ({
       ...prev,
-      [category]: !prev[category]
+      [phase]: !prev[phase]
     }))
   }
   
@@ -213,8 +215,7 @@ export default function ConfigPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          keywords: viewingProject.keywords,
-          subreddits: viewingProject.subreddits
+          keywords: viewingProject.keywords
         })
       })
       const data = await res.json()
@@ -233,29 +234,50 @@ export default function ConfigPage() {
     }
   }
 
-  // 删除关键词
-  const removeKeyword = (category: 'brand' | 'painPoints' | 'voice' | 'scenario' | 'comparison' | 'questions' | 'redditSyntax', keyword: string) => {
+  // 删除查询词
+  const removeQuery = (phase: 'phase1' | 'phase2' | 'phase3' | 'phase4', query: string) => {
+    const phaseMap: Record<string, 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain' | 'phase4_subreddits'> = {
+      phase1: 'phase1_brand',
+      phase2: 'phase2_competitor',
+      phase3: 'phase3_scene_pain',
+      phase4: 'phase4_subreddits'
+    }
+    const fullPhase = phaseMap[phase]
+    
     setViewingProject(prev => {
       if (!prev) return null
+      
+      if (phase === 'phase4') {
+        const targets = prev.keywords?.phase4_subreddits?.targets || []
+        const newTargets = targets.filter(t => {
+          if (t.subreddit === query) return false
+          t.search_within = t.search_within.filter(k => k !== query)
+          return true
+        })
+        return {
+          ...prev,
+          keywords: {
+            ...prev.keywords,
+            phase4_subreddits: {
+              ...prev.keywords?.phase4_subreddits,
+              targets: newTargets
+            }
+          }
+        }
+      }
+      
+      const phaseData = prev.keywords?.[fullPhase]
+      if (!phaseData || !('queries' in phaseData)) return prev
+      const queries = phaseData.queries || []
+      const newQueries = queries.filter((q: string) => q !== query)
       return {
         ...prev,
         keywords: {
           ...prev.keywords,
-          [category]: prev.keywords?.[category]?.filter(k => k !== keyword) || []
-        }
-      }
-    })
-  }
-
-  // 删除 Subreddit
-  const removeSubreddit = (relevance: 'high' | 'medium' | 'low', name: string) => {
-    setViewingProject(prev => {
-      if (!prev) return null
-      return {
-        ...prev,
-        subreddits: {
-          ...prev.subreddits,
-          [relevance]: prev.subreddits?.[relevance]?.filter(s => s.name !== name) || []
+          [fullPhase]: {
+            ...prev.keywords?.[fullPhase],
+            queries: newQueries
+          }
         }
       }
     })
@@ -389,38 +411,31 @@ export default function ConfigPage() {
     }))
   }
 
-  const getRelevanceColor = (relevance: string) => {
-    switch (relevance) {
-      case 'high': return 'bg-green-100 text-green-700 border-green-200'
-      case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-      case 'low': return 'bg-slate-100 text-slate-600 border-slate-200'
-      default: return 'bg-blue-100 text-blue-700 border-blue-200'
-    }
-  }
-
-  const getKeywordCategoryColor = (category: string) => {
-    switch (category) {
-      case 'brand': return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'painPoints': return 'bg-red-100 text-red-700 border-red-200'
-      case 'voice': return 'bg-green-100 text-green-700 border-green-200'
-      case 'scenario': return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'comparison': return 'bg-orange-100 text-orange-700 border-orange-200'
-      case 'questions': return 'bg-cyan-100 text-cyan-700 border-cyan-200'
-      case 'redditSyntax': return 'bg-indigo-100 text-indigo-700 border-indigo-200'
+  const getPhaseColor = (phase: string) => {
+    switch (phase) {
+      case 'phase1': return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'phase2': return 'bg-orange-100 text-orange-700 border-orange-200'
+      case 'phase3': return 'bg-green-100 text-green-700 border-green-200'
+      case 'phase4': return 'bg-purple-100 text-purple-700 border-purple-200'
       default: return 'bg-slate-100 text-slate-600 border-slate-200'
     }
   }
 
-  const getKeywordCategoryLabel = (category: string) => {
-    switch (category) {
-      case 'brand': return '品牌词'
-      case 'painPoints': return '痛点词'
-      case 'voice': return '用户声音'
-      case 'scenario': return '场景词'
-      case 'comparison': return '对比词'
-      case 'questions': return '问题词'
-      case 'redditSyntax': return 'Reddit语法'
-      default: return category
+  const getPhaseLabel = (phase: string) => {
+    switch (phase) {
+      case 'phase1': return 'Phase 1: 品牌核心词'
+      case 'phase2': return 'Phase 2: 竞品对比词'
+      case 'phase3': return 'Phase 3: 场景+痛点词'
+      case 'phase4': return 'Phase 4: Subreddit 定向'
+      default: return phase
+    }
+  }
+
+  const getRelevanceColor = (relevance: string) => {
+    switch (relevance) {
+      case 'high': return 'bg-green-100 text-green-700 border-green-200'
+      case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+      default: return 'bg-slate-100 text-slate-600 border-slate-200'
     }
   }
 
@@ -535,7 +550,7 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
 
                 {/* 显示关键词配置状态 */}
                 <div className="flex items-center gap-2 mb-4">
-                  {project.keywords?.brand && project.keywords.brand.length > 0 ? (
+                  {project.keywords?.phase1_brand?.queries?.length ? (
                     <span className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded flex items-center gap-1">
                       ✅ 已配置关键词
                     </span>
@@ -660,128 +675,118 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                 </button>
               </div>
 
-              {/* 关键词展示 - 可折叠面板 */}
-              {viewingProject.keywords?.brand && viewingProject.keywords.brand.length > 0 && (
+              {/* 四阶段搜索策略 */}
+              {viewingProject.keywords?.phase1_brand?.queries?.length ? (
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">关键词策略</h3>
-                  <div className="space-y-3">
-                    {(['brand', 'painPoints', 'voice', 'scenario', 'comparison', 'questions', 'redditSyntax'] as const).map(category => {
-                      const keywords = viewingProject.keywords?.[category] || []
-                      if (keywords.length === 0) return null
-                      const reasoning = viewingProject.keywordsReasoning?.[category]
-                      const isExpanded = expandedKeywords[category]
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">四阶段搜索策略</h3>
+                  <div className="space-y-4">
+                    {(['phase1', 'phase2', 'phase3', 'phase4'] as const).map(phase => {
+                      const phaseData = viewingProject.keywords?.[phase as keyof typeof viewingProject.keywords]
+                      if (!phaseData) return null
+                      
+                      const isExpanded = expandedPhases[phase]
+                      const hasQueries = phase === 'phase4' 
+                        ? (phaseData as any)?.targets?.length > 0
+                        : (phaseData as any)?.queries?.length > 0
+                      
+                      if (!hasQueries) return null
+
                       return (
-                        <div key={category} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                          {/* 分类 Header - 可点击展开 */}
+                        <div key={phase} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                           <button
-                            onClick={() => toggleKeywordsExpand(category)}
+                            onClick={() => togglePhaseExpand(phase)}
                             className="w-full px-4 py-3 flex justify-between items-center hover:bg-slate-50 transition-colors"
                           >
                             <div className="flex items-center gap-3">
                               <h4 className="font-medium text-slate-700">
-                                {getKeywordCategoryLabel(category)}
-                                <span className="ml-2 text-sm text-slate-500">({keywords.length}个)</span>
+                                {getPhaseLabel(phase)}
                               </h4>
+                              <span className="text-sm text-slate-500">
+                                ({(phaseData as any).description || ''})
+                              </span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {reasoning && (
-                                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-                                  💡 有生成逻辑
-                                </span>
-                              )}
-                              <svg
-                                className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
+                            <svg
+                              className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
                           </button>
 
-                          {/* 展开内容 */}
                           {isExpanded && (
                             <div className="px-4 pb-4 border-t border-slate-100">
-                              {/* 生成逻辑说明 */}
-                              {reasoning && (
-                                <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100">
-                                  <div className="text-xs font-medium text-purple-700 mb-1">AI 生成逻辑</div>
-                                  <div className="text-sm text-slate-700">{reasoning}</div>
+                              {phase === 'phase4' ? (
+                                <div className="space-y-3 mt-4">
+                                  {(phaseData as any).targets?.map((target: any, idx: number) => (
+                                    <div key={idx} className="bg-slate-50 rounded-lg p-4">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <span className={`px-3 py-1 rounded-full text-sm ${getRelevanceColor(target.relevance)}`}>
+                                          r/{target.subreddit}
+                                        </span>
+                                        <button
+                                          onClick={() => removeQuery(phase, target.subreddit)}
+                                          className="text-slate-400 hover:text-red-500"
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                      <div className="text-xs text-slate-500 mb-2">{target.reason}</div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {target.search_within?.map((term: string, i: number) => (
+                                          <span key={i} className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded border border-purple-200">
+                                            {term}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex flex-wrap gap-2 mt-4">
+                                  {(phaseData as any).queries?.map((query: string, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getPhaseColor(phase)}`}
+                                    >
+                                      {query}
+                                      <button
+                                        onClick={() => removeQuery(phase, query)}
+                                        className="ml-1 hover:text-red-500"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))}
                                 </div>
                               )}
-
-                              {/* 关键词标签 */}
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {keywords.map((keyword: string, idx: number) => (
-                                  <span
-                                    key={idx}
-                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getKeywordCategoryColor(category)}`}
-                                  >
-                                    {keyword}
-                                    <button
-                                      onClick={() => removeKeyword(category, keyword)}
-                                      className="ml-1 hover:text-red-500 transition-colors"
-                                    >
-                                      ×
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
                             </div>
                           )}
                         </div>
                       )
                     })}
                   </div>
-                </div>
-              )}
 
-              {/* Subreddit 展示 */}
-              {viewingProject.subreddits && (
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">推荐 Subreddits</h3>
-                  <div className="space-y-4">
-                    {(['high', 'medium', 'low'] as const).map(relevance => {
-                      const subreddits = viewingProject.subreddits?.[relevance] || []
-                      if (subreddits.length === 0) return null
-                      return (
-                        <div key={relevance}>
-                          <h4 className="font-medium text-slate-700 mb-3">
-                            {relevance === 'high' ? '高相关度' : relevance === 'medium' ? '中相关度' : '低相关度'}
-                            <span className="ml-2 text-sm text-slate-500">({subreddits.length}个)</span>
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {subreddits.map((sub, idx) => (
-                              <div
-                                key={idx}
-                                className={`p-4 rounded-xl border ${getRelevanceColor(relevance)} flex justify-between items-start`}
-                              >
-                                <div>
-                                  <div className="font-semibold">r/{sub.name}</div>
-                                  <div className="text-sm mt-1 opacity-80">{sub.reason}</div>
-                                  <div className="text-xs mt-2 opacity-60">
-                                    发帖频率: {sub.estimatedPosts === 'daily' ? '每日' : '每周'}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => removeSubreddit(relevance, sub.name)}
-                                  className="text-slate-400 hover:text-red-500 transition-colors"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
+                  {/* 保存按钮 */}
+                  <div className="flex justify-end pt-4 border-t border-slate-200 mt-4">
+                    <button
+                      onClick={handleSaveConfig}
+                      disabled={saving}
+                      className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {saving ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          保存中...
+                        </>
+                      ) : (
+                        '💾 保存配置'
+                      )}
+                    </button>
                   </div>
                 </div>
-              )}
-
-              {/* 保存按钮 */}
-              {viewingProject.keywords?.brand && viewingProject.keywords.brand.length > 0 && (
+              ) : (
                 <div className="flex justify-end pt-4 border-t border-slate-200">
                   <button
                     onClick={handleSaveConfig}
