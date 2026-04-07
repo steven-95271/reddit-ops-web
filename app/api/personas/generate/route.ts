@@ -71,12 +71,19 @@ async function callMiniMax(prompt: string): Promise<string> {
   const data = await response.json()
   console.log('[MiniMax Response]', JSON.stringify(data, null, 2))
   
-  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+  // MiniMax API 可能返回不同的结构，使用可选链安全访问
+  const content = data.choices?.[0]?.message?.content || 
+                  data.choices?.[0]?.text || 
+                  data.output || 
+                  data.result ||
+                  data.text
+  
+  if (!content) {
     console.error('[MiniMax Error] Invalid response structure:', data)
     throw new Error('MiniMax API returned invalid response structure')
   }
   
-  return data.choices[0].message.content || ''
+  return content
 }
 
 // 构建 AI Prompt
