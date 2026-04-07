@@ -52,10 +52,10 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'abab6.5s-chat',
+      model: 'MiniMax-M2.7-Highspeed',
       messages,
       temperature: 0.8,
-      max_tokens: 2000,
+      max_tokens: 8000,
     }),
   })
 
@@ -67,16 +67,19 @@ async function callMiniMax(messages: Array<{ role: string; content: string }>): 
   const data = await response.json()
   console.log('[MiniMax Response]', JSON.stringify(data, null, 2))
   
-  // MiniMax API 可能返回不同的结构，使用可选链安全访问
-  const content = data.choices?.[0]?.message?.content || 
+  // MiniMax M2.7 模型可能将内容放在 reasoning_content 或 content 中
+  const message = data.choices?.[0]?.message || {}
+  const content = message.content || 
+                  message.reasoning_content || 
                   data.choices?.[0]?.text || 
                   data.output || 
                   data.result ||
-                  data.text
+                  data.text ||
+                  ''
   
   if (!content) {
     console.error('[MiniMax Error] Invalid response structure:', JSON.stringify(data, null, 2))
-    throw new Error(`MiniMax API returned invalid response structure. Full response: ${JSON.stringify(data)}`)
+    throw new Error(`MiniMax API returned invalid response structure. Response: ${JSON.stringify(data).substring(0, 500)}`)
   }
   
   return content
