@@ -5,7 +5,9 @@ import { randomUUID } from 'crypto'
 // GET /api/projects - 返回所有项目列表
 export async function GET() {
   try {
+    console.log('[initDb] Starting...')
     await initDb()  // 确保表存在
+    console.log('[initDb] Done')
     const result = await sql`SELECT * FROM projects ORDER BY created_at DESC`
     
     // 解析 JSON 字段
