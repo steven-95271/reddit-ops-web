@@ -28,10 +28,6 @@ export async function GET(request: NextRequest) {
     `
     const candidateCount = parseInt(candidateCountResult.rows[0].count)
 
-    // 获取总数量 - 使用条件查询
-    let total = 0
-    let postsResult
-
     // 构建时间范围条件
     let startDateStr: string | null = null
     if (time_range && time_range !== 'all') {
@@ -56,229 +52,73 @@ export async function GET(request: NextRequest) {
       startDateStr = startDate.toISOString()
     }
 
-    // 根据条件组合执行不同的查询
-    if (phase && min_quality && startDateStr) {
-      // 所有条件
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND quality_score >= ${parseInt(min_quality)}
-        AND created_utc >= ${startDateStr}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND quality_score >= ${parseInt(min_quality)}
-        AND created_utc >= ${startDateStr}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else if (phase && min_quality) {
-      // phase + min_quality
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND quality_score >= ${parseInt(min_quality)}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND quality_score >= ${parseInt(min_quality)}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else if (phase && startDateStr) {
-      // phase + time_range
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND created_utc >= ${startDateStr}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND created_utc >= ${startDateStr}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else if (min_quality && startDateStr) {
-      // min_quality + time_range
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND quality_score >= ${parseInt(min_quality)}
-        AND created_utc >= ${startDateStr}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND quality_score >= ${parseInt(min_quality)}
-        AND created_utc >= ${startDateStr}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else if (phase) {
-      // phase only
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND category = ${phase}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else if (min_quality) {
-      // min_quality only
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND quality_score >= ${parseInt(min_quality)}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND quality_score >= ${parseInt(min_quality)}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else if (startDateStr) {
-      // time_range only
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id} 
-        AND created_utc >= ${startDateStr}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        AND created_utc >= ${startDateStr}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    } else {
-      // 基础查询（仅 project_id）
-      const countResult = await sql`
-        SELECT COUNT(*) as total FROM posts 
-        WHERE project_id = ${project_id}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-      `
-      total = parseInt(countResult.rows[0].total)
-      
-      postsResult = await sql`
-        SELECT 
-          id, reddit_id, subreddit, title, body, author, url,
-          score, num_comments, upvote_ratio, created_utc,
-          quality_score, ai_relevance_score, ai_intent_score, 
-          ai_opportunity_score, ai_suggested_angle, category,
-          is_candidate, ignored, scraped_at
-        FROM posts 
-        WHERE project_id = ${project_id}
-        ${is_candidate === 'true' ? sql`AND is_candidate = TRUE` : sql``}
-        ${ignored === 'true' ? sql`AND ignored = TRUE` : ignored === 'false' ? sql`AND ignored = FALSE` : sql``}
-        ORDER BY quality_score DESC NULLS LAST, created_utc DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
+    // 为每个筛选条件组合定义查询函数
+    const minQualityNum = min_quality ? parseInt(min_quality) : null
+    
+    // 组合条件：phase + min_quality + time_range + is_candidate + ignored
+    // 由于 @vercel/postgres 不支持动态 SQL，我们需要枚举所有条件组合
+    
+    type QueryResult = {
+      rows: any[]
     }
+    
+    let countResult: QueryResult
+    let postsResult: QueryResult
+    
+    // 简化处理：使用客户端过滤来避免复杂的 SQL 组合
+    // 先获取基础数据，然后过滤
+    
+    // 获取所有帖子（带基本过滤）
+    const allPostsResult = await sql`
+      SELECT 
+        id, reddit_id, subreddit, title, body, author, url,
+        score, num_comments, upvote_ratio, created_utc,
+        quality_score, ai_relevance_score, ai_intent_score, 
+        ai_opportunity_score, ai_suggested_angle, category,
+        is_candidate, ignored, scraped_at
+      FROM posts 
+      WHERE project_id = ${project_id}
+      ORDER BY quality_score DESC NULLS LAST, created_utc DESC
+    `
+    
+    // 客户端过滤
+    let filteredPosts = allPostsResult.rows
+    
+    if (minQualityNum !== null) {
+      filteredPosts = filteredPosts.filter(post => (post.quality_score || 0) >= minQualityNum)
+    }
+    
+    if (startDateStr) {
+      const startDate = new Date(startDateStr)
+      filteredPosts = filteredPosts.filter(post => {
+        const postDate = new Date(post.created_utc)
+        return postDate >= startDate
+      })
+    }
+    
+    if (phase) {
+      filteredPosts = filteredPosts.filter(post => post.category === phase)
+    }
+    
+    if (is_candidate === 'true') {
+      filteredPosts = filteredPosts.filter(post => post.is_candidate === true)
+    }
+    
+    if (ignored === 'true') {
+      filteredPosts = filteredPosts.filter(post => post.ignored === true)
+    } else if (ignored === 'false') {
+      filteredPosts = filteredPosts.filter(post => post.ignored === false)
+    }
+    
+    const total = filteredPosts.length
+    
+    // 应用分页
+    const paginatedPosts = filteredPosts.slice(offset, offset + limit)
 
     return NextResponse.json({
       success: true,
       data: {
-        posts: postsResult!.rows,
+        posts: paginatedPosts,
         total,
         candidateCount,
         limit,

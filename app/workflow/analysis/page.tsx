@@ -147,7 +147,7 @@ export default function AnalysisPage() {
     if (!selectedProject) return
 
     if (stats.candidates >= preferences.candidateLimit) {
-      showToast(`候选帖子已达上限 (${preferences.candidateLimit})，请先调整筛选或移除现有候选`, 'warning')
+      showToast(`候选帖子已达上限 (${preferences.candidateLimit})，请先调整筛选或移除现有候选`, 'info')
       return
     }
 
