@@ -19,35 +19,41 @@ export async function POST(
     const body = await request.json()
     const { action } = body // 'candidate' | 'unmark' | 'ignore' | 'unignore'
 
-    let updateFields: string[]
-    let updateValues: any[]
-
+    let result
     switch (action) {
       case 'candidate':
-        updateFields = ['is_candidate = TRUE', 'ignored = FALSE', 'candidate_marked_at = NOW()']
+        result = await sql`
+          UPDATE posts 
+          SET is_candidate = TRUE, ignored = FALSE, candidate_marked_at = NOW()
+          WHERE id = ${id}
+          RETURNING id, is_candidate, ignored
+        `
         break
       case 'unmark':
-        updateFields = ['is_candidate = FALSE', 'candidate_marked_at = NULL']
+        result = await sql`
+          UPDATE posts 
+          SET is_candidate = FALSE, candidate_marked_at = NULL
+          WHERE id = ${id}
+          RETURNING id, is_candidate, ignored
+        `
         break
       case 'ignore':
-        updateFields = ['ignored = TRUE', 'is_candidate = FALSE']
+        result = await sql`
+          UPDATE posts 
+          SET ignored = TRUE, is_candidate = FALSE
+          WHERE id = ${id}
+          RETURNING id, is_candidate, ignored
+        `
         break
       case 'unignore':
-        updateFields = ['ignored = FALSE']
+        result = await sql`
+          UPDATE posts 
+          SET ignored = FALSE
+          WHERE id = ${id}
+          RETURNING id, is_candidate, ignored
+        `
         break
-      default:
-        return NextResponse.json({
-          success: false,
-          error: 'Invalid action'
-        }, { status: 400 })
     }
-
-    const result = await sql`
-      UPDATE posts 
-      SET ${sql.unsafe(updateFields.join(', '))}
-      WHERE id = ${id}
-      RETURNING id, is_candidate, ignored
-    `
 
     if (result.rows.length === 0) {
       return NextResponse.json({
