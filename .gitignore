@@ -5,3 +5,14 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# Python
+venv/
+__pycache__/
+*.pyc
+flask.log
+flask_log.txt
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+web/tsconfig.tsbuildinfo
