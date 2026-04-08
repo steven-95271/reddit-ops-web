@@ -53,9 +53,14 @@ export async function POST(
           RETURNING id, is_candidate, ignored
         `
         break
+      default:
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid action'
+        }, { status: 400 })
     }
 
-    if (result.rows.length === 0) {
+    if (!result || result.rows.length === 0) {
       return NextResponse.json({
         success: false,
         error: 'Post not found'
