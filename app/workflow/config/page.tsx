@@ -153,8 +153,25 @@ export default function ConfigPage() {
   }
 
   // 查看项目详情
-  const handleViewDetail = (project: Project) => {
-    setViewingProject(project)
+  const handleViewDetail = async (project: Project) => {
+    console.log('[Frontend] Opening project detail, current data:', project)
+    
+    // 尝试从 API 获取最新数据
+    try {
+      const res = await fetch(`/api/projects/${project.id}`)
+      const data = await res.json()
+      if (data.success && data.data) {
+        console.log('[Frontend] Fetched latest project data:', data.data)
+        setViewingProject(data.data)
+      } else {
+        console.log('[Frontend] API fetch failed, using cached data')
+        setViewingProject(project)
+      }
+    } catch (error) {
+      console.error('[Frontend] Error fetching project detail:', error)
+      setViewingProject(project)
+    }
+    
     setShowDetail(true)
   }
 
@@ -333,18 +350,24 @@ export default function ConfigPage() {
         console.log('[Frontend] Returned project keywords:', data.data?.keywords)
 
         if (data.success) {
+          const updatedProject = data.data
+          console.log('[Frontend] PUT success, updating with:', updatedProject)
+          
           showToast('项目更新成功', 'success')
           setShowForm(false)
           resetForm()
+          setEditingProject(null)
           
-          // 更新 projects 列表
-          setProjects(prev => prev.map(p => p.id === editingProject.id ? data.data : p))
+          // 1. 用 API 返回的最新数据更新 projects 列表
+          setProjects(prev => {
+            const newProjects = prev.map(p => p.id === updatedProject.id ? updatedProject : p)
+            console.log('[Frontend] Updated projects list, project count:', newProjects.length)
+            return newProjects
+          })
           
-          // 如果正在查看该项目详情，同步更新 viewingProject
-          if (viewingProject && viewingProject.id === editingProject.id) {
-            console.log('[Frontend] Updating viewingProject with new data')
-            setViewingProject(data.data)
-          }
+          // 2. 无条件更新 viewingProject（如果当前有打开详情页）
+          console.log('[Frontend] Updating viewingProject, current:', viewingProject?.id, '-> new:', updatedProject.id)
+          setViewingProject(updatedProject)
         } else {
           showToast(data.error || '更新失败', 'error')
         }
