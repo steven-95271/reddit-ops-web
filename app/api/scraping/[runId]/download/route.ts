@@ -4,13 +4,13 @@ import { downloadDatasetAsCsv } from '@/lib/apify'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { runId: string } }
 ) {
   try {
     await initDb()
-    const { id } = params
+    const { runId } = params
 
-    if (!id) {
+    if (!runId) {
       return NextResponse.json({
         success: false,
         error: 'Run ID is required'
@@ -19,7 +19,7 @@ export async function GET(
 
     // 获取运行记录
     const result = await sql`
-      SELECT * FROM scraping_runs WHERE id = ${id}
+      SELECT * FROM scraping_runs WHERE id = ${runId}
     `
 
     if (result.rows.length === 0) {
