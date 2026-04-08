@@ -86,7 +86,8 @@ export default function ConfigPage() {
     target_audience: '',
     brand_names: [''],
     competitor_brands: [''],
-    seed_keywords: ['']
+    seed_keywords: [''],
+    keywords: {} as PhaseKeywords
   })
 
   // 加载项目列表
@@ -122,7 +123,8 @@ export default function ConfigPage() {
       target_audience: '',
       brand_names: [''],
       competitor_brands: [''],
-      seed_keywords: ['']
+      seed_keywords: [''],
+      keywords: {}
     })
     setProductUrl('')
     setEditingProject(null)
@@ -144,7 +146,8 @@ export default function ConfigPage() {
       target_audience: project.target_audience || '',
       brand_names: project.brand_names?.length ? project.brand_names : [''],
       competitor_brands: project.competitor_brands?.length ? project.competitor_brands : [''],
-      seed_keywords: project.keywords?.seed?.length ? project.keywords.seed : ['']
+      seed_keywords: project.keywords?.seed?.length ? project.keywords.seed : [''],
+      keywords: project.keywords || {}
     })
     setShowForm(true)
   }
@@ -307,8 +310,12 @@ export default function ConfigPage() {
       target_audience: formData.target_audience.trim(),
       brand_names: formData.brand_names.filter(Boolean),
       competitor_brands: formData.competitor_brands.filter(Boolean),
-      seed_keywords: formData.seed_keywords.filter(Boolean)
+      seed_keywords: formData.seed_keywords.filter(Boolean),
+      keywords: formData.keywords
     }
+
+    console.log('[Frontend] Submitting payload:', payload)
+    console.log('[Frontend] keywords in payload:', payload.keywords)
 
     try {
       setLoading(true)
@@ -322,18 +329,21 @@ export default function ConfigPage() {
         })
         const data = await res.json()
 
+        console.log('[Frontend] PUT response:', data)
+        console.log('[Frontend] Returned project keywords:', data.data?.keywords)
+
         if (data.success) {
           showToast('项目更新成功', 'success')
           setShowForm(false)
           resetForm()
-          fetchProjects()
-          // 如果正在查看该项目详情，则刷新项目数据
+          
+          // 更新 projects 列表
+          setProjects(prev => prev.map(p => p.id === editingProject.id ? data.data : p))
+          
+          // 如果正在查看该项目详情，同步更新 viewingProject
           if (viewingProject && viewingProject.id === editingProject.id) {
-            const refreshed = await fetch(`/api/projects/${editingProject.id}`)
-            const refreshedData = await refreshed.json()
-            if (refreshedData.success && refreshedData.data) {
-              setViewingProject(refreshedData.data)
-            }
+            console.log('[Frontend] Updating viewingProject with new data')
+            setViewingProject(data.data)
           }
         } else {
           showToast(data.error || '更新失败', 'error')

@@ -94,6 +94,10 @@ export async function PUT(
     const keywordsStr = keywords !== undefined ? JSON.stringify(keywords) : undefined
     const subredditsStr = subreddits !== undefined ? JSON.stringify(subreddits) : undefined
 
+    console.log('[API PUT] Updating project:', id)
+    console.log('[API PUT] keywords received:', keywords)
+    console.log('[API PUT] keywordsStr to save:', keywordsStr)
+
     // 动态构建更新语句
     const updates: string[] = []
     const values: any[] = []
@@ -152,10 +156,14 @@ export async function PUT(
 
     // 使用原生 SQL 执行更新
     const query = `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramIndex}`
+    console.log('[API PUT] Executing SQL:', query)
+    console.log('[API PUT] SQL values:', values)
     await sql.query(query, values)
 
     // 获取更新后的项目
     const updatedResult = await sql`SELECT * FROM projects WHERE id = ${id}`
+    console.log('[API PUT] Raw DB result keywords:', updatedResult.rows[0]?.keywords)
+    
     const updatedProject = {
       ...updatedResult.rows[0],
       brand_names: updatedResult.rows[0].brand_names ? JSON.parse(updatedResult.rows[0].brand_names) : [],
@@ -163,6 +171,8 @@ export async function PUT(
       keywords: updatedResult.rows[0].keywords ? JSON.parse(updatedResult.rows[0].keywords) : {},
       subreddits: updatedResult.rows[0].subreddits ? JSON.parse(updatedResult.rows[0].subreddits) : []
     }
+    
+    console.log('[API PUT] Returning updated project keywords:', updatedProject.keywords)
 
     return NextResponse.json({ 
       success: true, 
