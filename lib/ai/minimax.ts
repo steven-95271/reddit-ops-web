@@ -262,120 +262,100 @@ export async function generateKeywordsWithAI(
 
 请生成以下6类关键词（以 JSON 格式输出）:
 {
-    "brand": [
-        {"keyword": "关键词", "reason": "生成理由（中文）", "wordCount": 单词数},
-        ...
-    ],
-    "product": [...],
-    "category": [...],
-    "comparison": [...],
-    "scenario": [...],
-    "problem": [...],
-    "reasoning": "整体生成逻辑说明（中文）"
+    "brand": ["品牌词1", "品牌词2", "品牌词3"],
+    "brand_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
+    "product": ["型号词1", "型号词2", "型号词3"],
+    "product_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
+    "category": ["品类词1", "品类词2", "品类词3"],
+    "category_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
+    "comparison": ["对比词1", "对比词2", "对比词3"],
+    "comparison_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
+    "scenario": ["场景词1", "场景词2", "场景词3"],
+    "scenario_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
+    "problem": ["问题词1", "问题词2", "问题词3"],
+    "problem_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
+    "overall_reasoning": "整体生成逻辑说明（中文，100字以内）"
 }
 
-Requirements:
+**Phase 1: 品牌核心词（Brand core keywords - wide net casting）**
+- 目的：用最核心的品牌词广撒网，抓取所有提及品牌的帖子
+- 数量：3-5个即可，宁缺毋滥
+- 长度：每个词 1-3 个单词
+- 规则：
+  - 第1个必须是产品全名（如 "Oladance OWS Pro"）
+  - 第2个是品牌名（如 "Oladance"）
+  - 其余是品牌+最核心品类词组合（如 "Oladance earbuds"）
+  - 不要加年份、不要加 review/recommendation 等修饰词
+  - 不要生成超过 3 个单词的品牌词
+- 示例：
+  ✅ "Oladance OWS Pro"（产品全名）
+  ✅ "Oladance"（品牌名）
+  ✅ "Oladance earbuds"（品牌+品类）
+  ❌ "Oladance review 2025"（加了年份和review）
+  ❌ "best Oladance open ear headphones"（超过3词）
 
-**质量原则：宁缺毋滥。只输出高质量的关键词，不追求数量。**
+**Phase 2: 竞品对比词（Competitor comparison - high-value intelligence）**
+- 目的：找到用户在对比和讨论竞品的帖子
+- 数量：4-6个
+- 长度：每个词 2-4 个单词
+- 规则：
+  - 不要加年份（Reddit 用户搜索时很少加年份）
+  - 优先使用 "X vs Y" 格式（这是 Reddit 最常见的对比搜索模式）
+  - 包含 "X alternative"、"X problems" 格式
+- 示例：
+  ✅ "Shokz vs Oladance"（真实用户搜索）
+  ✅ "Shokz problems"（用户吐槽场景）
+  ✅ "Soundcore open ear"（竞品+品类）
+  ❌ "Shokz alternative open ear headphones 2025"（过长，没人这么搜）
+  ❌ "best open ear headphones 2026"（带年份，Reddit 搜索不需要）
 
-1. **Brand Keywords (品牌关键词)**
-   - 必须包含品牌名/产品名！
-   - 关键词长度：2-3个单词
-   - 示例（产品是 Shokz OpenRun）:
-     * {"keyword": "Shokz OpenRun", "reason": "产品全名，搜索精确度高", "wordCount": 2}
-     * {"keyword": "Shokz headphones", "reason": "品牌+品类组合", "wordCount": 2}
-
-2. **Product Keywords (型号关键词)**
-   - 具体型号名
-   - 关键词长度：2-3个单词
-   - 示例:
-     * {"keyword": "Shokz OpenRun Pro", "reason": "具体型号名", "wordCount": 3}
-
-3. **Category Keywords (品类关键词)**
-   - 品类通用词
-   - 关键词长度：2-3个单词
-   - 格式: "品类词", "品类 + 场景词"
-   - 示例:
-     * {"keyword": "open ear headphones", "reason": "核心品类词", "wordCount": 3}
-     * {"keyword": "bone conduction earbuds", "reason": "品类+形态", "wordCount": 3}
-
-4. **Comparison Keywords (对比关键词)** - **绝对不能为空！**
-   - 使用推断的竞品品牌生成对比词
-   - 关键词长度：3-4个单词
-   - 格式: "品牌 vs 竞品", "品牌 alternative", "best alternative to 品牌"
-   - 示例（产品是 Shokz，竞品是 Oladance/Bose）:
-     * {"keyword": "Shokz vs Oladance", "reason": "直接竞品对比", "wordCount": 2}
-     * {"keyword": "best alternative to Shokz", "reason": "替代搜索意图", "wordCount": 4}
-
-5. **Scenario Keywords (场景关键词)**
-   - 使用场景词
-   - 关键词长度：最多5个单词
-   - 格式: "品类 + for + 场景", "场景 + 需求"
-   - 示例:
-     * {"keyword": "running headphones", "reason": "运动场景", "wordCount": 2}
-     * {"keyword": "headphones for cycling", "reason": "骑行场景", "wordCount": 3}
-
-6. **Problem Keywords (问题关键词)**
-   - 用户痛点/问题词
-   - 关键词长度：最多5个单词
-   - 示例:
-     * {"keyword": "open ear uncomfortable", "reason": "痛点问题", "wordCount": 3}
+**Phase 3: 场景+痛点词（Scene & pain point keywords - user voice）**
+- 目的：找到用户在描述使用场景和痛点的帖子
+- 数量：5-8个
+- 长度：每个词 2-4 个单词，绝对不超过 5 个单词
+- 规则：
+  - 模拟 Reddit 用户真实搜索行为：用户搜的是短语不是句子
+- 示例：
+  ✅ "earbuds fall out running"（4词，真实痛点）
+  ✅ "headphones hurt ears"（3词，常见搜索）
+  ✅ "open ear cycling safety"（4词，场景词）
+  ❌ "headphones that dont hurt ears after hours of use"（10词，这是句子不是搜索词）
+  ❌ "earbuds for long commutes without ear fatigue"（8词，太长了）
+  ❌ "best headphones for people who hate in-ear"（8词，太长了）
 
 **强制规则**:
-- 绝对不超过6个单词
+- Phase 1 品牌词不超过 3 个单词
+- Phase 3 场景痛点词绝对不超过 5 个单词
 - 品牌关键词必须包含品牌名/产品名
 - 对比关键词必须使用推断的竞品品牌生成，绝对不能为空
 - 所有关键词用英文，匹配 Reddit 用户搜索习惯
-- 不要生成重复或过于相似的关键词
-- 每个关键词必须有 reason 解释生成理由`;
+- 不要生成重复或过于相似的关键词`;
 
   try {
     const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
     
     try {
       const result = JSON.parse(content);
+      const toKeywordItem = (kw: string, reason: string): KeywordItem => ({
+        keyword: kw,
+        reason: reason,
+        wordCount: kw.split(' ').length,
+      });
+      
       const keywords: KeywordCategories = {
-        brand: (result.brand || []).map((k: any) => ({
-          keyword: typeof k === 'string' ? k : k.keyword || '',
-          reason: typeof k === 'string' ? '' : (k.reason || ''),
-          wordCount: typeof k === 'string' ? k.split(' ').length : (k.wordCount || k.keyword?.split(' ').length || 0),
-        })),
-        product: (result.product || []).map((k: any) => ({
-          keyword: typeof k === 'string' ? k : k.keyword || '',
-          reason: typeof k === 'string' ? '' : (k.reason || ''),
-          wordCount: typeof k === 'string' ? k.split(' ').length : (k.wordCount || k.keyword?.split(' ').length || 0),
-        })),
-        category: (result.category || []).map((k: any) => ({
-          keyword: typeof k === 'string' ? k : k.keyword || '',
-          reason: typeof k === 'string' ? '' : (k.reason || ''),
-          wordCount: typeof k === 'string' ? k.split(' ').length : (k.wordCount || k.keyword?.split(' ').length || 0),
-        })),
-        comparison: (result.comparison || []).map((k: any) => ({
-          keyword: typeof k === 'string' ? k : k.keyword || '',
-          reason: typeof k === 'string' ? '' : (k.reason || ''),
-          wordCount: typeof k === 'string' ? k.split(' ').length : (k.wordCount || k.keyword?.split(' ').length || 0),
-        })),
-        scenario: (result.scenario || []).map((k: any) => ({
-          keyword: typeof k === 'string' ? k : k.keyword || '',
-          reason: typeof k === 'string' ? '' : (k.reason || ''),
-          wordCount: typeof k === 'string' ? k.split(' ').length : (k.wordCount || k.keyword?.split(' ').length || 0),
-        })),
-        problem: (result.problem || []).map((k: any) => ({
-          keyword: typeof k === 'string' ? k : k.keyword || '',
-          reason: typeof k === 'string' ? '' : (k.reason || ''),
-          wordCount: typeof k === 'string' ? k.split(' ').length : (k.wordCount || k.keyword?.split(' ').length || 0),
-        })),
-        reasoning: result.reasoning || '',
+        brand: (result.brand || []).map((k: string) => toKeywordItem(k, result.brand_reasoning || '')),
+        product: (result.product || []).map((k: string) => toKeywordItem(k, result.product_reasoning || '')),
+        category: (result.category || []).map((k: string) => toKeywordItem(k, result.category_reasoning || '')),
+        comparison: (result.comparison || []).map((k: string) => toKeywordItem(k, result.comparison_reasoning || '')),
+        scenario: (result.scenario || []).map((k: string) => toKeywordItem(k, result.scenario_reasoning || '')),
+        problem: (result.problem || []).map((k: string) => toKeywordItem(k, result.problem_reasoning || '')),
+        reasoning: result.overall_reasoning || result.reasoning || '',
       };
 
       if (keywords.comparison.length === 0) {
         console.warn('Comparison keywords empty, generating from inferred competitors');
         const fallbackCmp = generateComparisonKeywords(shortBrand, competitors);
-        keywords.comparison = fallbackCmp.map(k => ({
-          keyword: k,
-          reason: '从竞品推断生成',
-          wordCount: k.split(' ').length,
-        }));
+        keywords.comparison = fallbackCmp.map(k => toKeywordItem(k, '从竞品推断生成'));
       }
 
       return keywords;
@@ -435,13 +415,12 @@ export async function generateSubredditsWithAI(
 请推荐（以 JSON 格式输出）:
 {
     "highRelevance": [
-        {"name": "subreddit_name", "reason": "推荐理由（必须用中文）", "estimatedPosts": "daily"}
+        {"name": "subreddit_name", "reason": "用中文写推荐理由，50字以内，说明为什么这个社区适合推广该产品", "estimatedPosts": "daily"}
     ],
     "mediumRelevance": [
-        {"name": "subreddit_name", "reason": "推荐理由（必须用中文）", "estimatedPosts": "daily/weekly"}
+        {"name": "subreddit_name", "reason": "用中文写推荐理由，50字以内，说明为什么这个社区适合推广该产品", "estimatedPosts": "daily/weekly"}
     ],
-    "filterKeywords": ["filter1", "filter2", "filter3", "filter4", "filter5"],
-    "reasoning": "整体推荐逻辑说明（必须用中文）"
+    "filterKeywords": ["filter1", "filter2", "filter3", "filter4", "filter5"]
 }
 
 Requirements:
@@ -453,7 +432,7 @@ Requirements:
 - Subreddit names should NOT include "r/" prefix
 - estimatedPosts should be "daily" or "weekly"
 - Filter keywords help ensure content relevance for scraping
-- **reason 字段必须用中文填写！**`;
+- **reason 字段必须使用中文，不要用英文。写50字以内的中文理由，说明为什么这个社区适合推广该产品。**`;
 
   try {
     const content = await callAIWithFallback([{ role: 'user', content: prompt }]);

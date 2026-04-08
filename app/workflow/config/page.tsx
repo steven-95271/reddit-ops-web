@@ -327,6 +327,14 @@ export default function ConfigPage() {
           setShowForm(false)
           resetForm()
           fetchProjects()
+          // 如果正在查看该项目详情，则刷新项目数据
+          if (viewingProject && viewingProject.id === editingProject.id) {
+            const refreshed = await fetch(`/api/projects/${editingProject.id}`)
+            const refreshedData = await refreshed.json()
+            if (refreshedData.success && refreshedData.data) {
+              setViewingProject(refreshedData.data)
+            }
+          }
         } else {
           showToast(data.error || '更新失败', 'error')
         }
@@ -688,29 +696,29 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                   <div className="flex items-start gap-3">
                     <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium shrink-0">Phase 1</span>
                     <div>
-                      <span className="font-medium text-slate-700">品牌核心词 - 宽泛捕网</span>
-                      <p className="text-slate-500 mt-0.5">包含品牌名称变体 + 通用品类搜索，如 "[品牌] review"、"[品类] recommendation"。目标：捕获所有关于我们产品和品类的热门讨论。</p>
+                      <span className="font-medium text-slate-700">品牌核心词 - 广撒网</span>
+                      <p className="text-slate-500 mt-0.5">用品牌名和产品名搜索，抓取所有直接提及品牌的帖子。目标：建立品牌讨论基准。</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-medium shrink-0">Phase 2</span>
                     <div>
                       <span className="font-medium text-slate-700">竞品对比词 - 高价值情报</span>
-                      <p className="text-slate-500 mt-0.5">以竞品品牌为主角的比较讨论，如 "[竞品] problems"、"[竞品] vs [品类]"。目标：找到用户在购买决策前主动比较的讨论。</p>
+                      <p className="text-slate-500 mt-0.5">以竞品品牌为关键词，找到用户对比、讨论竞品的帖子。目标：找到可以展示差异化优势的机会。</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium shrink-0">Phase 3</span>
                     <div>
                       <span className="font-medium text-slate-700">场景+痛点词 - 用户声音</span>
-                      <p className="text-slate-500 mt-0.5">真实使用场景和痛点，如 "headphones for [场景]"、"tired of [问题]"。目标：找到自然讨论中产品推荐感强的内容。</p>
+                      <p className="text-slate-500 mt-0.5">用场景和痛点短语搜索，找到用户在讨论使用场景和遇到问题的帖子。目标：找到可以以解决方案角度回复的帖子。</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium shrink-0">Phase 4</span>
                     <div>
-                      <span className="font-medium text-slate-700">Subreddit 定向 - 精准挖掘</span>
-                      <p className="text-slate-500 mt-0.5">在高相关性社区内定向搜索，每个社区提供 3-5 个搜索词配合使用。目标：在天然讨论此品类的社区深度挖掘。</p>
+                      <span className="font-medium text-slate-700">Subreddit 定向 - 精准社区覆盖</span>
+                      <p className="text-slate-500 mt-0.5">在精选的相关社区内搜索，每个社区配 3-5 个定向搜索词。目标：确保在最相关的社区中有全面覆盖。</p>
                     </div>
                   </div>
                 </div>
