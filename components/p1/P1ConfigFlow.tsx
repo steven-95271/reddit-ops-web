@@ -270,7 +270,14 @@ export default function P1ConfigFlow({ onComplete }: P1ConfigFlowProps) {
       extracted_info: extractedInfo,
       keywords: {
         ...keywords,
-        all: [...keywords.brand, ...keywords.product, ...keywords.category, ...keywords.comparison, ...keywords.scenario, ...keywords.problem],
+        all: [
+          ...keywords.brand.map(k => k.keyword),
+          ...keywords.product.map(k => k.keyword),
+          ...keywords.category.map(k => k.keyword),
+          ...keywords.comparison.map(k => k.keyword),
+          ...keywords.scenario.map(k => k.keyword),
+          ...keywords.problem.map(k => k.keyword),
+        ],
       },
       subreddits,
       filterKeywords,

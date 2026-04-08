@@ -26,14 +26,22 @@ export interface ExtractedProductInfo {
   seedKeywords: string[];
 }
 
+// 关键词项
+export interface KeywordItem {
+  keyword: string;
+  reason: string;
+  wordCount: number;
+}
+
 // 关键词分类
 export interface KeywordCategories {
-  brand: string[];
-  product: string[];
-  category: string[];
-  comparison: string[];
-  scenario: string[];
-  problem: string[];
+  brand: KeywordItem[];
+  product: KeywordItem[];
+  category: KeywordItem[];
+  comparison: KeywordItem[];
+  scenario: KeywordItem[];
+  problem: KeywordItem[];
+  reasoning?: string;
 }
 
 // Subreddit 项

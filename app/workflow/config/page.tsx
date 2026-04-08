@@ -11,19 +11,29 @@ interface SubredditTarget {
   search_within: string[]
 }
 
+interface KeywordItem {
+  keyword: string
+  reason: string
+  wordCount: number
+}
+
 interface PhaseKeywords {
   seed?: string[]
+  reasoning?: string
   phase1_brand?: {
     description: string
     queries: string[]
+    reasoning?: string
   }
   phase2_competitor?: {
     description: string
     queries: string[]
+    reasoning?: string
   }
   phase3_scene_pain?: {
     description: string
     queries: string[]
+    reasoning?: string
   }
   phase4_subreddits?: {
     description?: string
@@ -710,6 +720,17 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
               {viewingProject.keywords?.phase1_brand?.queries?.length ? (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">四阶段搜索策略</h3>
+                  {viewingProject.keywords?.reasoning && (
+                    <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                      <div className="flex items-start gap-2">
+                        <span className="text-amber-600">🤖</span>
+                        <div>
+                          <div className="text-sm font-medium text-amber-800 mb-1">AI 生成逻辑</div>
+                          <div className="text-sm text-amber-700">{viewingProject.keywords.reasoning}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-4">
                     {(['phase1', 'phase2', 'phase3', 'phase4'] as const).map(phase => {
                       const phaseMap: Record<string, 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain' | 'phase4_subreddits'> = {
@@ -782,21 +803,41 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                                   ))}
                                 </div>
                               ) : (
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                  {(phaseData as any).queries?.map((query: string, idx: number) => (
-                                    <span
-                                      key={idx}
-                                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getPhaseColor(phase)}`}
-                                    >
-                                      {query}
-                                      <button
-                                        onClick={() => removeQuery(phase, query)}
-                                        className="ml-1 hover:text-red-500"
-                                      >
-                                        ×
-                                      </button>
-                                    </span>
-                                  ))}
+                                <div className="space-y-3 mt-4">
+                                  {(phaseData as any).queries?.map((item: any, idx: number) => {
+                                    const keyword = typeof item === 'string' ? item : item.keyword;
+                                    const reason = typeof item === 'string' ? '' : (item.reason || '');
+                                    return (
+                                      <div key={idx} className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${getPhaseColor(phase)}`}>
+                                            {keyword}
+                                            <button
+                                              onClick={() => removeQuery(phase, keyword)}
+                                              className="ml-1 hover:text-red-500"
+                                            >
+                                              ×
+                                            </button>
+                                          </span>
+                                          {reason && (
+                                            <details className="group">
+                                              <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 list-none">
+                                                <span className="inline-flex items-center gap-1">
+                                                  💡 理由
+                                                  <svg className="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                  </svg>
+                                                </span>
+                                              </summary>
+                                              <div className="mt-1 px-3 py-2 bg-slate-50 rounded-lg text-xs text-slate-600 border border-slate-100">
+                                                {reason}
+                                              </div>
+                                            </details>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>

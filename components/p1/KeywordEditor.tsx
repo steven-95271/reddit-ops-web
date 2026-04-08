@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { KeywordCategories } from '@/lib/types/p1';
+import { KeywordCategories, KeywordItem } from '@/lib/types/p1';
 
 interface KeywordEditorProps {
   keywords: KeywordCategories;
@@ -10,9 +10,10 @@ interface KeywordEditorProps {
 
 export default function KeywordEditor({ keywords, onChange }: KeywordEditorProps) {
   const [newKeyword, setNewKeyword] = useState('');
-  const [activeCategory, setActiveCategory] = useState<keyof KeywordCategories>('brand');
+  const [newReason, setNewReason] = useState('');
+  const [activeCategory, setActiveCategory] = useState<keyof Omit<KeywordCategories, 'reasoning'>>('brand');
 
-  const categories: { key: keyof KeywordCategories; label: string; color: string }[] = [
+  const categories: { key: keyof Omit<KeywordCategories, 'reasoning'>; label: string; color: string }[] = [
     { key: 'brand', label: '品牌关键词', color: 'blue' },
     { key: 'product', label: '型号关键词', color: 'cyan' },
     { key: 'category', label: '品类关键词', color: 'teal' },
@@ -23,18 +24,24 @@ export default function KeywordEditor({ keywords, onChange }: KeywordEditorProps
 
   const addKeyword = () => {
     if (!newKeyword.trim()) return;
+    const newItem: KeywordItem = {
+      keyword: newKeyword.trim(),
+      reason: newReason.trim(),
+      wordCount: newKeyword.trim().split(' ').length,
+    };
     const updated = {
       ...keywords,
-      [activeCategory]: [...keywords[activeCategory], newKeyword.trim()],
+      [activeCategory]: [...(keywords[activeCategory] || []), newItem],
     };
     onChange(updated);
     setNewKeyword('');
+    setNewReason('');
   };
 
-  const removeKeyword = (category: keyof KeywordCategories, index: number) => {
+  const removeKeyword = (category: keyof Omit<KeywordCategories, 'reasoning'>, index: number) => {
     const updated = {
       ...keywords,
-      [category]: keywords[category].filter((_, i) => i !== index),
+      [category]: (keywords[category] || []).filter((_, i) => i !== index),
     };
     onChange(updated);
   };
@@ -48,6 +55,10 @@ export default function KeywordEditor({ keywords, onChange }: KeywordEditorProps
     };
     return map[color] || 'bg-slate-100 text-slate-700';
   };
+
+  const totalKeywords = Object.keys(categories).reduce((acc, key) => {
+    return acc + (keywords[key as keyof Omit<KeywordCategories, 'reasoning'>]?.length || 0);
+  }, 0);
 
   return (
     <div className="space-y-4">
@@ -63,7 +74,7 @@ export default function KeywordEditor({ keywords, onChange }: KeywordEditorProps
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {cat.label} ({keywords[cat.key].length})
+            {cat.label} ({(keywords[cat.key] || []).length})
           </button>
         ))}
       </div>
@@ -71,37 +82,49 @@ export default function KeywordEditor({ keywords, onChange }: KeywordEditorProps
       {/* 当前分类的关键词 */}
       <div className="p-4 bg-slate-50 rounded-lg min-h-[120px]">
         <div className="flex flex-wrap gap-2">
-          {keywords[activeCategory].map((keyword, index) => (
-            <span
-              key={index}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${
-                getColorClass(categories.find((c) => c.key === activeCategory)?.color || '')
-              }`}
-            >
-              {keyword}
-              <button
-                onClick={() => removeKeyword(activeCategory, index)}
-                className="ml-1 hover:text-red-500"
+          {(keywords[activeCategory] || []).map((item, index) => (
+            <div key={index} className="flex flex-col gap-1">
+              <span
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border ${
+                  getColorClass(categories.find((c) => c.key === activeCategory)?.color || '')
+                }`}
               >
-                ×
-              </button>
-            </span>
+                {item.keyword}
+                <button
+                  onClick={() => removeKeyword(activeCategory, index)}
+                  className="ml-1 hover:text-red-500"
+                >
+                  ×
+                </button>
+              </span>
+              {item.reason && (
+                <span className="text-xs text-slate-500 ml-2">{item.reason}</span>
+              )}
+            </div>
           ))}
-          {keywords[activeCategory].length === 0 && (
+          {(keywords[activeCategory] || []).length === 0 && (
             <span className="text-slate-400 text-sm">暂无关键词</span>
           )}
         </div>
       </div>
 
       {/* 添加关键词 */}
-      <div className="flex gap-2">
+      <div className="space-y-2">
         <input
           type="text"
           value={newKeyword}
           onChange={(e) => setNewKeyword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
           placeholder={`添加${categories.find((c) => c.key === activeCategory)?.label}...`}
-          className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <input
+          type="text"
+          value={newReason}
+          onChange={(e) => setNewReason(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
+          placeholder="生成理由（可选）..."
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
         />
         <button
           onClick={addKeyword}
@@ -114,7 +137,7 @@ export default function KeywordEditor({ keywords, onChange }: KeywordEditorProps
 
       {/* 统计 */}
       <div className="flex gap-4 text-xs text-slate-500">
-        <span>总计: {Object.values(keywords).flat().length} 个关键词</span>
+        <span>总计: {totalKeywords} 个关键词</span>
       </div>
     </div>
   );
