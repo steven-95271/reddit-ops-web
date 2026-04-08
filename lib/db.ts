@@ -34,6 +34,7 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS posts (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
+          reddit_id TEXT,
           subreddit TEXT NOT NULL,
           title TEXT NOT NULL,
           body TEXT,
@@ -41,11 +42,20 @@ export async function initDb() {
           url TEXT,
           score INTEGER DEFAULT 0,
           num_comments INTEGER DEFAULT 0,
+          upvote_ratio REAL DEFAULT 0,
           created_utc TIMESTAMP,
           hot_score REAL DEFAULT 0,
           composite_score REAL DEFAULT 0,
+          quality_score INTEGER DEFAULT 0,
+          ai_relevance_score INTEGER,
+          ai_intent_score INTEGER,
+          ai_opportunity_score INTEGER,
+          ai_suggested_angle TEXT,
+          ai_scored_at TIMESTAMP,
           category TEXT,
           is_candidate BOOLEAN DEFAULT FALSE,
+          candidate_marked_at TIMESTAMP,
+          ignored BOOLEAN DEFAULT FALSE,
           scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
         )

@@ -3,19 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
-import Link from 'next/link'
 
 interface Project {
   id: string
   name: string
-  subreddits: string
-  keywords: string
-  competitor_brands: string
+  product_name: string
+  product_description: string
+  brand_names?: string[]
+  competitor_brands?: string[]
 }
 
 interface Post {
   id: string
-  project_id: string
+  reddit_id: string
   subreddit: string
   title: string
   body: string
@@ -23,443 +23,645 @@ interface Post {
   url: string
   score: number
   num_comments: number
-  hot_score: number
-  composite_score: number
+  upvote_ratio: number
+  created_utc: string
+  quality_score: number
+  ai_relevance_score: number
+  ai_intent_score: number
+  ai_opportunity_score: number
+  ai_suggested_angle: string
   category: string
   is_candidate: boolean
-  created_utc: string
-  grade?: string
+  ignored: boolean
 }
 
-const categoryColors: Record<string, string> = {
-  A: 'bg-blue-100 text-blue-700',
-  B: 'bg-red-100 text-red-700',
-  C: 'bg-yellow-100 text-yellow-700',
-  D: 'bg-purple-100 text-purple-700',
-  E: 'bg-green-100 text-green-700',
+interface PreferenceSettings {
+  minQualityScore: number
+  minRelevance: number
+  preferFresh: boolean
+  preferHighEngagement: boolean
+  candidateLimit: number
 }
 
-const categoryNames: Record<string, string> = {
-  A: '深度测评',
-  B: '场景痛点',
-  C: '观点争议',
-  D: '竞品KOL',
-  E: '平台趋势',
-}
-
-const gradeColors: Record<string, string> = {
-  S: 'bg-purple-600 text-white',
-  A: 'bg-green-600 text-white',
-  B: 'bg-blue-600 text-white',
-  C: 'bg-gray-400 text-white',
+const defaultPreferences: PreferenceSettings = {
+  minQualityScore: 50,
+  minRelevance: 5,
+  preferFresh: true,
+  preferHighEngagement: false,
+  candidateLimit: 100
 }
 
 export default function AnalysisPage() {
   const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [analysisStats, setAnalysisStats] = useState<{
-    total_posts: number
-    updated: number
-    grade_stats: Record<string, number>
-    category_stats: Record<string, number>
-  } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [aiScoring, setAiScoring] = useState(false)
+  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 })
 
-  // Filters
-  const [gradeFilter, setGradeFilter] = useState<string>('all')
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [subredditFilter, setSubredditFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'composite_score' | 'hot_score' | 'score' | 'num_comments'>('composite_score')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [filters, setFilters] = useState({
+    min_quality: 50,
+    time_range: '30d',
+    phase: '',
+    show_candidates: false,
+    show_ignored: false
+  })
 
-  // Fetch projects on mount
+  const [preferences, setPreferences] = useState<PreferenceSettings>(defaultPreferences)
+  const [showPreferences, setShowPreferences] = useState(false)
+
+  const [stats, setStats] = useState({
+    total: 0,
+    candidates: 0,
+    aiScored: 0
+  })
+
   useEffect(() => {
     fetchProjects()
   }, [])
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects')
-      const result = await response.json()
-      if (result.success) {
-        setProjects(result.data)
-      } else {
-        showToast(result.error || '加载项目失败', 'error')
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      if (data.success) {
+        setProjects(data.data || [])
       }
     } catch (error) {
-      showToast('加载项目失败', 'error')
+      console.error('Error fetching projects:', error)
     }
   }
 
-  const runAnalysis = async (projectId: string) => {
-    setIsAnalyzing(true)
+  const fetchPosts = useCallback(async () => {
+    if (!selectedProject) return
+
+    setLoading(true)
     try {
-      const response = await fetch('/api/analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
+      const params = new URLSearchParams({
+        project_id: selectedProject.id,
+        min_quality: filters.min_quality.toString(),
+        time_range: filters.time_range,
+        limit: '100'
       })
-      const result = await response.json()
-      
-      if (result.success) {
-        setAnalysisStats(result.data)
-        showToast(`评分完成：共处理 ${result.data.updated} 个帖子`, 'success')
-        await fetchPosts(projectId)
+
+      if (filters.phase) {
+        params.set('phase', filters.phase)
+      }
+
+      if (filters.show_candidates) {
+        params.set('is_candidate', 'true')
+      }
+
+      if (!filters.show_ignored) {
+        params.set('ignored', 'false')
       } else {
-        showToast(result.error || '评分失败', 'error')
+        params.set('ignored', 'true')
+      }
+
+      const res = await fetch(`/api/posts?${params}`)
+      const data = await res.json()
+
+      if (data.success) {
+        setPosts(data.data.posts)
+        setStats({
+          total: data.data.total,
+          candidates: data.data.candidateCount,
+          aiScored: data.data.posts.filter((p: Post) => p.ai_relevance_score != null).length
+        })
       }
     } catch (error) {
-      showToast('评分过程出错', 'error')
+      console.error('Error fetching posts:', error)
+      showToast('获取帖子失败', 'error')
     } finally {
-      setIsAnalyzing(false)
+      setLoading(false)
     }
-  }
-
-  const fetchPosts = async (projectId: string) => {
-    setIsLoading(true)
-    try {
-      const params = new URLSearchParams({ project_id: projectId })
-      if (gradeFilter !== 'all') params.set('grade', gradeFilter)
-      if (categoryFilter !== 'all') params.set('category', categoryFilter)
-      params.set('sort_by', sortBy)
-      params.set('sort_order', sortOrder)
-
-      const response = await fetch(`/api/analysis?${params}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setPosts(result.data)
-      } else {
-        showToast(result.error || '加载帖子失败', 'error')
-      }
-    } catch (error) {
-      showToast('加载帖子失败', 'error')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const updateCandidates = async (postIds: string[], isCandidate: boolean) => {
-    try {
-      const response = await fetch('/api/analysis/candidates', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ post_ids: postIds, is_candidate: isCandidate }),
-      })
-      const result = await response.json()
-      
-      if (result.success) {
-        setPosts(prev => prev.map(post => 
-          postIds.includes(post.id) ? { ...post, is_candidate: isCandidate } : post
-        ))
-        showToast(`${isCandidate ? '标记' : '取消标记'} ${result.data.updated_count} 个候选`, 'success')
-      } else {
-        showToast(result.error || '更新失败', 'error')
-      }
-    } catch (error) {
-      showToast('更新候选状态失败', 'error')
-    }
-  }
-
-  const handleProjectChange = async (projectId: string) => {
-    setSelectedProjectId(projectId)
-    if (projectId) {
-      await runAnalysis(projectId)
-    }
-  }
-
-  const handleFilterChange = useCallback(() => {
-    if (selectedProjectId) {
-      fetchPosts(selectedProjectId)
-    }
-  }, [selectedProjectId, gradeFilter, categoryFilter, subredditFilter, sortBy, sortOrder])
+  }, [selectedProject, filters])
 
   useEffect(() => {
-    handleFilterChange()
-  }, [handleFilterChange])
+    if (selectedProject) {
+      fetchPosts()
+    }
+  }, [selectedProject, fetchPosts])
 
-  // Get unique subreddits from posts
-  const subreddits = Array.from(new Set(posts.map(p => p.subreddit))).sort()
+  const runAIScoring = async () => {
+    if (!selectedProject) return
 
-  // Apply subreddit filter to displayed posts
-  const filteredPosts = subredditFilter === 'all' 
-    ? posts 
-    : posts.filter(p => p.subreddit === subredditFilter)
-
-  // Calculate stats
-  const stats = {
-    total: posts.length,
-    candidates: posts.filter(p => p.is_candidate).length,
-    gradeStats: {
-      S: posts.filter(p => p.grade === 'S').length,
-      A: posts.filter(p => p.grade === 'A').length,
-      B: posts.filter(p => p.grade === 'B').length,
-      C: posts.filter(p => p.grade === 'C').length,
-    },
-    categoryStats: {
-      A: posts.filter(p => p.category === 'A').length,
-      B: posts.filter(p => p.category === 'B').length,
-      C: posts.filter(p => p.category === 'C').length,
-      D: posts.filter(p => p.category === 'D').length,
-      E: posts.filter(p => p.category === 'E').length,
-    },
-  }
-
-  const markAllAsCandidates = () => {
-    const ids = filteredPosts.map(p => p.id)
-    if (ids.length === 0) {
-      showToast('没有可标记的帖子', 'error')
+    if (stats.candidates >= preferences.candidateLimit) {
+      showToast(`候选帖子已达上限 (${preferences.candidateLimit})，请先调整筛选或移除现有候选`, 'warning')
       return
     }
-    updateCandidates(ids, true)
+
+    setAiScoring(true)
+    setAiProgress({ current: 0, total: 0 })
+
+    try {
+      const res = await fetch('/api/posts/ai-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject.id
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setAiProgress({ current: data.data.scored, total: data.data.total })
+        showToast(`AI 评分完成：${data.data.scored} 条帖子已评分`, 'success')
+        fetchPosts()
+      } else {
+        showToast(data.error || 'AI 评分失败', 'error')
+      }
+    } catch (error) {
+      console.error('Error running AI scoring:', error)
+      showToast('AI 评分失败', 'error')
+    } finally {
+      setAiScoring(false)
+    }
   }
 
-  const markHighGradeAsCandidates = () => {
-    const highGradePosts = posts.filter(p => (p.grade === 'S' || p.grade === 'A') && !p.is_candidate)
-    const ids = highGradePosts.map(p => p.id)
-    if (ids.length === 0) {
-      showToast('没有符合条件的 S/A 级帖子', 'error')
-      return
+  const handleAction = async (postId: string, action: 'candidate' | 'unmark' | 'ignore' | 'unignore') => {
+    try {
+      const res = await fetch(`/api/posts/${postId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              is_candidate: action === 'candidate',
+              ignored: action === 'ignore'
+            }
+          }
+          return p
+        }))
+
+        if (action === 'candidate') {
+          setStats(prev => ({ ...prev, candidates: prev.candidates + 1 }))
+          showToast('已标记为候选', 'success')
+        } else if (action === 'unmark') {
+          setStats(prev => ({ ...prev, candidates: prev.candidates - 1 }))
+          showToast('已取消候选标记', 'success')
+        }
+      }
+    } catch (error) {
+      console.error('Error updating post:', error)
+      showToast('操作失败', 'error')
     }
-    updateCandidates(ids, true)
+  }
+
+  const calculateQualityScore = (post: Post): number => {
+    let interactionScore = 0
+    if (post.score > 0) interactionScore += Math.min(20, Math.log10(post.score + 1) * 10)
+    if (post.num_comments > 0) interactionScore += Math.min(10, Math.log10(post.num_comments + 1) * 5)
+    if (post.upvote_ratio > 0.8) interactionScore += 10
+
+    const postAge = Date.now() - new Date(post.created_utc).getTime()
+    const daysOld = postAge / (1000 * 60 * 60 * 24)
+    let freshnessScore = 0
+    if (daysOld < 1) freshnessScore = 30
+    else if (daysOld < 7) freshnessScore = 20
+    else if (daysOld < 30) freshnessScore = 10
+    else freshnessScore = 5
+
+    const aiScore = (post.ai_relevance_score || 5) + (post.ai_intent_score || 5) + (post.ai_opportunity_score || 5)
+
+    return Math.round(interactionScore + freshnessScore + aiScore)
+  }
+
+  const getQualityColor = (score: number) => {
+    if (score >= 70) return 'text-green-600 bg-green-100'
+    if (score >= 50) return 'text-yellow-600 bg-yellow-100'
+    return 'text-red-600 bg-red-100'
+  }
+
+  const getPhaseColor = (category: string) => {
+    switch (category) {
+      case 'phase1_brand': return 'bg-blue-100 text-blue-700'
+      case 'phase2_competitor': return 'bg-orange-100 text-orange-700'
+      case 'phase3_scene_pain': return 'bg-green-100 text-green-700'
+      case 'phase4_subreddits': return 'bg-purple-100 text-purple-700'
+      default: return 'bg-slate-100 text-slate-700'
+    }
+  }
+
+  const phaseLabels: Record<string, string> = {
+    phase1_brand: 'P1品牌',
+    phase2_competitor: 'P2竞品',
+    phase3_scene_pain: 'P3场景',
+    phase4_subreddits: 'P4社区'
   }
 
   return (
-    <div className="space-y-6">
-      <WorkflowGuide
-        title="P3 分析筛选"
-        description="对抓取到的帖子进行多维评分和分类，筛选出高价值候选帖"
-        steps={[
-          { title: '选择项目加载帖子', description: '系统自动加载该项目的抓取数据' },
-          { title: '自动评分和分类', description: '系统计算 Hot Score 和 Composite Score，并归入五维分类' },
-          { title: '筛选和排序', description: '按评级、分类、Subreddit 筛选，按评分/点赞/评论排序' },
-          { title: '标记候选并进入 P4', description: '确认候选列表后进入人设设计' },
-        ]}
-        details={`【热帖评分逻辑】...
-`}
-      />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">P3 候选筛选</h1>
+          <p className="text-slate-600 mt-2">
+            从原始抓取数据中筛选高质量候选帖子，用于后续内容生成
+          </p>
+        </div>
 
-      {/* Project Selector */}
-      <div className="glass-card">
-        <div className="flex items-center gap-4">
-          <label className="text-sm font-semibold text-slate-600">选择项目：</label>
+        <div className="mb-6">
+          <WorkflowGuide
+            title="P3 候选筛选"
+            description="四层筛选漏斗：从原始数据到候选池"
+            steps={[
+              { title: 'L1 自动过滤', description: '去重、长度、时间过滤' },
+              { title: 'L2 质量评分', description: '互动、新鲜度、影响力计算' },
+              { title: 'L3 AI 筛选', description: '语义相关度、意图匹配、植入性评估' },
+              { title: 'L4 人工审核', description: '最终确认进入候选池' }
+            ]}
+            details={`【筛选标准】
+• 相关度：帖子内容与产品的匹配程度
+• 互动性：upvotes、评论数、好评率
+• 新鲜度：帖子发布时间（越新鲜越好）
+• 可植入性：话题场景是否适合自然提及品牌
+
+【候选池限制】
+• 系统自动控制候选数量上限为 ${preferences.candidateLimit} 条
+• 超出上限后需先标记或移除现有候选
+
+【AI 评分说明】
+• 批量调用 AI 对帖子进行三维度评分
+• relevance (0-10): 内容相关度
+• intent (0-10): 购买意图匹配度
+• opportunity (0-10): 植入机会评估`}
+          />
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            选择项目
+          </label>
           <select
-            value={selectedProjectId}
-            onChange={(e) => handleProjectChange(e.target.value)}
-            className="flex-1 bg-white/80 border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
+            value={selectedProject?.id || ''}
+            onChange={(e) => {
+              const project = projects.find(p => p.id === e.target.value)
+              setSelectedProject(project || null)
+            }}
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">请选择一个项目...</option>
-            {projects.map((project) => (
+            <option value="">请选择一个项目</option>
+            {projects.map(project => (
               <option key={project.id} value={project.id}>
-                {project.name}
+                {project.name} - {project.product_name}
               </option>
             ))}
           </select>
-          {isAnalyzing && (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
-              评分中...
-            </div>
-          )}
         </div>
-      </div>
 
-      {selectedProjectId && (
-        <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="glass-card">
-              <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">总帖子数</h3>
-              <div className="text-3xl font-black text-slate-900">{stats.total}</div>
-            </div>
-            <div className="glass-card">
-              <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">等级分布</h3>
-              <div className="flex gap-2">
-                {Object.entries(stats.gradeStats).map(([grade, count]) => (
-                  <div key={grade} className="flex-1 text-center">
-                    <div className={`text-lg font-black ${grade === 'S' ? 'text-purple-600' : grade === 'A' ? 'text-green-600' : grade === 'B' ? 'text-blue-600' : 'text-gray-400'}`}>
-                      {count}
-                    </div>
-                    <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${gradeColors[grade]}`}>
-                      {grade}
-                    </div>
-                  </div>
-                ))}
+        {selectedProject && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">质量分 ≥</label>
+                  <input
+                    type="number"
+                    value={filters.min_quality}
+                    onChange={(e) => setFilters(f => ({ ...f, min_quality: parseInt(e.target.value) || 0 }))}
+                    className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    min={0}
+                    max={100}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">时间范围</label>
+                  <select
+                    value={filters.time_range}
+                    onChange={(e) => setFilters(f => ({ ...f, time_range: e.target.value }))}
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  >
+                    <option value="24h">最近 24 小时</option>
+                    <option value="7d">最近 7 天</option>
+                    <option value="30d">最近 30 天</option>
+                    <option value="year">最近一年</option>
+                    <option value="all">全部时间</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="showCandidates"
+                    checked={filters.show_candidates}
+                    onChange={(e) => setFilters(f => ({ ...f, show_candidates: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <label htmlFor="showCandidates" className="text-sm text-slate-700">只看候选</label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="showIgnored"
+                    checked={filters.show_ignored}
+                    onChange={(e) => setFilters(f => ({ ...f, show_ignored: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <label htmlFor="showIgnored" className="text-sm text-slate-700">显示已忽略</label>
+                </div>
               </div>
-            </div>
-            <div className="glass-card">
-              <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">分类分布</h3>
-              <div className="space-y-1">
-                {Object.entries(stats.categoryStats).slice(0, 3).map(([cat, count]) => (
-                  <div key={cat} className="flex items-center justify-between">
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${categoryColors[cat]}`}>
-                      {cat}
-                    </span>
-                    <span className="text-xs font-black text-slate-900">{count}</span>
-                  </div>
-                ))}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowPreferences(true)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  偏好设置
+                </button>
+
+                <button
+                  onClick={runAIScoring}
+                  disabled={aiScoring || loading}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {aiScoring ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      AI 评分中... {aiProgress.current}/{aiProgress.total}
+                    </>
+                  ) : (
+                    <>
+                      🤖 AI 筛选
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={fetchPosts}
+                  disabled={loading}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {loading ? '加载中...' : '刷新'}
+                </button>
               </div>
-            </div>
-            <div className="glass-card">
-              <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">已标记候选</h3>
-              <div className="text-3xl font-black text-slate-900">{stats.candidates}</div>
             </div>
           </div>
+        )}
 
-          {/* Filters */}
-          <div className="glass-card">
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={gradeFilter}
-                onChange={(e) => setGradeFilter(e.target.value)}
-                className="bg-white/80 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">全部等级</option>
-                <option value="S">S 级</option>
-                <option value="A">A 级</option>
-                <option value="B">B 级</option>
-                <option value="C">C 级</option>
-              </select>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-white/80 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">全部分类</option>
-                <option value="A">A 深度测评</option>
-                <option value="B">B 场景痛点</option>
-                <option value="C">C 观点争议</option>
-                <option value="D">D 竞品KOL</option>
-                <option value="E">E 平台趋势</option>
-              </select>
-              <select
-                value={subredditFilter}
-                onChange={(e) => setSubredditFilter(e.target.value)}
-                className="bg-white/80 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">全部 Subreddit</option>
-                {subreddits.map((sub) => (
-                  <option key={sub} value={sub}>r/{sub}</option>
-                ))}
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-white/80 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
-              >
-                <option value="composite_score">综合评分</option>
-                <option value="hot_score">热度评分</option>
-                <option value="score">Upvotes</option>
-                <option value="num_comments">评论数</option>
-              </select>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as any)}
-                className="bg-white/80 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
-              >
-                <option value="desc">降序</option>
-                <option value="asc">升序</option>
-              </select>
-              <div className="flex-1" />
-              <button
-                onClick={markAllAsCandidates}
-                className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition-colors"
-              >
-                全选为候选
+        {selectedProject && (
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div className="text-3xl font-bold text-slate-900">{stats.total}</div>
+              <div className="text-sm text-slate-500">符合条件的帖子</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div className="text-3xl font-bold text-green-600">{stats.candidates}</div>
+              <div className="text-sm text-slate-500">已标记候选 / {preferences.candidateLimit}</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div className="text-3xl font-bold text-purple-600">{stats.aiScored}</div>
+              <div className="text-sm text-slate-500">已 AI 评分</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div className="text-3xl font-bold text-blue-600">{posts.length}</div>
+              <div className="text-sm text-slate-500">当前显示</div>
+            </div>
+          </div>
+        )}
+
+        {selectedProject && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {posts.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  暂无符合条件的帖子，请调整筛选条件
+                </div>
+              ) : (
+                posts.map(post => {
+                  const qualityScore = calculateQualityScore(post)
+
+                  return (
+                    <div key={post.id} className={`p-4 hover:bg-slate-50 ${post.ignored ? 'opacity-50' : ''}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            {post.category && (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${getPhaseColor(post.category)}`}>
+                                {phaseLabels[post.category] || post.category}
+                              </span>
+                            )}
+                            <span className="text-xs text-slate-500">r/{post.subreddit}</span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs text-slate-500">
+                              {new Date(post.created_utc).toLocaleDateString()}
+                            </span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs text-slate-500">{post.score} ↑</span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs text-slate-500">{post.num_comments} 评论</span>
+                          </div>
+
+                          <h3 className="text-slate-900 font-medium mb-2 line-clamp-2">
+                            {post.title}
+                          </h3>
+
+                          {post.body && (
+                            <p className="text-sm text-slate-600 line-clamp-2 mb-2">
+                              {post.body.substring(0, 200)}...
+                            </p>
+                          )}
+
+                          {post.ai_relevance_score != null && (
+                            <div className="flex items-center gap-4 text-xs">
+                              <span className="text-purple-600">
+                                相关度: {post.ai_relevance_score}/10
+                              </span>
+                              <span className="text-purple-600">
+                                意图: {post.ai_intent_score}/10
+                              </span>
+                              <span className="text-purple-600">
+                                植入性: {post.ai_opportunity_score}/10
+                              </span>
+                              {post.ai_suggested_angle && (
+                                <span className="text-slate-500 italic">
+                                  💡 {post.ai_suggested_angle}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getQualityColor(qualityScore)}`}>
+                            {qualityScore} 分
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {post.is_candidate ? (
+                              <button
+                                onClick={() => handleAction(post.id, 'unmark')}
+                                className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium"
+                              >
+                                ✓ 候选
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAction(post.id, 'candidate')}
+                                disabled={stats.candidates >= preferences.candidateLimit}
+                                className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                标记候选
+                              </button>
+                            )}
+
+                            {post.ignored ? (
+                              <button
+                                onClick={() => handleAction(post.id, 'unignore')}
+                                className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-xs font-medium"
+                              >
+                                恢复
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAction(post.id, 'ignore')}
+                                className="px-3 py-1.5 border border-slate-300 text-slate-400 rounded-lg text-xs hover:bg-slate-50"
+                              >
+                                忽略
+                              </button>
+                            )}
+
+                            <a
+                              href={post.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded-lg text-xs hover:bg-slate-50"
+                            >
+                              查看原帖
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {selectedProject && stats.candidates > 0 && (
+          <div className="mt-6 flex justify-between items-center">
+            <div className="text-sm text-slate-500">
+              已标记 {stats.candidates} 条候选帖子
+            </div>
+            <div className="flex gap-4">
+              <button className="px-6 py-3 border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-slate-50">
+                导出 CSV
               </button>
-              <button
-                onClick={markHighGradeAsCandidates}
-                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
-              >
-                标记 S+A 为候选
+              <button className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700">
+                进入 P4 内容生成 →
               </button>
             </div>
           </div>
+        )}
 
-          {/* Posts Table */}
-          <div className="glass-card">
-            <h2 className="text-lg font-black text-slate-900 mb-4">
-              帖子列表 ({filteredPosts.length})
-            </h2>
-            
-            {isLoading ? (
-              <div className="text-center py-12">
-                <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-sm text-slate-500">加载中...</p>
-              </div>
-            ) : filteredPosts.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                暂无符合条件的帖子
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {filteredPosts.map((post) => (
-                  <div key={post.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                    {/* Candidate Checkbox */}
+        {showPreferences && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+              <h2 className="text-xl font-bold text-slate-900 mb-4">偏好设置</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    最低质量分阈值: {preferences.minQualityScore}
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={preferences.minQualityScore}
+                    onChange={(e) => setPreferences(p => ({ ...p, minQualityScore: parseInt(e.target.value) }))}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    最低 AI 相关度: {preferences.minRelevance}
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={10}
+                    value={preferences.minRelevance}
+                    onChange={(e) => setPreferences(p => ({ ...p, minRelevance: parseInt(e.target.value) }))}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    候选池上限: {preferences.candidateLimit}
+                  </label>
+                  <input
+                    type="range"
+                    min={10}
+                    max={200}
+                    step={10}
+                    value={preferences.candidateLimit}
+                    onChange={(e) => setPreferences(p => ({ ...p, candidateLimit: parseInt(e.target.value) }))}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={post.is_candidate}
-                      onChange={(e) => updateCandidates([post.id], e.target.checked)}
-                      className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                      checked={preferences.preferFresh}
+                      onChange={(e) => setPreferences(p => ({ ...p, preferFresh: e.target.checked }))}
+                      className="w-4 h-4"
                     />
-                    
-                    {/* Grade Badge */}
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black ${gradeColors[post.grade || 'C']}`}>
-                      {post.grade}
-                    </div>
-                    
-                    {/* Category Badge */}
-                    <div className={`px-2 py-1 rounded-md text-xs font-bold ${categoryColors[post.category || 'E']}`}>
-                      {post.category} {categoryNames[post.category || 'E']}
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-slate-800 truncate">{post.title}</div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-slate-400">r/{post.subreddit}</span>
-                        <span className="text-xs text-slate-400">👍 {post.score}</span>
-                        <span className="text-xs text-slate-400">💬 {post.num_comments}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Scores */}
-                    <div className="text-right space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">综合:</span>
-                        <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-slate-900 rounded-full"
-                            style={{ width: `${(post.composite_score || 0) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-slate-900 w-10">
-                          {((post.composite_score || 0) * 100).toFixed(0)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">热度:</span>
-                        <span className="text-xs font-bold text-slate-600">
-                          {Math.round(post.hot_score || 0)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                    <span className="text-sm text-slate-700">优先新鲜帖子</span>
+                  </label>
 
-          {/* Next Step Button */}
-          <Link href="/workflow/persona">
-            <button className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors">
-              下一步：人设管理 →
-            </button>
-          </Link>
-        </>
-      )}
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={preferences.preferHighEngagement}
+                      onChange={(e) => setPreferences(p => ({ ...p, preferHighEngagement: e.target.checked }))}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm text-slate-700">优先高互动帖子</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowPreferences(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPreferences(false)
+                    fetchPosts()
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                >
+                  应用设置
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
