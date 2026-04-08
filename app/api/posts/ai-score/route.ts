@@ -188,17 +188,23 @@ export async function POST(request: NextRequest) {
     const competitorBrands = project.competitor_brands ? JSON.parse(project.competitor_brands) : []
 
     // 获取要评分的帖子
-    let postsQuery = ''
-    const queryParams: any[] = [project_id]
-    
+    let postsResult
     if (post_ids && post_ids.length > 0) {
-      postsQuery = `SELECT * FROM posts WHERE project_id = $1 AND id = ANY($2) AND ai_scored_at IS NULL LIMIT 50`
-      queryParams.push(post_ids)
+      postsResult = await sql`
+        SELECT * FROM posts 
+        WHERE project_id = ${project_id} 
+        AND id = ANY(${post_ids}) 
+        AND ai_scored_at IS NULL 
+        LIMIT 50
+      `
     } else {
-      postsQuery = `SELECT * FROM posts WHERE project_id = $1 AND ai_scored_at IS NULL LIMIT 50`
+      postsResult = await sql`
+        SELECT * FROM posts 
+        WHERE project_id = ${project_id} 
+        AND ai_scored_at IS NULL 
+        LIMIT 50
+      `
     }
-
-    const postsResult = await sql`${sql.unsafe(postsQuery)}`
 
     if (postsResult.rows.length === 0) {
       return NextResponse.json({
