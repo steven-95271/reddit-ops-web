@@ -78,11 +78,11 @@ export async function PUT(
       status 
     } = body
 
-    // 当 seed_keywords 传入时，同时更新 keywords.seed（保持 JSON 字段为唯一数据源）
+    // 将 seed_keywords 合并到 keywords.seed（种子关键词只存在 keywords JSON 字段里）
     let keywordsToSave = keywords
-    if (seed_keywords !== undefined && keywords) {
+    if (seed_keywords !== undefined) {
       keywordsToSave = {
-        ...keywords,
+        ...(keywords || {}),
         seed: seed_keywords
       }
     }
@@ -102,13 +102,11 @@ export async function PUT(
     const brandNamesStr = brand_names !== undefined ? JSON.stringify(brand_names) : undefined
     const competitorBrandsStr = competitor_brands !== undefined ? JSON.stringify(competitor_brands) : undefined
     const keywordsStr = keywordsToSave !== undefined ? JSON.stringify(keywordsToSave) : undefined
-    const seedKeywordsStr = seed_keywords !== undefined ? JSON.stringify(seed_keywords) : undefined
     const subredditsStr = subreddits !== undefined ? JSON.stringify(subreddits) : undefined
 
     console.log('[API PUT] Updating project:', id)
     console.log('[API PUT] seed_keywords received:', seed_keywords)
     console.log('[API PUT] keywordsToSave:', keywordsToSave)
-    console.log('[API PUT] keywordsStr to save:', keywordsStr)
 
     // 动态构建更新语句
     const updates: string[] = []
@@ -138,10 +136,6 @@ export async function PUT(
     if (competitorBrandsStr !== undefined) {
       updates.push(`competitor_brands = $${paramIndex++}`)
       values.push(competitorBrandsStr)
-    }
-    if (seedKeywordsStr !== undefined) {
-      updates.push(`seed_keywords = $${paramIndex++}`)
-      values.push(seedKeywordsStr)
     }
     if (keywordsStr !== undefined) {
       updates.push(`keywords = $${paramIndex++}`)
