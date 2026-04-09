@@ -31,6 +31,7 @@ export interface KeywordItem {
   keyword: string;
   reason: string;
   wordCount: number;
+  intent?: string;
 }
 
 // 关键词分类
@@ -49,6 +50,7 @@ export interface SubredditItem {
   name: string;
   reason: string;
   estimatedPosts: 'daily' | 'weekly';
+  searchKeywords?: string[];
 }
 
 // Subreddit 分类

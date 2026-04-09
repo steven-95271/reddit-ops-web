@@ -282,7 +282,7 @@ export async function generateKeywordsWithAI(
   const brandName = productInfo.productName || productInfo.seedKeywords?.[0] || 'this product';
   const shortBrand = productInfo.productName?.split(' ')[0] || brandName;
 
-  const prompt = `你是一个 Reddit 营销专家和关键词研究专家。Based on the following product information, generate comprehensive keyword suggestions optimized for Reddit search behavior.
+  const prompt = `你是一个 Reddit 营销专家和关键词研究专家。Based on the following product information, generate keyword suggestions optimized for Reddit search behavior.
 
 产品信息:
 - 产品类型: ${productInfo.productType}
@@ -293,95 +293,108 @@ export async function generateKeywordsWithAI(
 - 竞品品牌（已推断）: ${competitors.join(', ')}
 - 种子关键词: ${productInfo.seedKeywords?.join(', ') || 'N/A'}${feedbackSection}
 
-请生成以下5类关键词（以 JSON 格式输出）：
+请为 Apify 抓取和人工分析生成关键词（以 JSON 格式输出）：
 {
-    "brand": ["品牌词1", "品牌词2", "品牌词3"],
-    "brand_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
-    "category": ["品类词1", "品类词2", "品类词3"],
-    "category_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
-    "comparison": ["对比词1", "对比词2", "对比词3"],
-    "comparison_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
-    "scenario": ["场景词1", "场景词2", "场景词3"],
-    "scenario_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
-    "overall_reasoning": "整体生成逻辑说明（中文，100字以内）"
+    "phase1": {
+        "search": ["Oladance", "OWS Pro", "open earbuds"],
+        "intent": ["brand awareness", "product name search"]
+    },
+    "phase2": {
+        "search": ["vs Shokz", "Shokz alternative", "vs OpenFit"],
+        "intent": ["competitor comparison", "brand switching"]
+    },
+    "phase3": {
+        "search": ["open ear running", "hear surroundings earbuds", "bone conduction alternative"],
+        "intent": ["pain point: situational awareness during workout"]
+    }
 }
 
-**1. Brand Keywords (品牌核心词): 3-5个，宁缺毋滥**
-- 每个词 1-3 个单词，不要超过 3 个单词
-- 不要加 review、recommendation、worth it、best 等修饰词
-- 不要加年份
-- 示例: "Oladance OWS Pro", "Oladance earbuds", "Oladance headphones"
-- 错误示例: "Oladance OWS Pro review 2026"（太长+有年份）
-- 重要：产品型号词（如 "Oladance OWS Pro"）合并到此分类，不要单独分类
+**Phase 1 - Brand (品牌词): 3-5个**
+- search: 1-2词，短词给 Apify 搜索用
+- intent: 描述用户搜索意图，给分析用
+- 示例: "Oladance" + "brand awareness"
+- 示例: "OWS Pro" + "specific model search"
 
-**2. Category Keywords (品类词): 3-5个**
-- 每个词 2-3 个单词
-- 示例: "open ear earbuds", "bone conduction headphones"
-- 错误示例: "best open ear wireless earbuds recommendations"
+**Phase 2 - Comparison (竞品对比词): 3-5个**
+- search: 2-3词，"X vs Y" 格式或 "X alternative" 格式
+- intent: 对比意图描述
+- 示例: "vs Shokz" + "competitor comparison"
+- 示例: "Shokz alternative" + "brand switching consideration"
 
-**3. Comparison Keywords (竞品对比词): 4-6个**
-- 每个词 2-4 个单词，不要超过 4 个单词
-- 不要加年份
-- 优先 "X vs Y" 格式
-- 示例: "Shokz vs Oladance", "Soundcore alternative", "Shokz problems"
-- 错误示例: "Shokz vs open ear earbuds 2026", "switched from Shokz to something else"
+**Phase 3 - Scenario (场景痛点词): 3-5个**【重要规则】
+- search: 必须 2-3 个词，名词+形容词组合，不要完整句子
+- intent: 场景/痛点描述
+- ✅ 正确示例:
+  - "open ear running" + "earbuds for outdoor activity"
+  - "hear surroundings earbuds" + "situational awareness need"
+  - "bone conduction alternative" + "comparing technologies"
+  - "workout headphones safety" + "outdoor exercise use case"
+  - "Shokz vs open ear" + "technology comparison"
+- ❌ 错误示例（完整句子/太长）:
+  - "hear traffic while running earbuds" (5+ words, sentence)
+  - "open ear vs bone conduction workout" (too long)
 
-**4. Scenario Keywords (场景+痛点词): 5-8个**
-- 每个词 2-4 个单词，绝对不超过 5 个单词
-- 模拟 Reddit 用户真实搜索的短语，不是句子
-- 示例: "earbuds fall out running", "headphones hurt ears", "open ear cycling safety"
-- 错误示例: "headphones for marathon training don't fall out"（8词，句子）
-- 错误示例: "earbuds that don't hurt after hours of use"（9词，句子）
-
-**绝对禁止规则（违反任何一条则整个输出作废）**：
-1. 任何关键词不得超过 5 个英文单词
+**绝对禁止规则**：
+1. Phase 3 search 词必须 2-3 个词
 2. 不得包含年份数字（2024/2025/2026等）
-3. 不得包含 "that"、"which"、"don't"、"doesn't" 等连接词（这说明你在写句子而不是搜索词）
-4. 种子关键词仅作为参考，不要逐个扩展。前1-2个种子词是核心，其余仅供理解产品定位
+3. 不得包含 "that"、"which"、"don't"、"doesn't" 等连接词（说明你在写句子）
+4. search 词只写名词+形容词组合，不写完整句子
 
 **强制规则**:
-- Brand 品牌词不超过 3 个单词
-- Category 品类词不超过 3 个单词
-- Comparison 对比词不超过 4 个单词
-- Scenario 场景痛点词绝对不超过 5 个单词
-- 所有关键词用英文，匹配 Reddit 用户真实搜索习惯
-- 不要生成重复或过于相似的关键词`;
+- 所有 search 词用英文
+- intent 用英文简短描述
+- 不要生成重复或过于相似的词`;
 
   try {
     const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
     
     try {
       const result = JSON.parse(content);
-      const toKeywordItem = (kw: string, reason: string): KeywordItem => ({
+      
+      const toKeywordItem = (kw: string, intent: string, phaseReasoning: string): KeywordItem => ({
         keyword: kw,
-        reason: reason,
+        reason: phaseReasoning,
         wordCount: kw.split(' ').length,
+        intent: intent,
       });
-      
-      // Product 分类已删除，合并到 brand 里
-      const allBrandKeywords = [
-        ...(result.brand || []),
-        ...(result.product || []),
-      ];
-      
+
+      const phase1 = result.phase1 || {};
+      const phase2 = result.phase2 || {};
+      const phase3 = result.phase3 || {};
+      const phase1Search = Array.isArray(phase1.search) ? phase1.search : [];
+      const phase1Intent = Array.isArray(phase1.intent) ? phase1.intent : [];
+      const phase2Search = Array.isArray(phase2.search) ? phase2.search : [];
+      const phase2Intent = Array.isArray(phase2.intent) ? phase2.intent : [];
+      const phase3Search = Array.isArray(phase3.search) ? phase3.search : [];
+      const phase3Intent = Array.isArray(phase3.intent) ? phase3.intent : [];
+
       const keywords: KeywordCategories = {
-        brand: allBrandKeywords.map((k: string) => toKeywordItem(k, result.brand_reasoning || '')),
+        brand: phase1Search.map((k: string, i: number) => 
+          toKeywordItem(k, phase1Intent[i] || phase1Intent[0] || 'brand awareness', 'Phase 1: Brand keywords')
+        ),
         product: [],
-        category: (result.category || []).map((k: string) => toKeywordItem(k, result.category_reasoning || '')),
-        comparison: (result.comparison || []).map((k: string) => toKeywordItem(k, result.comparison_reasoning || '')),
-        scenario: (result.scenario || []).map((k: string) => toKeywordItem(k, result.scenario_reasoning || '')),
+        category: phase2Search.map((k: string, i: number) => 
+          toKeywordItem(k, phase2Intent[i] || phase2Intent[0] || 'comparison intent', 'Phase 2: Comparison keywords')
+        ),
+        comparison: phase2Search.map((k: string, i: number) => 
+          toKeywordItem(k, phase2Intent[i] || phase2Intent[0] || 'competitor comparison', 'Phase 2: Comparison keywords')
+        ),
+        scenario: phase3Search.map((k: string, i: number) => 
+          toKeywordItem(k, phase3Intent[i] || phase3Intent[0] || 'scenario intent', 'Phase 3: Scenario keywords')
+        ),
         problem: [],
-        reasoning: result.overall_reasoning || result.reasoning || '',
+        reasoning: `Phase 1: ${phase1Search.length} brand keywords | Phase 2: ${phase2Search.length} comparison keywords | Phase 3: ${phase3Search.length} scenario keywords`,
       };
 
       if (keywords.comparison.length === 0) {
         console.warn('Comparison keywords empty, generating from inferred competitors');
         const fallbackCmp = generateComparisonKeywords(shortBrand, competitors);
-        keywords.comparison = fallbackCmp.map(k => toKeywordItem(k, '从竞品推断生成'));
+        keywords.comparison = fallbackCmp.map(k => toKeywordItem(k, 'competitor comparison', 'Phase 2: Fallback from inferred competitors'));
       }
 
       return keywords;
-    } catch {
+    } catch (e) {
+      console.error('[generateKeywordsWithAI] JSON parse error:', e);
       return extractKeywordsFromText(content);
     }
   } catch (error) {
@@ -438,10 +451,10 @@ export async function generateSubredditsWithAI(
 请推荐（以 JSON 格式输出）:
 {
     "highRelevance": [
-        {"name": "subreddit_name", "reason": "用中文写推荐理由，30-50字，说明为什么这个社区适合推广该产品。绝对不要用英文写 reason。", "estimatedPosts": "daily"}
+        {"name": "subreddit_name", "reason": "用中文写推荐理由，30-50字，说明为什么这个社区适合推广该产品。绝对不要用英文写 reason。", "estimatedPosts": "daily", "searchKeywords": ["keyword1", "keyword2", "keyword3"]}
     ],
     "mediumRelevance": [
-        {"name": "subreddit_name", "reason": "用中文写推荐理由，30-50字，说明为什么这个社区适合推广该产品。绝对不要用英文写 reason。", "estimatedPosts": "daily/weekly"}
+        {"name": "subreddit_name", "reason": "用中文写推荐理由，30-50字，说明为什么这个社区适合推广该产品。绝对不要用英文写 reason。", "estimatedPosts": "daily/weekly", "searchKeywords": ["keyword1", "keyword2", "keyword3"]}
     ],
     "filterKeywords": ["filter1", "filter2", "filter3", "filter4", "filter5"]
 }
@@ -450,8 +463,14 @@ Requirements:
 1. High Relevance Subreddits (高相关度): 5-8个，直接相关的板块，如 headphones, running
 2. Medium Relevance Subreddits (中相关度): 3-5个，间接相关的板块，如 gadgets, audiophile
 3. Filter Keywords: 5-10个用于过滤帖子内容的关键词，如 "comfortable", "review", "running", "workout", "vs", "comparison"
+4. **searchKeywords（重要）**: 每个 subreddit 提供 3-5 个搜索关键词，每个关键词最多 3 个词，用于在该板块内搜索
+   - r/headphones → ["open-back alternative", "vs Shokz", "open ear IEM"]
+   - r/running → ["running earbuds awareness", "open ear workout", "Shokz alternative"]
+   - r/audiophile → ["open ear driver", "spatial audio earbuds", "bone conduction vs"]
 
-重要提醒：所有 reason 字段必须使用中文撰写，如果你写了英文，整个输出作废。
+重要提醒：
+- 所有 reason 字段必须使用中文撰写，如果你写了英文，整个输出作废
+- searchKeywords 必须全部用英文，最多 3 个词
 
 注意事项:
 - Subreddit names should NOT include "r/" prefix
@@ -463,10 +482,22 @@ Requirements:
     
     try {
       const result = JSON.parse(content);
+      const highSubs = (result.highRelevance || result.high_relevance || []).map((s: any) => ({
+        name: s.name,
+        reason: s.reason,
+        estimatedPosts: s.estimatedPosts || 'daily',
+        searchKeywords: Array.isArray(s.searchKeywords) ? s.searchKeywords : [],
+      }));
+      const mediumSubs = (result.mediumRelevance || result.medium_relevance || []).map((s: any) => ({
+        name: s.name,
+        reason: s.reason,
+        estimatedPosts: s.estimatedPosts || 'weekly',
+        searchKeywords: Array.isArray(s.searchKeywords) ? s.searchKeywords : [],
+      }));
       return {
         subreddits: {
-          high: result.highRelevance || result.high_relevance || [],
-          medium: result.mediumRelevance || result.medium_relevance || [],
+          high: highSubs,
+          medium: mediumSubs,
         },
         filterKeywords: result.filterKeywords || [],
       };
