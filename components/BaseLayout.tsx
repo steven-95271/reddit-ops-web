@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import ToastContainer, { showToast } from '@/components/Toast'
 
@@ -12,7 +12,7 @@ export default function BaseLayout({ children, title, subtitle }: { children: Re
   const [currentProject, setCurrentProject] = useState<any>(null)
   const [showNewProject, setShowNewProject] = useState(false)
 
-  useState(() => {
+  useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       .then(r => r.json())
       .then(data => {
@@ -21,7 +21,7 @@ export default function BaseLayout({ children, title, subtitle }: { children: Re
           setCurrentProject(data.projects[0])
         }
       })
-  })
+  }, [])
 
   const handleProjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const pid = e.target.value
