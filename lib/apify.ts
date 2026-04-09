@@ -6,8 +6,8 @@
 const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
 const APIFY_BASE_URL = 'https://api.apify.com/v2'
 
-// Actor ID for Reddit Scraper
-const REDDIT_SCRAPER_ACTOR_ID = 'automation-lab/reddit-scraper'
+// Actor ID for Reddit Scraper (注意：Apify URL 中 / 改为 ~)
+const REDDIT_SCRAPER_ACTOR_ID = 'automation-lab~reddit-scraper'
 
 interface ScrapingParams {
   subreddits: string[]
@@ -101,17 +101,17 @@ export async function startScraping(params: ScrapingParams): Promise<string> {
     console.log('Starting Apify scraping with input:', JSON.stringify(actorInput, null, 2))
 
     // 调用 Apify API 启动 Actor
-    const response = await fetch(
-      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-        },
-        body: JSON.stringify(actorInput),
-      }
-    )
+    const url = `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs?token=${APIFY_API_TOKEN}`
+    console.log('[Apify] Actor URL:', url)
+    console.log('[Apify] Token exists:', !!APIFY_API_TOKEN)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(actorInput),
+    })
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -308,17 +308,17 @@ export async function startScrapingSingle(params: ScrapingParams): Promise<strin
     console.log('Starting Apify scraping with input:', JSON.stringify(actorInput, null, 2))
 
     // 调用 Apify API 启动 Actor
-    const response = await fetch(
-      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-        },
-        body: JSON.stringify(actorInput),
-      }
-    )
+    const url = `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs?token=${APIFY_API_TOKEN}`
+    console.log('[Apify] Actor URL:', url)
+    console.log('[Apify] Token exists:', !!APIFY_API_TOKEN)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(actorInput),
+    })
 
     if (!response.ok) {
       const errorText = await response.text()

@@ -60,11 +60,25 @@ interface PhaseConfig {
   sort_by: 'hot' | 'new' | 'top' | 'relevance'
 }
 
+const defaultPhaseConfig: PhaseConfig = {
+  time_range: '7d',
+  max_posts: 100,
+  sort_by: 'hot'
+}
+
 const phaseLabels: Record<string, { label: string; color: string; bgColor: string }> = {
   phase1_brand: { label: 'Phase 1 品牌词', color: 'text-blue-700', bgColor: 'bg-blue-100' },
   phase2_competitor: { label: 'Phase 2 竞品词', color: 'text-orange-700', bgColor: 'bg-orange-100' },
   phase3_scene_pain: { label: 'Phase 3 场景词', color: 'text-green-700', bgColor: 'bg-green-100' },
   phase4_subreddits: { label: 'Phase 4 Subreddit', color: 'text-purple-700', bgColor: 'bg-purple-100' }
+}
+
+// Phase 名称到数组索引的映射
+const phaseToIndex: Record<string, number> = {
+  phase1_brand: 0,
+  phase2_competitor: 1,
+  phase3_scene_pain: 2,
+  phase4_subreddits: 3
 }
 
 const statusLabels: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -82,13 +96,13 @@ export default function ScrapingPage() {
   const [runs, setRuns] = useState<ScrapingRun[]>([])
   const [isPolling, setIsPolling] = useState(false)
 
-  // 四阶段配置
-  const [phaseConfigs, setPhaseConfigs] = useState<Record<string, PhaseConfig>>({
-    phase1_brand: { time_range: '7d', max_posts: 100, sort_by: 'hot' },
-    phase2_competitor: { time_range: '30d', max_posts: 100, sort_by: 'top' },
-    phase3_scene_pain: { time_range: '30d', max_posts: 100, sort_by: 'relevance' },
-    phase4_subreddits: { time_range: '30d', max_posts: 100, sort_by: 'hot' }
-  })
+  // 四阶段配置 - 数组结构便于索引访问
+  const [phaseConfigs, setPhaseConfigs] = useState<PhaseConfig[]>([
+    { ...defaultPhaseConfig, sort_by: 'hot',       time_range: '7d'   },  // Phase 1
+    { ...defaultPhaseConfig, sort_by: 'top',       time_range: '30d'  },  // Phase 2
+    { ...defaultPhaseConfig, sort_by: 'relevance', time_range: '30d'  },  // Phase 3
+    { ...defaultPhaseConfig, sort_by: 'hot',       time_range: '30d'  },  // Phase 4
+  ])
 
   // 高级 Apify 配置
   const [advancedConfig, setAdvancedConfig] = useState({
@@ -213,7 +227,7 @@ export default function ScrapingPage() {
           query,
           subreddit,
           config: {
-            ...phaseConfigs[phase],
+            ...(phaseConfigs[phaseToIndex[phase]] ?? defaultPhaseConfig),
             ...advancedConfig
           }
         })
@@ -273,7 +287,12 @@ export default function ScrapingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: selectedProject?.id,
-          phase_configs: phaseConfigs,
+          phase_configs: {
+            phase1_brand: phaseConfigs[0],
+            phase2_competitor: phaseConfigs[1],
+            phase3_scene_pain: phaseConfigs[2],
+            phase4_subreddits: phaseConfigs[3]
+          },
           items: itemsToScrape
         })
       })
@@ -308,7 +327,12 @@ export default function ScrapingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: selectedProject.id,
-          phase_configs: phaseConfigs
+          phase_configs: {
+            phase1_brand: phaseConfigs[0],
+            phase2_competitor: phaseConfigs[1],
+            phase3_scene_pain: phaseConfigs[2],
+            phase4_subreddits: phaseConfigs[3]
+          }
         })
       })
 
@@ -335,10 +359,13 @@ export default function ScrapingPage() {
 
   // 更新阶段配置
   const updatePhaseConfig = (phase: string, key: keyof PhaseConfig, value: any) => {
-    setPhaseConfigs(prev => ({
-      ...prev,
-      [phase]: { ...prev[phase], [key]: value }
-    }))
+    const index = phaseToIndex[phase]
+    if (index === undefined) return
+    setPhaseConfigs(prev => {
+      const newConfigs = [...prev]
+      newConfigs[index] = { ...newConfigs[index], [key]: value }
+      return newConfigs
+    })
   }
 
   // 计算统计信息
@@ -499,7 +526,7 @@ export default function ScrapingPage() {
               if (count === 0) return null
               
               const phaseInfo = phaseLabels[phase]
-              const config = phaseConfigs[phase]
+              const config = phaseConfigs[phaseToIndex[phase]] ?? defaultPhaseConfig
               const isExpanded = expandedPhases[phase]
               const selectedCount = selectedItems[phase]?.size || 0
 
