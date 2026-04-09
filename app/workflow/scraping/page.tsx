@@ -90,6 +90,26 @@ export default function ScrapingPage() {
     phase4_subreddits: { time_range: '30d', max_posts: 100, sort_by: 'hot' }
   })
 
+  // 高级 Apify 配置
+  const [advancedConfig, setAdvancedConfig] = useState({
+    includeComments: true,
+    maxCommentsPerPost: 20,
+    commentDepth: 3,
+    deduplicatePosts: true,
+    maxRetries: 5
+  })
+
+  // 展开的 Phase
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
+
+  // 选中的抓取项: phase -> Set of query/subreddit identifiers
+  const [selectedItems, setSelectedItems] = useState<Record<string, Set<string>>>({
+    phase1_brand: new Set(),
+    phase2_competitor: new Set(),
+    phase3_scene_pain: new Set(),
+    phase4_subreddits: new Set()
+  })
+
   // 加载项目列表
   useEffect(() => {
     fetchProjects()
@@ -141,7 +161,140 @@ export default function ScrapingPage() {
     }
   }, [])
 
-  // 开始批量抓取
+  // 切换 Phase 展开/折叠
+  const togglePhaseExpand = (phase: string) => {
+    setExpandedPhases(prev => ({
+      ...prev,
+      [phase]: !prev[phase]
+    }))
+  }
+
+  // 切换单个抓取项的选中状态
+  const toggleItemSelection = (phase: string, itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev[phase] || [])
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return { ...prev, [phase]: newSet }
+    })
+  }
+
+  // 全选某 Phase 的所有项
+  const selectAllInPhase = (phase: string) => {
+    if (!selectedProject?.keywords) return
+    let items: string[] = []
+    if (phase === 'phase4_subreddits') {
+      items = (selectedProject.keywords.phase4_subreddits?.targets || []).map(t => t.subreddit)
+    } else {
+      const phaseKey = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
+      items = (selectedProject.keywords[phaseKey]?.queries || []).map((q, i) => `q_${i}`)
+    }
+    setSelectedItems(prev => ({ ...prev, [phase]: new Set(items) }))
+  }
+
+  // 取消全选某 Phase
+  const deselectAllInPhase = (phase: string) => {
+    setSelectedItems(prev => ({ ...prev, [phase]: new Set() }))
+  }
+
+  // 启动单项抓取（单个关键词或单个 subreddit）
+  const startSingleScraping = async (phase: string, itemId: string, query: string, subreddit?: string) => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/scraping/single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject?.id,
+          phase,
+          query,
+          subreddit,
+          config: {
+            ...phaseConfigs[phase],
+            ...advancedConfig
+          }
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast(`已启动抓取任务: ${query}`, 'success')
+        // 刷新状态
+        if (batchId) {
+          pollStatus(batchId)
+        }
+      } else {
+        showToast(data.error || '启动失败', 'error')
+      }
+    } catch (error) {
+      showToast('启动失败', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 启动选中项抓取
+  const startSelectedScraping = async () => {
+    const totalSelected = Object.values(selectedItems).reduce((sum, set) => sum + Array.from(set).length, 0)
+    if (totalSelected === 0) {
+      showToast('请先选择要抓取的项', 'error')
+      return
+    }
+    setLoading(true)
+    try {
+      const itemsToScrape: Array<{ phase: string; query: string; subreddit?: string }> = []
+      for (const [phase, itemSet] of Object.entries(selectedItems)) {
+        if (itemSet.size === 0) continue
+        if (phase === 'phase4_subreddits') {
+          const targets = selectedProject?.keywords?.phase4_subreddits?.targets || []
+          for (const target of targets) {
+            if (itemSet.has(target.subreddit)) {
+              itemsToScrape.push({
+                phase,
+                query: target.search_within?.[0] || '',
+                subreddit: target.subreddit
+              })
+            }
+          }
+        } else {
+          const phaseKey = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
+          const queries = selectedProject?.keywords?.[phaseKey]?.queries || []
+          for (let i = 0; i < queries.length; i++) {
+            if (itemSet.has(`q_${i}`)) {
+              itemsToScrape.push({ phase, query: queries[i] })
+            }
+          }
+        }
+      }
+      const res = await fetch('/api/scraping/custom-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject?.id,
+          phase_configs: phaseConfigs,
+          items: itemsToScrape
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setBatchId(data.data.batch_id)
+        setRuns(data.data.runs)
+        setIsPolling(true)
+        showToast(`已启动 ${data.data.total_runs} 个抓取任务`, 'success')
+        setTimeout(() => pollStatus(data.data.batch_id), 5000)
+      } else {
+        showToast(data.error || '启动失败', 'error')
+      }
+    } catch (error) {
+      showToast('启动失败', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 开始批量抓取（全部）
   const startBatchScraping = async () => {
     if (!selectedProject) {
       showToast('请先选择一个项目', 'error')
@@ -310,37 +463,120 @@ export default function ScrapingPage() {
           )}
         </div>
 
-        {/* 四阶段参数配置 */}
+        {/* 四阶段关键词详情 + 抓取控制 */}
         {selectedProject && totalKeywords > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">四阶段抓取参数配置</h2>
-            
-            <div className="space-y-6">
-              {Object.entries(phaseConfigs).map(([phase, config]) => {
-                const count = phaseCounts[phase as keyof typeof phaseCounts] || 0
-                if (count === 0) return null
-                
-                const phaseInfo = phaseLabels[phase]
-                
-                return (
-                  <div key={phase} className="border border-slate-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
+          <div className="space-y-4 mb-6">
+            {/* 顶部操作栏 */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => window.location.href = '/workflow/config'}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                  >
+                    ← 返回 P1 修改关键词
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-sm text-slate-500">
+                    已选择 {Object.values(selectedItems).reduce((s, set) => s + set.size, 0)} / {totalKeywords} 项
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={startSelectedScraping}
+                    disabled={loading || isPolling || Object.values(selectedItems).every(s => Array.from(s).length === 0)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    抓取所选 ({Object.values(selectedItems).reduce((s, set) => s + set.size, 0)})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 各 Phase 详情卡片 */}
+            {(['phase1_brand', 'phase2_competitor', 'phase3_scene_pain', 'phase4_subreddits'] as const).map(phase => {
+              const count = phaseCounts[phase as keyof typeof phaseCounts] || 0
+              if (count === 0) return null
+              
+              const phaseInfo = phaseLabels[phase]
+              const config = phaseConfigs[phase]
+              const isExpanded = expandedPhases[phase]
+              const selectedCount = selectedItems[phase]?.size || 0
+
+              // 获取关键词列表
+              let keywords: string[] = []
+              let targets: Array<{ subreddit: string; reason: string; search_within: string[] }> = []
+              if (phase === 'phase4_subreddits') {
+                targets = selectedProject?.keywords?.phase4_subreddits?.targets || []
+              } else {
+                const phaseKey = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
+                keywords = selectedProject?.keywords?.[phaseKey]?.queries || []
+              }
+
+              // Phase 说明
+              const phaseDescriptions: Record<string, string> = {
+                phase1_brand: '直接搜索品牌相关讨论，宽泛覆盖，获取品牌声量数据',
+                phase2_competitor: '竞品对比内容，高价值购买决策情报，了解市场份额',
+                phase3_scene_pain: '真实使用场景和痛点讨论，发现用户真实需求',
+                phase4_subreddits: '精准定向特定社区，深度挖掘目标用户'
+              }
+
+              return (
+                <div key={phase} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  {/* Phase 头部 */}
+                  <div className="p-4 border-b border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedCount === count && count > 0}
+                          ref={el => { if (el) el.indeterminate = selectedCount > 0 && selectedCount < count }}
+                          onChange={() => selectedCount === count ? deselectAllInPhase(phase) : selectAllInPhase(phase)}
+                          className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
                         <span className={`px-2 py-1 rounded text-xs font-medium ${phaseInfo.bgColor} ${phaseInfo.color}`}>
                           {phaseInfo.label}
                         </span>
-                        <span className="text-sm text-slate-500">{count} 个查询词</span>
+                        <span className="text-sm text-slate-600">{phaseDescriptions[phase]}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500">{selectedCount}/{count} 项</span>
+                        <button
+                          onClick={() => togglePhaseExpand(phase)}
+                          className="p-1 hover:bg-slate-100 rounded"
+                        >
+                          <svg className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-3 gap-4">
+
+                    {/* 参数配置行 */}
+                    <div className="grid grid-cols-3 gap-4 mt-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">时间范围</label>
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs font-medium text-slate-600">时间范围</label>
+                          <button
+                            onClick={() => {
+                              const explanations: Record<string, string> = {
+                                '24h': '适合快速获取最新动态，数据量小但即时性强',
+                                '7d': '平衡数据量和时效性，适合常规监控',
+                                '30d': '完整月度数据，适合趋势分析',
+                                'year': '年度数据，适合全面了解讨论演变'
+                              }
+                              alert(explanations[config.time_range])
+                            }}
+                            className="text-slate-400 hover:text-slate-600"
+                          >
+                            ⓘ
+                          </button>
+                        </div>
                         <select
                           value={config.time_range}
                           onChange={(e) => updatePhaseConfig(phase, 'time_range', e.target.value)}
                           disabled={isPolling}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                          className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         >
                           <option value="24h">最近 24 小时</option>
                           <option value="7d">最近 7 天</option>
@@ -350,7 +586,15 @@ export default function ScrapingPage() {
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">最大数量</label>
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs font-medium text-slate-600">最大数量</label>
+                          <button
+                            onClick={() => alert('建议值：100-200条。过多会导致抓取慢且数据重复，过少则样本不足。')}
+                            className="text-slate-400 hover:text-slate-600"
+                          >
+                            ⓘ
+                          </button>
+                        </div>
                         <input
                           type="number"
                           value={config.max_posts}
@@ -358,17 +602,33 @@ export default function ScrapingPage() {
                           min={10}
                           max={1000}
                           disabled={isPolling}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                          className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">排序方式</label>
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs font-medium text-slate-600">排序方式</label>
+                          <button
+                            onClick={() => {
+                              const explanations: Record<string, string> = {
+                                'hot': '热门内容，Reddit算法综合评分，适合获取高参与度内容',
+                                'new': '最新内容，时效性强，适合发现新趋势',
+                                'top': '评分最高内容，质量最高，适合深度分析',
+                                'relevance': '相关度排序，算法匹配最精准，适合搜索场景'
+                              }
+                              alert(explanations[config.sort_by])
+                            }}
+                            className="text-slate-400 hover:text-slate-600"
+                          >
+                            ⓘ
+                          </button>
+                        </div>
                         <select
                           value={config.sort_by}
                           onChange={(e) => updatePhaseConfig(phase, 'sort_by', e.target.value)}
                           disabled={isPolling}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                          className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         >
                           <option value="hot">热门 (Hot)</option>
                           <option value="new">最新 (New)</option>
@@ -377,9 +637,178 @@ export default function ScrapingPage() {
                         </select>
                       </div>
                     </div>
+
+                    {/* 批量操作 */}
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => selectAllInPhase(phase)}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        全选
+                      </button>
+                      <button
+                        onClick={() => deselectAllInPhase(phase)}
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        取消全选
+                      </button>
+                      <button
+                        onClick={() => {
+                          // 启动当前 phase 所有任务
+                          if (phase === 'phase4_subreddits') {
+                            targets.forEach(t => {
+                              startSingleScraping(phase, t.subreddit, t.search_within?.[0] || '', t.subreddit)
+                            })
+                          } else {
+                            keywords.forEach((q, i) => {
+                              startSingleScraping(phase, `q_${i}`, q)
+                            })
+                          }
+                        }}
+                        disabled={loading || isPolling}
+                        className="text-xs text-green-600 hover:text-green-800"
+                      >
+                        启动全部 →
+                      </button>
+                    </div>
                   </div>
-                )
-              })}
+
+                  {/* 关键词列表（展开时） */}
+                  {isExpanded && (
+                    <div className="p-4 bg-slate-50">
+                      {phase === 'phase4_subreddits' ? (
+                        <div className="space-y-2">
+                          {targets.map((target, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
+                              <input
+                                type="checkbox"
+                                checked={selectedItems[phase]?.has(target.subreddit) || false}
+                                onChange={() => toggleItemSelection(phase, target.subreddit)}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-purple-600">r/{target.subreddit}</span>
+                                  <span className="text-xs text-slate-400">|</span>
+                                  <span className="text-xs text-slate-500">搜索词: {target.search_within?.join(', ') || '无'}</span>
+                                </div>
+                                <div className="text-xs text-slate-400 mt-1">原因: {target.reason}</div>
+                              </div>
+                              <button
+                                onClick={() => startSingleScraping(phase, target.subreddit, target.search_within?.[0] || '', target.subreddit)}
+                                disabled={loading || isPolling}
+                                className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
+                              >
+                                抓取
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {keywords.map((keyword, idx) => (
+                            <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
+                              <input
+                                type="checkbox"
+                                checked={selectedItems[phase]?.has(`q_${idx}`) || false}
+                                onChange={() => toggleItemSelection(phase, `q_${idx}`)}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-slate-700">{keyword}</span>
+                              <button
+                                onClick={() => startSingleScraping(phase, `q_${idx}`, keyword)}
+                                disabled={loading || isPolling}
+                                className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
+                              >
+                                抓取
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* 高级参数配置 */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <button
+                onClick={() => setExpandedPhases(prev => ({ ...prev, advanced: !prev.advanced }))}
+                className="flex items-center gap-2 text-sm font-medium text-slate-700"
+              >
+                <svg className={`w-4 h-4 transition-transform ${expandedPhases.advanced ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                高级 Apify 参数配置
+              </button>
+              
+              {expandedPhases.advanced && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">includeComments (是否抓取评论)</label>
+                    <select
+                      value={advancedConfig.includeComments ? 'true' : 'false'}
+                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, includeComments: e.target.value === 'true' }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    >
+                      <option value="true">是</option>
+                      <option value="false">否</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">maxCommentsPerPost (每帖子最大评论数)</label>
+                    <input
+                      type="number"
+                      value={advancedConfig.maxCommentsPerPost}
+                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, maxCommentsPerPost: parseInt(e.target.value) || 20 }))}
+                      min={1}
+                      max={100}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">commentDepth (评论深度)</label>
+                    <input
+                      type="number"
+                      value={advancedConfig.commentDepth}
+                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, commentDepth: parseInt(e.target.value) || 3 }))}
+                      min={1}
+                      max={10}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">maxRetries (最大重试次数)</label>
+                    <input
+                      type="number"
+                      value={advancedConfig.maxRetries}
+                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, maxRetries: parseInt(e.target.value) || 5 }))}
+                      min={0}
+                      max={10}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">deduplicatePosts (去重)</label>
+                    <select
+                      value={advancedConfig.deduplicatePosts ? 'true' : 'false'}
+                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, deduplicatePosts: e.target.value === 'true' }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    >
+                      <option value="true">是</option>
+                      <option value="false">否</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2 text-xs text-slate-500 bg-slate-50 p-3 rounded">
+                    <strong>参数说明：</strong> 这些参数控制 Apify Reddit Scraper 的行为。
+                    includeComments开启后会在帖子下抓取评论；maxCommentsPerPost限制每帖评论数；
+                    commentDepth控制评论嵌套深度；deduplicatePosts去除重复帖子；
+                    maxRetries网络失败时的重试次数。
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -515,7 +944,7 @@ export default function ScrapingPage() {
           <button
             onClick={startBatchScraping}
             disabled={!selectedProject || loading || isPolling || totalKeywords === 0}
-            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
           >
             {loading ? (
               <>
@@ -523,14 +952,14 @@ export default function ScrapingPage() {
                 启动中...
               </>
             ) : (
-              '🚀 开始批量抓取'
+              <>🚀 启动全部抓取任务</>
             )}
           </button>
 
           {stats.succeeded > 0 && !isPolling && (
             <button
               onClick={() => window.location.href = '/workflow/analysis'}
-              className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all flex items-center gap-2 shadow-lg"
+              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all flex items-center gap-2 shadow-lg"
             >
               下一步：分析筛选 →
             </button>

@@ -553,7 +553,7 @@ export default function ConfigPage() {
         const match = String(q).match(/^(.+?)\s+vs\s+(.+?)$/i)
         return match ? [match[1].trim(), match[2].trim()] : []
       })
-    const uniqueCompetitors = [...new Set(competitors)].slice(0, 2)
+    const uniqueCompetitors = Array.from(new Set(competitors)).slice(0, 2)
 
     // Phase 3 scene keywords examples
     const phase3Examples = (kw.phase3_scene_pain?.queries || []).slice(0, 2)
