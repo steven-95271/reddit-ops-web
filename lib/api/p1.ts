@@ -8,10 +8,21 @@ import {
   ApiResponse,
 } from '@/lib/types/p1';
 
+const getBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:3000';
+};
+
 export async function analyzeProject(
   input: P1Input
 ): Promise<ApiResponse<ExtractedProductInfo>> {
-  const response = await fetch('/api/p1/analyze', {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/p1/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -32,7 +43,8 @@ export async function generateRound(
     apifyConfig?: ApifySearchConfig;
   }>
 > {
-  const response = await fetch('/api/p1/generate', {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/p1/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
@@ -48,7 +60,8 @@ export async function generateRound(
 export async function saveConfigCard(
   cardData: Partial<DataCard>
 ): Promise<ApiResponse<{ card: DataCard }>> {
-  const response = await fetch('/api/p1/save', {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/p1/save`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ card_data: cardData }),
@@ -60,7 +73,8 @@ export async function saveConfigCard(
 export async function scrapeWebsite(
   url: string
 ): Promise<ApiResponse<{ url: string; title: string; content: string; contentLength: number }>> {
-  const response = await fetch('/api/p1/scrape', {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/p1/scrape`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
