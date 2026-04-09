@@ -33,47 +33,51 @@ interface MiniMaxResponse {
  * 尝试调用 Kimi，失败时使用 MiniMax-M2.7-Highspeed
  */
 async function callAIWithFallback(messages: MiniMaxMessage[]): Promise<string> {
-  // Primary: Try Kimi
-  console.log('Trying Kimi moonshot-v1-8k...');
+  // Primary: Try MiniMax
+  console.log('Trying MiniMax-M2.7-Highspeed (minimaxi.com)...');
+  try {
+    const result = await callMiniMax(messages);
+    console.log('MiniMax API success');
+    return result;
+  } catch (error) {
+    console.error('MiniMax failed:', error);
+  }
+
+  // Fallback to Kimi
+  console.log('Falling back to Kimi moonshot-v1-8k...');
   try {
     const result = await callKimi(messages);
     console.log('Kimi moonshot-v1-8k success');
     return result;
   } catch (error) {
-    console.error('Kimi moonshot-v1-8k failed:', error);
-  }
-
-  // Fallback to MiniMax
-  console.log('Falling back to MiniMax-M2.7-Highspeed...');
-  try {
-    if (!MINIMAX_API_KEY) {
-      throw new Error('MINIMAX_API_KEY not configured');
-    }
-    const result = await callMiniMax(messages);
-    console.log('MiniMax API success');
-    return result;
-  } catch (error) {
-    console.error('MiniMax API also failed:', error);
+    console.error('Kimi also failed:', error);
     throw error;
   }
 }
 
 /**
- * 调用 MiniMax API
+ * 调用 MiniMax API (minimaxi.com 国内版)
  */
 async function callMiniMax(messages: MiniMaxMessage[]): Promise<string> {
-  if (!MINIMAX_API_KEY) {
+  const apiKey = process.env.MINIMAX_API_KEY
+  const groupId = process.env.MINIMAX_GROUP_ID
+
+  if (!apiKey) {
     throw new Error('MINIMAX_API_KEY not configured');
   }
+  if (!groupId) {
+    throw new Error('MINIMAX_GROUP_ID not configured');
+  }
 
-  const response = await fetch(MINIMAX_API_URL, {
+  const response = await fetch('https://api.minimaxi.com/v1/text/chatcompletion_v2', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MINIMAX_MODEL,
+      model: 'MiniMax-M2.7-Highspeed',
+      group_id: groupId,
       messages,
     }),
   });
