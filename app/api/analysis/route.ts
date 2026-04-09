@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 import { calculateHotScore, calculateCompositeScore, classifyGrade, classifyCategory } from '@/lib/scoring'
 
+export const dynamic = 'force-dynamic'
+
 interface PostRow {
   id: string
   project_id: string

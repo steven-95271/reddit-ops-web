@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 import { getScrapingResults } from '@/lib/apify'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/scraping/[runId]/results - 获取抓取结果并保存到数据库
 export async function POST(
   request: NextRequest,
