@@ -72,10 +72,20 @@ export async function PUT(
       target_audience, 
       brand_names, 
       competitor_brands, 
+      seed_keywords,
       keywords, 
       subreddits, 
       status 
     } = body
+
+    // 当 seed_keywords 传入时，同时更新 keywords.seed（保持 JSON 字段为唯一数据源）
+    let keywordsToSave = keywords
+    if (seed_keywords !== undefined && keywords) {
+      keywordsToSave = {
+        ...keywords,
+        seed: seed_keywords
+      }
+    }
 
     // 检查项目是否存在
     const existingResult = await sql`SELECT id FROM projects WHERE id = ${id}`
@@ -91,11 +101,13 @@ export async function PUT(
     // 将数组/对象转换为 JSON 字符串
     const brandNamesStr = brand_names !== undefined ? JSON.stringify(brand_names) : undefined
     const competitorBrandsStr = competitor_brands !== undefined ? JSON.stringify(competitor_brands) : undefined
-    const keywordsStr = keywords !== undefined ? JSON.stringify(keywords) : undefined
+    const keywordsStr = keywordsToSave !== undefined ? JSON.stringify(keywordsToSave) : undefined
+    const seedKeywordsStr = seed_keywords !== undefined ? JSON.stringify(seed_keywords) : undefined
     const subredditsStr = subreddits !== undefined ? JSON.stringify(subreddits) : undefined
 
     console.log('[API PUT] Updating project:', id)
-    console.log('[API PUT] keywords received:', keywords)
+    console.log('[API PUT] seed_keywords received:', seed_keywords)
+    console.log('[API PUT] keywordsToSave:', keywordsToSave)
     console.log('[API PUT] keywordsStr to save:', keywordsStr)
 
     // 动态构建更新语句
@@ -126,6 +138,10 @@ export async function PUT(
     if (competitorBrandsStr !== undefined) {
       updates.push(`competitor_brands = $${paramIndex++}`)
       values.push(competitorBrandsStr)
+    }
+    if (seedKeywordsStr !== undefined) {
+      updates.push(`seed_keywords = $${paramIndex++}`)
+      values.push(seedKeywordsStr)
     }
     if (keywordsStr !== undefined) {
       updates.push(`keywords = $${paramIndex++}`)

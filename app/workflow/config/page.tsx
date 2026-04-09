@@ -319,7 +319,15 @@ export default function ConfigPage() {
       return
     }
 
-    // 过滤空值
+    // 统一方案：以 keywords.seed 为唯一数据源
+    // 将用户编辑的 seed_keywords 写入 keywords.seed
+    const filteredSeedKeywords = formData.seed_keywords.filter(Boolean)
+    const updatedKeywords = {
+      ...formData.keywords,
+      seed: filteredSeedKeywords
+    }
+
+    // 过滤空值，keywords 包含同步后的 seed
     const payload = {
       name: formData.name.trim(),
       product_name: formData.product_name.trim(),
@@ -327,8 +335,8 @@ export default function ConfigPage() {
       target_audience: formData.target_audience.trim(),
       brand_names: formData.brand_names.filter(Boolean),
       competitor_brands: formData.competitor_brands.filter(Boolean),
-      seed_keywords: formData.seed_keywords.filter(Boolean),
-      keywords: formData.keywords
+      seed_keywords: filteredSeedKeywords,
+      keywords: updatedKeywords
     }
 
     console.log('[Frontend] Submitting payload:', payload)
