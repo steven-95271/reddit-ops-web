@@ -74,6 +74,19 @@ async function callMiniMax(messages: MiniMaxMessage[]): Promise<string> {
 }
 
 /**
+ * 剥离 markdown 代码块包裹，解析 AI 返回的 JSON
+ */
+function parseAIJson(raw: string): any {
+  let cleaned = raw.trim();
+
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+  cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  cleaned = cleaned.trim();
+
+  return JSON.parse(cleaned);
+}
+
+/**
  * 竞品推断：基于产品类型推断常见竞品品牌
  */
 function inferCompetitorsByProductType(productType: string, existingCompetitors: string[]): string[] {
@@ -151,7 +164,7 @@ Instructions:
     console.log('[analyzeProductWithAI] Response received, parsing...');
 
     try {
-      const result = JSON.parse(content);
+      const result = parseAIJson(content);
       return {
         productType: result.productType || '',
         productName: result.productName,
@@ -269,7 +282,7 @@ export async function generateKeywordsWithAI(
     console.log('[generateKeywordsWithAI] Response received, parsing...');
 
     try {
-      const result = JSON.parse(content);
+      const result = parseAIJson(content);
 
       const toKeywordItem = (kw: string, intent: string, phaseReasoning: string): KeywordItem => ({
         keyword: kw,
@@ -377,7 +390,7 @@ Requirements:
     console.log('[generateSubredditsWithAI] Response received, parsing...');
 
     try {
-      const result = JSON.parse(content);
+      const result = parseAIJson(content);
       const highSubs = (result.highRelevance || result.high_relevance || []).map((s: any) => ({
         name: s.name,
         reason: s.reason,
@@ -472,7 +485,7 @@ Requirements:
     console.log('[generateSearchStrategyWithAI] Response received, parsing...');
 
     try {
-      const result = JSON.parse(content);
+      const result = parseAIJson(content);
       return {
         searches: result.searches || [],
         comments: result.comments || {
