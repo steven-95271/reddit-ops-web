@@ -52,7 +52,7 @@ export default function PublishPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const result = await response.json()
       if (result.success) {
         setProjects(result.data)
