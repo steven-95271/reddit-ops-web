@@ -246,7 +246,7 @@ export async function generateKeywordsWithAI(
   const feedbackSection = feedback ? `\n\n用户反馈: ${feedback}\n请根据用户反馈调整关键词生成策略。` : '';
 
   const competitors = inferCompetitorsByProductType(productInfo.productType, productInfo.competitors);
-  const brandName = productInfo.productName || productInfo.seedKeywords[0] || 'this product';
+  const brandName = productInfo.productName || productInfo.seedKeywords?.[0] || 'this product';
   const shortBrand = productInfo.productName?.split(' ')[0] || brandName;
 
   const prompt = `你是一个 Reddit 营销专家和关键词研究专家。Based on the following product information, generate comprehensive keyword suggestions optimized for Reddit search behavior.
@@ -255,80 +255,63 @@ export async function generateKeywordsWithAI(
 - 产品类型: ${productInfo.productType}
 - 产品名称: ${productInfo.productName || 'N/A'}
 - 品牌名/简称: ${shortBrand}
-- 核心卖点: ${productInfo.sellingPoints.join(', ')}
-- 目标人群: ${productInfo.targetAudience.join(', ')}
+- 核心卖点: ${productInfo.sellingPoints?.join(', ') || 'N/A'}
+- 目标人群: ${productInfo.targetAudience?.join(', ') || 'N/A'}
 - 竞品品牌（已推断）: ${competitors.join(', ')}
-- 种子关键词: ${productInfo.seedKeywords.join(', ')}${feedbackSection}
+- 种子关键词: ${productInfo.seedKeywords?.join(', ') || 'N/A'}${feedbackSection}
 
-请生成以下6类关键词（以 JSON 格式输出）:
+请生成以下5类关键词（以 JSON 格式输出）：
 {
     "brand": ["品牌词1", "品牌词2", "品牌词3"],
     "brand_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
-    "product": ["型号词1", "型号词2", "型号词3"],
-    "product_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
     "category": ["品类词1", "品类词2", "品类词3"],
     "category_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
     "comparison": ["对比词1", "对比词2", "对比词3"],
     "comparison_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
     "scenario": ["场景词1", "场景词2", "场景词3"],
     "scenario_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
-    "problem": ["问题词1", "问题词2", "问题词3"],
-    "problem_reasoning": "该阶段选词逻辑说明（中文，50字以内）",
     "overall_reasoning": "整体生成逻辑说明（中文，100字以内）"
 }
 
-**Phase 1: 品牌核心词（Brand core keywords - wide net casting）**
-- 目的：用最核心的品牌词广撒网，抓取所有提及品牌的帖子
-- 数量：3-5个即可，宁缺毋滥
-- 长度：每个词 1-3 个单词
-- 规则：
-  - 第1个必须是产品全名（如 "Oladance OWS Pro"）
-  - 第2个是品牌名（如 "Oladance"）
-  - 其余是品牌+最核心品类词组合（如 "Oladance earbuds"）
-  - 不要加年份、不要加 review/recommendation 等修饰词
-  - 不要生成超过 3 个单词的品牌词
-- 示例：
-  ✅ "Oladance OWS Pro"（产品全名）
-  ✅ "Oladance"（品牌名）
-  ✅ "Oladance earbuds"（品牌+品类）
-  ❌ "Oladance review 2025"（加了年份和review）
-  ❌ "best Oladance open ear headphones"（超过3词）
+**1. Brand Keywords (品牌核心词): 3-5个，宁缺毋滥**
+- 每个词 1-3 个单词，不要超过 3 个单词
+- 不要加 review、recommendation、worth it、best 等修饰词
+- 不要加年份
+- 示例: "Oladance OWS Pro", "Oladance earbuds", "Oladance headphones"
+- 错误示例: "Oladance OWS Pro review 2026"（太长+有年份）
+- 重要：产品型号词（如 "Oladance OWS Pro"）合并到此分类，不要单独分类
 
-**Phase 2: 竞品对比词（Competitor comparison - high-value intelligence）**
-- 目的：找到用户在对比和讨论竞品的帖子
-- 数量：4-6个
-- 长度：每个词 2-4 个单词
-- 规则：
-  - 不要加年份（Reddit 用户搜索时很少加年份）
-  - 优先使用 "X vs Y" 格式（这是 Reddit 最常见的对比搜索模式）
-  - 包含 "X alternative"、"X problems" 格式
-- 示例：
-  ✅ "Shokz vs Oladance"（真实用户搜索）
-  ✅ "Shokz problems"（用户吐槽场景）
-  ✅ "Soundcore open ear"（竞品+品类）
-  ❌ "Shokz alternative open ear headphones 2025"（过长，没人这么搜）
-  ❌ "best open ear headphones 2026"（带年份，Reddit 搜索不需要）
+**2. Category Keywords (品类词): 3-5个**
+- 每个词 2-3 个单词
+- 示例: "open ear earbuds", "bone conduction headphones"
+- 错误示例: "best open ear wireless earbuds recommendations"
 
-**Phase 3: 场景+痛点词（Scene & pain point keywords - user voice）**
-- 目的：找到用户在描述使用场景和痛点的帖子
-- 数量：5-8个
-- 长度：每个词 2-4 个单词，绝对不超过 5 个单词
-- 规则：
-  - 模拟 Reddit 用户真实搜索行为：用户搜的是短语不是句子
-- 示例：
-  ✅ "earbuds fall out running"（4词，真实痛点）
-  ✅ "headphones hurt ears"（3词，常见搜索）
-  ✅ "open ear cycling safety"（4词，场景词）
-  ❌ "headphones that dont hurt ears after hours of use"（10词，这是句子不是搜索词）
-  ❌ "earbuds for long commutes without ear fatigue"（8词，太长了）
-  ❌ "best headphones for people who hate in-ear"（8词，太长了）
+**3. Comparison Keywords (竞品对比词): 4-6个**
+- 每个词 2-4 个单词，不要超过 4 个单词
+- 不要加年份
+- 优先 "X vs Y" 格式
+- 示例: "Shokz vs Oladance", "Soundcore alternative", "Shokz problems"
+- 错误示例: "Shokz vs open ear earbuds 2026", "switched from Shokz to something else"
+
+**4. Scenario Keywords (场景+痛点词): 5-8个**
+- 每个词 2-4 个单词，绝对不超过 5 个单词
+- 模拟 Reddit 用户真实搜索的短语，不是句子
+- 示例: "earbuds fall out running", "headphones hurt ears", "open ear cycling safety"
+- 错误示例: "headphones for marathon training don't fall out"（8词，句子）
+- 错误示例: "earbuds that don't hurt after hours of use"（9词，句子）
+
+**绝对禁止规则（违反任何一条则整个输出作废）**：
+1. 任何关键词不得超过 5 个英文单词
+2. 不得包含年份数字（2024/2025/2026等）
+3. 不得包含 "that"、"which"、"don't"、"doesn't" 等连接词（这说明你在写句子而不是搜索词）
+4. 种子关键词仅作为参考，不要逐个扩展。前1-2个种子词是核心，其余仅供理解产品定位
 
 **强制规则**:
-- Phase 1 品牌词不超过 3 个单词
-- Phase 3 场景痛点词绝对不超过 5 个单词
-- 品牌关键词必须包含品牌名/产品名
-- 对比关键词必须使用推断的竞品品牌生成，绝对不能为空
-- 所有关键词用英文，匹配 Reddit 用户搜索习惯
+- Brand 品牌词不超过 3 个单词
+- Category 品类词不超过 3 个单词
+- Comparison 对比词不超过 4 个单词
+- Scenario 场景痛点词绝对不超过 5 个单词
+- 所有关键词用英文，匹配 Reddit 用户真实搜索习惯
 - 不要生成重复或过于相似的关键词`;
 
   try {
@@ -342,13 +325,19 @@ export async function generateKeywordsWithAI(
         wordCount: kw.split(' ').length,
       });
       
+      // Product 分类已删除，合并到 brand 里
+      const allBrandKeywords = [
+        ...(result.brand || []),
+        ...(result.product || []),
+      ];
+      
       const keywords: KeywordCategories = {
-        brand: (result.brand || []).map((k: string) => toKeywordItem(k, result.brand_reasoning || '')),
-        product: (result.product || []).map((k: string) => toKeywordItem(k, result.product_reasoning || '')),
+        brand: allBrandKeywords.map((k: string) => toKeywordItem(k, result.brand_reasoning || '')),
+        product: [],
         category: (result.category || []).map((k: string) => toKeywordItem(k, result.category_reasoning || '')),
         comparison: (result.comparison || []).map((k: string) => toKeywordItem(k, result.comparison_reasoning || '')),
         scenario: (result.scenario || []).map((k: string) => toKeywordItem(k, result.scenario_reasoning || '')),
-        problem: (result.problem || []).map((k: string) => toKeywordItem(k, result.problem_reasoning || '')),
+        problem: [],
         reasoning: result.overall_reasoning || result.reasoning || '',
       };
 
@@ -415,10 +404,10 @@ export async function generateSubredditsWithAI(
 请推荐（以 JSON 格式输出）:
 {
     "highRelevance": [
-        {"name": "subreddit_name", "reason": "用中文写推荐理由，50字以内，说明为什么这个社区适合推广该产品", "estimatedPosts": "daily"}
+        {"name": "subreddit_name", "reason": "用中文写推荐理由，30-50字，说明为什么这个社区适合推广该产品。绝对不要用英文写 reason。", "estimatedPosts": "daily"}
     ],
     "mediumRelevance": [
-        {"name": "subreddit_name", "reason": "用中文写推荐理由，50字以内，说明为什么这个社区适合推广该产品", "estimatedPosts": "daily/weekly"}
+        {"name": "subreddit_name", "reason": "用中文写推荐理由，30-50字，说明为什么这个社区适合推广该产品。绝对不要用英文写 reason。", "estimatedPosts": "daily/weekly"}
     ],
     "filterKeywords": ["filter1", "filter2", "filter3", "filter4", "filter5"]
 }
@@ -428,11 +417,12 @@ Requirements:
 2. Medium Relevance Subreddits (中相关度): 3-5个，间接相关的板块，如 gadgets, audiophile
 3. Filter Keywords: 5-10个用于过滤帖子内容的关键词，如 "comfortable", "review", "running", "workout", "vs", "comparison"
 
+重要提醒：所有 reason 字段必须使用中文撰写，如果你写了英文，整个输出作废。
+
 注意事项:
 - Subreddit names should NOT include "r/" prefix
 - estimatedPosts should be "daily" or "weekly"
-- Filter keywords help ensure content relevance for scraping
-- **reason 字段必须使用中文，不要用英文。写50字以内的中文理由，说明为什么这个社区适合推广该产品。**`;
+- Filter keywords help ensure content relevance for scraping`;
 
   try {
     const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
@@ -596,11 +586,11 @@ function extractKeywordsFromText(text: string): KeywordCategories {
   
   return {
     brand: keywords.slice(0, 5).map(toKeywordItem),
-    product: keywords.slice(5, 10).map(toKeywordItem),
-    category: keywords.slice(10, 15).map(toKeywordItem),
-    comparison: keywords.slice(15, 20).map(toKeywordItem),
-    scenario: keywords.slice(20, 25).map(toKeywordItem),
-    problem: keywords.slice(25, 30).map(toKeywordItem),
+    product: [],
+    category: keywords.slice(5, 10).map(toKeywordItem),
+    comparison: keywords.slice(10, 15).map(toKeywordItem),
+    scenario: keywords.slice(15, 20).map(toKeywordItem),
+    problem: [],
   };
 }
 

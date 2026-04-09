@@ -66,6 +66,10 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false)
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
   
+  // 添加自定义关键词
+  const [addingKeywordPhase, setAddingKeywordPhase] = useState<string | null>(null)
+  const [newKeywordInput, setNewKeywordInput] = useState('')
+  
   // URL 提取
   const [productUrl, setProductUrl] = useState('')
   const [extracting, setExtracting] = useState(false)
@@ -76,6 +80,44 @@ export default function ConfigPage() {
       ...prev,
       [phase]: !prev[phase]
     }))
+  }
+  
+  // 添加自定义关键词到指定 Phase
+  const handleAddCustomKeyword = (phase: string) => {
+    if (!newKeywordInput.trim() || !viewingProject) return
+
+    const phaseMap: Record<string, 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain' | 'phase4_subreddits'> = {
+      phase1: 'phase1_brand',
+      phase2: 'phase2_competitor',
+      phase3: 'phase3_scene_pain',
+      phase4: 'phase4_subreddits'
+    }
+    const fullPhase = phaseMap[phase]
+
+    setViewingProject(prev => {
+      if (!prev) return null
+      const phaseData = prev.keywords?.[fullPhase]
+      if (!phaseData) return prev
+
+      if (phase === 'phase4' || !('queries' in phaseData)) {
+        return prev
+      }
+
+      const newQueries = [...(phaseData.queries || []), newKeywordInput.trim()]
+      return {
+        ...prev,
+        keywords: {
+          ...prev.keywords,
+          [fullPhase]: {
+            ...phaseData,
+            queries: newQueries
+          }
+        }
+      }
+    })
+
+    setNewKeywordInput('')
+    setAddingKeywordPhase(null)
   }
   
   // 表单状态
@@ -886,6 +928,43 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                                       </div>
                                     );
                                   })}
+
+                                  {/* 添加自定义关键词 */}
+                                  {addingKeywordPhase === phase ? (
+                                    <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                                      <input
+                                        type="text"
+                                        value={newKeywordInput}
+                                        onChange={e => setNewKeywordInput(e.target.value)}
+                                        placeholder="输入关键词"
+                                        className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        onKeyDown={e => e.key === 'Enter' && handleAddCustomKeyword(phase)}
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleAddCustomKeyword(phase)}
+                                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                                      >
+                                        添加
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setAddingKeywordPhase(null)
+                                          setNewKeywordInput('')
+                                        }}
+                                        className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"
+                                      >
+                                        取消
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setAddingKeywordPhase(phase)}
+                                      className="mt-3 pt-3 border-t border-dashed border-slate-200 w-full text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg px-3 py-2 transition-colors"
+                                    >
+                                      + 添加关键词
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
