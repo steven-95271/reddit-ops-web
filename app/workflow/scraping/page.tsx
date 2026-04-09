@@ -151,6 +151,7 @@ export default function ScrapingPage() {
       const data = await res.json()
 
       if (data.success) {
+        console.log('[Scraping] API response:', JSON.stringify(data))
         setRuns(data.data.runs)
         
         // 检查是否全部完成
@@ -897,6 +898,7 @@ export default function ScrapingPage() {
                 </thead>
                 <tbody>
                   {runs.map((run) => {
+                    if (!run) return null
                     const phaseInfo = phaseLabels[run.phase]
                     const statusInfo = statusLabels[run.status]
                     
@@ -921,7 +923,7 @@ export default function ScrapingPage() {
                         </td>
                         <td className="py-3 px-2">
                           <div className="text-xs text-slate-500">
-                            {run.params.time_range} | {run.params.max_posts}条 | {run.params.sort_by}
+                            {run.params?.time_range || '-'} | {run.params?.max_posts || 0}条 | {run.params?.sort_by || '-'}
                           </div>
                         </td>
                         <td className="py-3 px-2">
