@@ -535,6 +535,62 @@ export default function ConfigPage() {
     }
   }
 
+  const generateStrategySummary = (project: Project): string => {
+    const kw = project.keywords
+    if (!kw?.phase1_brand?.queries?.length) return ''
+
+    const productName = project.product_name || '本产品'
+    const phase1Count = kw.phase1_brand.queries.length
+    const phase2Count = kw.phase2_competitor?.queries?.length || 0
+    const phase3Count = kw.phase3_scene_pain?.queries?.length || 0
+    const phase4Count = kw.phase4_subreddits?.targets?.length || 0
+
+    // Extract competitors from phase2 queries (format: "X vs Y")
+    const phase2Queries = kw.phase2_competitor?.queries || []
+    const competitors = phase2Queries
+      .slice(0, 4)
+      .flatMap(q => {
+        const match = String(q).match(/^(.+?)\s+vs\s+(.+?)$/i)
+        return match ? [match[1].trim(), match[2].trim()] : []
+      })
+    const uniqueCompetitors = [...new Set(competitors)].slice(0, 2)
+
+    // Phase 3 scene keywords examples
+    const phase3Examples = (kw.phase3_scene_pain?.queries || []).slice(0, 2)
+
+    // Phase 4 subreddit examples
+    const phase4Examples = (kw.phase4_subreddits?.targets || [])
+      .slice(0, 2)
+      .map(t => t.subreddit)
+
+    const parts: string[] = []
+
+    parts.push(`Phase 1 锁定 ${phase1Count} 个品牌核心词覆盖直接搜索流量`)
+
+    if (phase2Count > 0 && uniqueCompetitors.length > 0) {
+      const compStr = uniqueCompetitors.join('、')
+      parts.push(`Phase 2 生成 ${phase2Count} 个竞品对比词定向捕获决策期用户（覆盖 ${compStr} 等）`)
+    } else if (phase2Count > 0) {
+      parts.push(`Phase 2 生成 ${phase2Count} 个竞品对比词定向捕获决策期用户`)
+    }
+
+    if (phase3Count > 0) {
+      const sceneStr = phase3Examples.length > 0
+        ? `（聚焦 ${phase3Examples.join('、')}）`
+        : ''
+      parts.push(`Phase 3 扩展 ${phase3Count} 个场景痛点词触达潜在需求用户${sceneStr}`)
+    }
+
+    if (phase4Count > 0) {
+      const subStr = phase4Examples.length > 0
+        ? `（含 ${phase4Examples.join('、')} 等）`
+        : ''
+      parts.push(`Phase 4 精准定向 ${phase4Count} 个相关 Subreddit 社区${subStr}`)
+    }
+
+    return `AI 已基于 ${productName} 生成搜索策略：${parts.join('；')}。`
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -810,17 +866,17 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
               {viewingProject.keywords?.phase1_brand?.queries?.length ? (
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">四阶段搜索策略</h3>
-                  {viewingProject.keywords?.reasoning && (
+                  {viewingProject.keywords?.phase1_brand?.queries?.length ? (
                     <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
                       <div className="flex items-start gap-2">
                         <span className="text-amber-600">🤖</span>
                         <div>
                           <div className="text-sm font-medium text-amber-800 mb-1">AI 生成逻辑</div>
-                          <div className="text-sm text-amber-700">{viewingProject.keywords.reasoning}</div>
+                          <div className="text-sm text-amber-700">{generateStrategySummary(viewingProject)}</div>
                         </div>
                       </div>
                     </div>
-                  )}
+                  ) : null}
                   <div className="space-y-4">
                     {(['phase1', 'phase2', 'phase3', 'phase4'] as const).map(phase => {
                       const phaseMap: Record<string, 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain' | 'phase4_subreddits'> = {
