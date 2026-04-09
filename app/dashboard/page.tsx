@@ -67,7 +67,7 @@ export default function DashboardPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const result = await response.json()
       if (result.success) {
         setProjects(result.data)
@@ -81,7 +81,7 @@ export default function DashboardPage() {
     setIsLoading(true)
     try {
       const params = selectedProjectId ? `?project_id=${selectedProjectId}` : ''
-      const response = await fetch(`/api/stats${params}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/stats${params}`)
       const result = await response.json()
       if (result.success) {
         setStats(result.data)

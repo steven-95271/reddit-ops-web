@@ -65,7 +65,7 @@ export default function PersonaPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const result = await response.json()
       if (result.success) {
         setProjects(result.data)
@@ -80,7 +80,7 @@ export default function PersonaPage() {
   const fetchPersonas = useCallback(async (projectId: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/personas?project_id=${projectId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/personas?project_id=${projectId}`)
       const result = await response.json()
       if (result.success) {
         setPersonas(result.data)
@@ -135,7 +135,7 @@ export default function PersonaPage() {
     if (!confirm('确定要删除这个人设吗？')) return
 
     try {
-      const response = await fetch(`/api/personas/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/personas/${id}`, {
         method: 'DELETE',
       })
       const result = await response.json()
@@ -435,7 +435,7 @@ function PreviewModal({ personaId, onClose }: { personaId: string; onClose: () =
 
     setIsGenerating(true)
     try {
-      const response = await fetch(`/api/personas/${personaId}/preview`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/personas/${personaId}/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sample_post_title: postTitle, sample_post_body: postBody }),
@@ -680,7 +680,7 @@ function EditPersonaModal({ personaId, onClose, onSuccess }: { personaId: string
   })
 
   useEffect(() => {
-    fetch(`/api/personas/${personaId}`)
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/personas/${personaId}`)
       .then(res => res.json())
       .then(result => {
         if (result.success) {
@@ -710,7 +710,7 @@ function EditPersonaModal({ personaId, onClose, onSuccess }: { personaId: string
 
     setIsSubmitting(true)
     try {
-      const response = await fetch(`/api/personas/${personaId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/personas/${personaId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

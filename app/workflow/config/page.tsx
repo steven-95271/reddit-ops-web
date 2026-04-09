@@ -140,7 +140,7 @@ export default function ConfigPage() {
   const fetchProjects = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const data = await res.json()
       
       if (data.success) {
@@ -200,7 +200,7 @@ export default function ConfigPage() {
     
     // 尝试从 API 获取最新数据
     try {
-      const res = await fetch(`/api/projects/${project.id}`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects/${project.id}`)
       const data = await res.json()
       if (data.success && data.data) {
         console.log('[Frontend] Fetched latest project data:', data.data)
@@ -225,7 +225,7 @@ export default function ConfigPage() {
     }
 
     try {
-      const res = await fetch(`/api/projects/${project.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects/${project.id}`, {
         method: 'DELETE'
       })
       const data = await res.json()
@@ -248,7 +248,7 @@ export default function ConfigPage() {
 
     try {
       setExpanding(true)
-      const res = await fetch(`/api/projects/${viewingProject.id}/expand`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects/${viewingProject.id}/expand`, {
         method: 'POST'
       })
       const data = await res.json()
@@ -279,7 +279,7 @@ export default function ConfigPage() {
 
     try {
       setSaving(true)
-      const res = await fetch(`/api/projects/${viewingProject.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects/${viewingProject.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -388,7 +388,7 @@ export default function ConfigPage() {
       
       if (editingProject) {
         // 更新项目
-        const res = await fetch(`/api/projects/${editingProject.id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects/${editingProject.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -422,7 +422,7 @@ export default function ConfigPage() {
         }
       } else {
         // 创建新项目
-        const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

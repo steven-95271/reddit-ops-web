@@ -82,7 +82,7 @@ export default function AnalysisPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const data = await res.json()
       if (data.success) {
         setProjects(data.data || [])
@@ -118,7 +118,7 @@ export default function AnalysisPage() {
         params.set('ignored', 'true')
       }
 
-      const res = await fetch(`/api/posts?${params}`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/posts?${params}`)
       const data = await res.json()
 
       if (data.success) {
@@ -182,7 +182,7 @@ export default function AnalysisPage() {
 
   const handleAction = async (postId: string, action: 'candidate' | 'unmark' | 'ignore' | 'unignore') => {
     try {
-      const res = await fetch(`/api/posts/${postId}/action`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/posts/${postId}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })

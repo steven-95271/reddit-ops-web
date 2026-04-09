@@ -75,7 +75,7 @@ export default function ContentPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const result = await response.json()
       if (result.success) {
         setProjects(result.data)
@@ -87,7 +87,7 @@ export default function ContentPage() {
 
   const fetchPersonas = useCallback(async (projectId: string) => {
     try {
-      const response = await fetch(`/api/personas?project_id=${projectId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/personas?project_id=${projectId}`)
       const result = await response.json()
       if (result.success) {
         setPersonas(result.data)
@@ -102,7 +102,7 @@ export default function ContentPage() {
 
   const fetchCandidatePosts = useCallback(async (projectId: string) => {
     try {
-      const response = await fetch(`/api/analysis?project_id=${projectId}&is_candidate=true`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/analysis?project_id=${projectId}&is_candidate=true`)
       const result = await response.json()
       if (result.success) {
         setCandidatePosts(result.data)
@@ -173,7 +173,7 @@ export default function ContentPage() {
 
   const handleUpdateContent = async (contentId: string, updates: any) => {
     try {
-      const response = await fetch(`/api/content/${contentId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/content/${contentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),

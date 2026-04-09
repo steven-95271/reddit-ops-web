@@ -97,7 +97,7 @@ export default function ScrapingPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const data = await res.json()
       if (data.success) {
         setProjects(data.data || [])
@@ -113,7 +113,7 @@ export default function ScrapingPage() {
   // 轮询状态
   const pollStatus = useCallback(async (bid: string) => {
     try {
-      const res = await fetch(`/api/scraping/batch/${bid}`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/scraping/batch/${bid}`)
       const data = await res.json()
 
       if (data.success) {

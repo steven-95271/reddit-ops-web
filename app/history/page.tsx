@@ -58,7 +58,7 @@ export default function HistoryPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const result = await response.json()
       if (result.success) {
         setProjects(result.data)
@@ -71,7 +71,7 @@ export default function HistoryPage() {
   const fetchRecords = useCallback(async (projectId: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/content?project_id=${projectId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/content?project_id=${projectId}`)
       const result = await response.json()
       if (result.success) {
         setRecords(result.data)

@@ -52,7 +52,7 @@ export default function PublishPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const result = await response.json()
       if (result.success) {
         setProjects(result.data)
@@ -65,7 +65,7 @@ export default function PublishPage() {
   const fetchPublishData = useCallback(async (projectId: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/publish?project_id=${projectId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/publish?project_id=${projectId}`)
       const result = await response.json()
       if (result.success) {
         setPendingContents(result.data.pending)
@@ -123,7 +123,7 @@ export default function PublishPage() {
 
   const handleUpdatePublishRecord = async (id: string, updates: { upvotes?: number; replies?: number }) => {
     try {
-      const response = await fetch(`/api/publish/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/publish/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -145,7 +145,7 @@ export default function PublishPage() {
     if (!confirm('确定要删除这条发布记录吗？内容将回到待发布状态。')) return
 
     try {
-      const response = await fetch(`/api/publish/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/publish/${id}`, {
         method: 'DELETE',
       })
       const result = await response.json()
