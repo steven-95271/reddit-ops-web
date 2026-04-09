@@ -1,6 +1,6 @@
 /**
  * AI API Client
- * 主模型: Qwen3.6 Plus Free (OpenCode)
+ * 主模型: Kimi moonshot-v1-8k
  * 备用模型: MiniMax-M2.7-Highspeed
  */
 
@@ -11,10 +11,6 @@ import {
   SubredditCategories,
   ApifySearchConfig,
 } from '@/lib/types/p1';
-
-const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY || 'sk-8dxSo4bl8P3TyEY59AFu15usvmIHN8nDF7Iiv885IpSR4WZQb9exallyxcwAxoC5';
-const OPENCODE_API_URL = 'https://api.opencode.ai/v1/chat/completions';
-const OPENCODE_MODEL = 'opencode/qwen3.6-plus-free';
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
 const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimaxi.chat/v1/text/chatcompletion_v2';
@@ -34,17 +30,17 @@ interface MiniMaxResponse {
 }
 
 /**
- * 尝试调用 Qwen3.6 Plus Free，失败时使用 MiniMax-M2.7-Highspeed
+ * 尝试调用 Kimi，失败时使用 MiniMax-M2.7-Highspeed
  */
 async function callAIWithFallback(messages: MiniMaxMessage[]): Promise<string> {
+  // Primary: Try Kimi
+  console.log('Trying Kimi moonshot-v1-8k...');
   try {
-    // Try Qwen3.6 Plus Free first (primary)
-    console.log('Trying Qwen3.6 Plus Free (OpenCode)...');
-    const result = await callOpenCodeZen(messages);
-    console.log('Qwen3.6 Plus Free success');
+    const result = await callKimi(messages);
+    console.log('Kimi moonshot-v1-8k success');
     return result;
   } catch (error) {
-    console.error('Qwen3.6 Plus Free failed:', error);
+    console.error('Kimi moonshot-v1-8k failed:', error);
   }
 
   // Fallback to MiniMax
@@ -83,36 +79,68 @@ async function callMiniMax(messages: MiniMaxMessage[]): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`MiniMax API error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`MiniMax API error: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
-  const data: MiniMaxResponse = await response.json();
-  return data.choices[0]?.message?.content || '';
+  const data = await response.json();
+  console.log('[MiniMax raw response]:', JSON.stringify(data, null, 2));
+
+  const message = data.choices?.[0]?.message || {};
+  const content = message.content ||
+                  message.reasoning_content ||
+                  data.choices?.[0]?.text ||
+                  data.output ||
+                  data.result ||
+                  data.text ||
+                  '';
+
+  if (!content) {
+    console.error('[MiniMax Error] Invalid response structure:', JSON.stringify(data, null, 2));
+    throw new Error(`MiniMax API returned invalid response structure. Response: ${JSON.stringify(data).substring(0, 500)}`);
+  }
+
+  return content;
 }
 
 /**
- * 调用 OpenCode Zen API (Qwen3.6 Plus Free)
+ * 调用 Kimi API (moonshot-v1-8k)
  */
-async function callOpenCodeZen(messages: MiniMaxMessage[]): Promise<string> {
-  const response = await fetch(OPENCODE_API_URL, {
+async function callKimi(messages: MiniMaxMessage[]): Promise<string> {
+  const KIMI_API_KEY = process.env.KIMI_API_KEY
+  const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions'
+  const KIMI_MODEL = 'moonshot-v1-8k'
+
+  if (!KIMI_API_KEY) {
+    throw new Error('KIMI_API_KEY not configured');
+  }
+
+  const response = await fetch(KIMI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENCODE_API_KEY}`,
+      'Authorization': `Bearer ${KIMI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: OPENCODE_MODEL,
+      model: KIMI_MODEL,
       messages,
       temperature: 0.7,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenCode Zen API error: ${response.status} ${response.statusText}`);
+    throw new Error(`Kimi API error: ${response.status} ${response.statusText}`);
   }
 
-  const data: MiniMaxResponse = await response.json();
-  return data.choices[0]?.message?.content || '';
+  const data = await response.json();
+  console.log('[Kimi raw response]:', JSON.stringify(data, null, 2));
+
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('[Kimi Error] Invalid response structure:', data);
+    throw new Error('Kimi API returned invalid response structure');
+  }
+
+  return data.choices[0].message.content || '';
 }
 
 /**

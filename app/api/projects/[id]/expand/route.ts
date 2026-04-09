@@ -56,9 +56,19 @@ export async function POST(
     const project = result.rows[0]
 
     const brandNames = project.brand_names ? JSON.parse(project.brand_names) : []
-    const competitorBrands = project.competitor_brands ? JSON.parse(project.competitor_brands) : []
     const existingKeywords = project.keywords ? JSON.parse(project.keywords) : {}
-    const seedKeywords = existingKeywords.seed || []
+
+    // 种子关键词可能是用中文逗号、英文逗号或顿号分隔的单个字符串，需要分割处理
+    const rawSeeds = existingKeywords.seed || []
+    const seedKeywords = Array.isArray(rawSeeds)
+      ? rawSeeds.flatMap((s: string) => s.split(/[,，、]/)).map((s: string) => s.trim()).filter(Boolean)
+      : String(rawSeeds).split(/[,，、]/).map((s: string) => s.trim()).filter(Boolean)
+
+    // 竞品品牌也做同样处理
+    const rawCompetitors = project.competitor_brands ? JSON.parse(project.competitor_brands) : []
+    const competitorBrands = Array.isArray(rawCompetitors)
+      ? rawCompetitors.flatMap((s: string) => s.split(/[,，、]/)).map((s: string) => s.trim()).filter(Boolean)
+      : String(rawCompetitors).split(/[,，、]/).map((s: string) => s.trim()).filter(Boolean)
 
     // 构建 ExtractedProductInfo
     const productInfo: ExtractedProductInfo = {
