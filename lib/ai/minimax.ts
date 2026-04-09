@@ -160,9 +160,10 @@ Instructions:
 - 种子关键词应该是英文，适合在 Reddit 上搜索`;
 
   try {
+    console.log('[generateKeywordsWithAI] Full prompt being sent to AI:', prompt)
     const content = await callAIWithFallback([{ role: 'user', content: prompt }]);
+    console.log('[generateKeywordsWithAI] Raw AI response:', content)
     
-    // 尝试解析 JSON
     try {
       const result = JSON.parse(content);
       return {
@@ -352,7 +353,8 @@ export async function generateKeywordsWithAI(
       return extractKeywordsFromText(content);
     }
   } catch (error) {
-    console.error('Keyword generation failed:', error);
+    console.error('[generateKeywordsWithAI] Error during AI call or parsing:', error);
+    console.error('[generateKeywordsWithAI] Error details:', JSON.stringify(error, null, 2));
     return fallbackKeywordGeneration(productInfo);
   }
 }

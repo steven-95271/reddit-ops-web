@@ -70,6 +70,7 @@ export async function POST(
       seedKeywords: seedKeywords
     }
 
+    console.log('[Expand] productInfo to generateKeywordsWithAI:', JSON.stringify(productInfo, null, 2))
     console.log('[Expand] Generating keywords with optimized prompt...')
     const keywordsResult = await generateKeywordsWithAI(productInfo)
 
