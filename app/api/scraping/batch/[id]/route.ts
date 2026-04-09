@@ -37,6 +37,7 @@ export async function GET(
         if (run.status === 'running' && run.apify_run_id) {
           try {
             const status = await getScrapingStatus(run.apify_run_id)
+            console.log(`[Batch ${id}] Run ${run.id} (${run.apify_run_id}) status: ${status.status}`)
             
             if (status.status === 'SUCCEEDED') {
               // 获取 dataset_id
@@ -51,6 +52,7 @@ export async function GET(
               `
               return { ...run, status: 'succeeded', apify_dataset_id: datasetId }
             } else if (['FAILED', 'TIMED_OUT', 'ABORTED'].includes(status.status)) {
+              console.log(`[Batch ${id}] Run ${run.id} failed with status: ${status.status}, error: ${status.errorMessage}`)
               await sql`
                 UPDATE scraping_runs 
                 SET status = 'failed', 

@@ -66,6 +66,9 @@ const defaultPhaseConfig: PhaseConfig = {
   sort_by: 'hot'
 }
 
+// Apify Actor ID (URL 中 / 改为 ~)
+const REDDIT_SCRAPER_ACTOR_ID = 'automation-lab~reddit-scraper'
+
 const phaseLabels: Record<string, { label: string; color: string; bgColor: string }> = {
   phase1_brand: { label: 'Phase 1 品牌词', color: 'text-blue-700', bgColor: 'bg-blue-100' },
   phase2_competitor: { label: 'Phase 2 竞品词', color: 'text-orange-700', bgColor: 'bg-orange-100' },
@@ -890,6 +893,7 @@ export default function ScrapingPage() {
                     <th className="text-left py-3 px-2 font-medium text-slate-700">阶段</th>
                     <th className="text-left py-3 px-2 font-medium text-slate-700">查询词</th>
                     <th className="text-left py-3 px-2 font-medium text-slate-700">Subreddit</th>
+                    <th className="text-left py-3 px-2 font-medium text-slate-700">Apify Run ID</th>
                     <th className="text-left py-3 px-2 font-medium text-slate-700">参数</th>
                     <th className="text-left py-3 px-2 font-medium text-slate-700">状态</th>
                     <th className="text-left py-3 px-2 font-medium text-slate-700">结果</th>
@@ -919,6 +923,21 @@ export default function ScrapingPage() {
                             <span className="text-purple-600">r/{run.subreddit}</span>
                           ) : (
                             <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          {run.apify_run_id ? (
+                            <a
+                              href={`https://console.apify.com/actors/${REDDIT_SCRAPER_ACTOR_ID.replace('~', '/')}/runs/${run.apify_run_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 underline font-mono"
+                              title="在 Apify 后台查看"
+                            >
+                              {run.apify_run_id.slice(0, 12)}...
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 text-xs">-</span>
                           )}
                         </td>
                         <td className="py-3 px-2">

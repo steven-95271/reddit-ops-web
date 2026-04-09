@@ -86,12 +86,12 @@ export async function startScraping(params: ScrapingParams): Promise<string> {
       searchQueries: searchQueries.slice(0, 10), // 最多10个查询
       sortOrder: params.sort_by,
       timeFilter: timeFilterMap[params.time_range] || 'all',
-      maxPostsPerSource: Math.min(params.max_posts, 500), // 单个查询最多500条
+      maxPostsPerSource: Math.min(params.max_posts, 30), // 限制30条避免超时
       includeComments: true,
-      maxCommentsPerPost: 20,
-      commentDepth: 3,
+      maxCommentsPerPost: 10,
+      commentDepth: 2,
       deduplicatePosts: true,
-      maxRetries: 5,
+      maxRetries: 3,
       proxyConfiguration: {
         useApifyProxy: true,
         apifyProxyGroups: ['RESIDENTIAL']
@@ -293,12 +293,12 @@ export async function startScrapingSingle(params: ScrapingParams): Promise<strin
       searchSubreddit,
       sort: params.sort_by,
       timeFilter: timeFilterMap[params.time_range] || 'week',
-      maxPostsPerSource: Math.min(params.max_posts, 1000),
+      maxPostsPerSource: Math.min(params.max_posts, 30), // 限制30条避免超时
       includeComments: true,
-      maxCommentsPerPost: 50,
+      maxCommentsPerPost: 10,
       commentDepth: 2,
       deduplicatePosts: true,
-      maxRetries: 5,
+      maxRetries: 3,
       proxyConfiguration: {
         useApifyProxy: true,
         apifyProxyGroups: ['RESIDENTIAL']
