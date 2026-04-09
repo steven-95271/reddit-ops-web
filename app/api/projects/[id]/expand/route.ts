@@ -33,6 +33,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log('[Expand] API route hit')
+  console.log('[Expand] MINIMAX_API_KEY exists:', !!process.env.MINIMAX_API_KEY)
+  console.log('[Expand] MINIMAX_GROUP_ID exists:', !!process.env.MINIMAX_GROUP_ID)
+
   try {
     await initDb()
     const { id } = params
@@ -55,24 +59,20 @@ export async function POST(
 
     const project = result.rows[0]
 
-    const brandNames = project.brand_names ? JSON.parse(project.brand_names) : []
     const existingKeywords = project.keywords ? JSON.parse(project.keywords) : {}
 
-    // 种子关键词可能是用中文逗号、英文逗号或顿号分隔的单个字符串，需要分割处理
     const rawSeeds = existingKeywords.seed || []
     const seedKeywords = Array.isArray(rawSeeds)
       ? rawSeeds.flatMap((s: string) => s.split(/[,，、]/)).map((s: string) => s.trim()).filter(Boolean)
       : String(rawSeeds).split(/[,，、]/).map((s: string) => s.trim()).filter(Boolean)
 
-    // 竞品品牌也做同样处理
     const rawCompetitors = project.competitor_brands ? JSON.parse(project.competitor_brands) : []
     const competitorBrands = Array.isArray(rawCompetitors)
       ? rawCompetitors.flatMap((s: string) => s.split(/[,，、]/)).map((s: string) => s.trim()).filter(Boolean)
       : String(rawCompetitors).split(/[,，、]/).map((s: string) => s.trim()).filter(Boolean)
 
-    // 构建 ExtractedProductInfo
     const productInfo: ExtractedProductInfo = {
-      productType: '',  // 从产品描述推断
+      productType: '',
       productName: project.product_name || '',
       sellingPoints: [],
       targetAudience: project.target_audience ? [project.target_audience] : [],
@@ -80,14 +80,16 @@ export async function POST(
       seedKeywords: seedKeywords
     }
 
-    console.log('[Expand] productInfo to generateKeywordsWithAI:', JSON.stringify(productInfo, null, 2))
-    console.log('[Expand] Generating keywords with optimized prompt...')
+    console.log('[Expand] productInfo:', JSON.stringify(productInfo, null, 2))
+
+    console.log('[Expand] Calling generateKeywordsWithAI...')
     const keywordsResult = await generateKeywordsWithAI(productInfo)
+    console.log('[Expand] generateKeywordsWithAI done, brands:', keywordsResult.brand.length, '| comparisons:', keywordsResult.comparison.length, '| scenarios:', keywordsResult.scenario.length)
 
-    console.log('[Expand] Generating subreddits with optimized prompt...')
+    console.log('[Expand] Calling generateSubredditsWithAI...')
     const subredditsResult = await generateSubredditsWithAI(productInfo, keywordsResult)
+    console.log('[Expand] generateSubredditsWithAI done, high:', subredditsResult.subreddits.high.length, '| medium:', subredditsResult.subreddits.medium.length)
 
-    // 映射到 ExpandResult 格式
     const expandResult: ExpandResult = {
       phase1_brand: {
         description: keywordsResult.brand[0]?.reason || 'Brand core keywords',
@@ -108,13 +110,13 @@ export async function POST(
             subreddit: s.name,
             reason: s.reason,
             relevance: 'high' as const,
-            search_within: keywordsResult.scenario.slice(0, 3).map(k => k.keyword)
+            search_within: (s.searchKeywords || keywordsResult.scenario.slice(0, 3).map(k => k.keyword))
           })),
           ...subredditsResult.subreddits.medium.map(s => ({
             subreddit: s.name,
             reason: s.reason,
             relevance: 'medium' as const,
-            search_within: keywordsResult.scenario.slice(0, 3).map(k => k.keyword)
+            search_within: (s.searchKeywords || keywordsResult.scenario.slice(0, 3).map(k => k.keyword))
           }))
         ]
       }
@@ -132,13 +134,14 @@ export async function POST(
 
     const now = new Date().toISOString()
     await sql`
-      UPDATE projects 
-      SET 
+      UPDATE projects
+      SET
         keywords = ${JSON.stringify(updatedKeywords)},
         updated_at = ${now}
       WHERE id = ${id}
     `
 
+    console.log('[Expand] Success, returning updated keywords')
     return NextResponse.json({
       success: true,
       data: {
@@ -147,7 +150,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Error expanding project:', error)
+    console.error('[Expand] Error:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to expand project'

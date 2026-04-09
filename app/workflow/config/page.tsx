@@ -267,7 +267,7 @@ export default function ConfigPage() {
       }
     } catch (error) {
       console.error('Error expanding project:', error)
-      showToast('AI 生成失败', 'error')
+      showToast(`AI 生成失败：${error instanceof Error ? error.message : String(error)}`, 'error')
     } finally {
       setExpanding(false)
     }
