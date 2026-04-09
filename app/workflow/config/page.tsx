@@ -140,7 +140,7 @@ export default function ConfigPage() {
   const fetchProjects = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/projects')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const data = await res.json()
       
       if (data.success) {
@@ -422,7 +422,7 @@ export default function ConfigPage() {
         }
       } else {
         // 创建新项目
-        const res = await fetch('/api/projects', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

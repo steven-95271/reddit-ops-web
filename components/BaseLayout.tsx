@@ -13,7 +13,7 @@ export default function BaseLayout({ children, title, subtitle }: { children: Re
   const [showNewProject, setShowNewProject] = useState(false)
 
   useState(() => {
-    fetch('/api/projects')
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       .then(r => r.json())
       .then(data => {
         setProjects(data.projects || [])
@@ -99,7 +99,7 @@ function NewProjectModal({ onClose }: { onClose: () => void }) {
     }
 
     try {
-      const res = await fetch('/api/projects', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

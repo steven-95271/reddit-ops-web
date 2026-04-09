@@ -82,7 +82,7 @@ export default function AnalysisPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch('/api/projects')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
       const data = await res.json()
       if (data.success) {
         setProjects(data.data || [])
