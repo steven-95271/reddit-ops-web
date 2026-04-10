@@ -176,6 +176,7 @@ export async function initDb() {
           total_posts INTEGER DEFAULT 0,
           inserted_posts INTEGER DEFAULT 0,
           skipped_posts INTEGER DEFAULT 0,
+          cost_usd REAL DEFAULT 0,
           error_message TEXT,
           started_at TIMESTAMP,
           completed_at TIMESTAMP,
@@ -184,6 +185,14 @@ export async function initDb() {
         )
       `
       console.log('[initDb] scraping_runs table created/verified')
+
+      // Add cost_usd column if it doesn't exist (for existing tables)
+      try {
+        await sql`ALTER TABLE scraping_runs ADD COLUMN cost_usd REAL DEFAULT 0`
+        console.log('[initDb] Added cost_usd column to scraping_runs')
+      } catch {
+        // Column may already exist, ignore
+      }
     } catch (err) {
       console.error('[initDb] Error creating scraping_runs table:', err)
       throw err

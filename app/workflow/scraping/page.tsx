@@ -99,6 +99,9 @@ export default function ScrapingPage() {
   const [runs, setRuns] = useState<ScrapingRun[]>([])
   const [isPolling, setIsPolling] = useState(false)
 
+  // 共享的轮询 intervals（组件级别声明，避免 TDZ）
+  const pollingIntervals = useRef<Record<string, NodeJS.Timeout>>({})
+
   // 四阶段配置 - 数组结构便于索引访问
   const [phaseConfigs, setPhaseConfigs] = useState<PhaseConfig[]>([
     { ...defaultPhaseConfig, sort_by: 'hot',       time_range: '7d'   },  // Phase 1
@@ -154,8 +157,7 @@ export default function ScrapingPage() {
     window.open(url, '_blank')
   }
 
-  // 轮询单个 Run 状态
-  const pollingIntervals = useRef<Record<string, NodeJS.Timeout>>({})
+  // 轮询单个 Run 状态（Phase 4 用）
   const startPollingRun = (runId: string, subredditName: string) => {
     if (pollingIntervals.current[runId]) {
       clearInterval(pollingIntervals.current[runId])
@@ -184,6 +186,18 @@ export default function ScrapingPage() {
         if (isTerminal) {
           clearInterval(poll)
           delete pollingIntervals.current[runId]
+
+          await fetch(`/api/scraping/runs/${runId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: data.status,
+              item_count: data.itemCount ?? 0,
+              cost_usd: data.costUsd ?? 0,
+              dataset_id: data.datasetId ?? null,
+              finished_at: new Date().toISOString()
+            })
+          })
         }
       } catch (error) {
         console.error('[Poll] Error:', error)
@@ -256,6 +270,35 @@ export default function ScrapingPage() {
     fetchProjects()
   }, [])
 
+  // 页面加载时从 DB 读取历史任务，并恢复 RUNNING 任务的轮询
+  useEffect(() => {
+    if (selectedProject?.id) {
+      loadHistoryRuns(selectedProject.id)
+    }
+  }, [selectedProject?.id])
+
+  async function loadHistoryRuns(projectId: string) {
+    try {
+      const res = await fetch(`/api/scraping/runs?projectId=${projectId}`)
+      const data = await res.json()
+
+      if (data.runs && data.runs.length > 0) {
+        console.log('[loadHistoryRuns] loaded', data.runs.length, 'runs from DB')
+        setRuns(data.runs)
+
+        // 对仍在 RUNNING 状态的任务重新启动轮询
+        data.runs
+          .filter((r: any) => r.status === 'running' && r.apify_run_id)
+          .forEach((r: any) => {
+            console.log('[Resume polling] runId:', r.apify_run_id)
+            startPolling(r.apify_run_id)
+          })
+      }
+    } catch (err) {
+      console.error('[loadHistoryRuns] failed:', err)
+    }
+  }
+
   const fetchProjects = async () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
@@ -301,6 +344,65 @@ export default function ScrapingPage() {
       console.error('Error polling status:', error)
       setIsPolling(false)
     }
+  }, [])
+
+  // 轮询单个 Apify Run 并在终态时写回 DB
+  const startPolling = useCallback((runId: string) => {
+    if (pollingIntervals.current[runId]) {
+      clearInterval(pollingIntervals.current[runId])
+    }
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scraping/${runId}/status`)
+        const data = await res.json()
+        console.log('[Poll] runId:', runId, 'status:', data.status)
+        const isTerminal = TERMINAL_STATUSES.includes(data.status)
+
+        // 更新前端 state（如果是 subredditRunStatuses 中的 run）
+        setSubredditRunStatuses(prev => {
+          for (const [subreddit, info] of Object.entries(prev)) {
+            const runIndex = info.runs.findIndex(r => r.runId === runId)
+            if (runIndex !== -1) {
+              const updatedRuns = [...info.runs]
+              updatedRuns[runIndex] = { ...updatedRuns[runIndex], ...data }
+              const allTerminal = updatedRuns.every(r => TERMINAL_STATUSES.includes(r.status))
+              return {
+                ...prev,
+                [subreddit]: {
+                  status: allTerminal && updatedRuns.every(r => r.status !== 'RUNNING') ? 'DONE' : 'RUNNING',
+                  runs: updatedRuns
+                }
+              }
+            }
+          }
+          return prev
+        })
+
+        // 终态：停止轮询 + 写回 DB
+        if (isTerminal) {
+          clearInterval(poll)
+          delete pollingIntervals.current[runId]
+
+          await fetch(`/api/scraping/runs/${runId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: data.status,
+              item_count: data.itemCount ?? 0,
+              cost_usd: data.costUsd ?? 0,
+              dataset_id: data.datasetId ?? null,
+              finished_at: new Date().toISOString()
+            })
+          })
+          console.log('[Poll] Stopped polling for runId:', runId, 'final status:', data.status)
+        }
+      } catch (err) {
+        console.error('[Poll] Error:', err)
+        clearInterval(poll)
+        delete pollingIntervals.current[runId]
+      }
+    }, 5000)
+    pollingIntervals.current[runId] = poll
   }, [])
 
   // 切换 Phase 展开/折叠
@@ -1124,7 +1226,7 @@ export default function ScrapingPage() {
                         <td className="py-3 px-2">
                           {run.apify_run_id ? (
                             <a
-                              href={`https://console.apify.com/actors/${REDDIT_SCRAPER_ACTOR_ID.replace('~', '/')}/runs/${run.apify_run_id}`}
+                              href={`https://console.apify.com/actors/${REDDIT_SCRAPER_ACTOR_ID}/runs/${run.apify_run_id}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-blue-600 hover:text-blue-800 underline font-mono"
