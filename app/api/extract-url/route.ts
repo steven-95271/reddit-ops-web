@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initDb } from '@/lib/db'
 
 const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
-const KIMI_API_KEY = process.env.KIMI_API_KEY || ''
-const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions'
-const KIMI_MODEL = 'kimi-k2-5'
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY
 const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimaxi.chat/v1/text/chatcompletion_v2'
@@ -188,62 +185,6 @@ function extractTextFromHtml(html: string): string {
   return textContent
 }
 
-async function callAIWithFallback(prompt: string): Promise<string> {
-  try {
-    console.log('Trying Kimi K2.5...')
-    const result = await callKimi(prompt)
-    console.log('Kimi K2.5 success')
-    return result
-  } catch (error) {
-    console.error('Kimi K2.5 failed:', error)
-  }
-
-  console.log('Falling back to MiniMax-M2.7-Highspeed...')
-  try {
-    if (!MINIMAX_API_KEY) {
-      throw new Error('MINIMAX_API_KEY not configured')
-    }
-    const result = await callMiniMax(prompt)
-    console.log('MiniMax API success')
-    return result
-  } catch (error) {
-    console.error('MiniMax API also failed:', error)
-    throw error
-  }
-}
-
-async function callKimi(prompt: string): Promise<string> {
-  if (!KIMI_API_KEY) {
-    throw new Error('KIMI_API_KEY not configured')
-  }
-
-  const response = await fetch(KIMI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${KIMI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: KIMI_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Kimi API error: ${response.status} ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  console.log('[Kimi Response]', JSON.stringify(data, null, 2))
-  
-  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-    console.error('[Kimi Error] Invalid response structure:', data)
-    throw new Error('Kimi API returned invalid response structure')
-  }
-  
-  return data.choices[0].message.content || ''
-}
-
 async function callMiniMax(prompt: string): Promise<string> {
   if (!MINIMAX_API_KEY) {
     throw new Error('MINIMAX_API_KEY not configured')
@@ -395,7 +336,13 @@ Example output:
 }`
 
     // 调用 AI 提取信息
-    const aiResponse = await callAIWithFallback(prompt)
+    const aiResponse = await callMiniMax(prompt)
+    if (!aiResponse) {
+      return NextResponse.json({
+        success: false,
+        error: 'MiniMax extraction failed. Check MINIMAX_API_KEY.'
+      }, { status: 500 })
+    }
 
     // 解析 AI 返回的 JSON
     let extractedInfo: ExtractedInfo

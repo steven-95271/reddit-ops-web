@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 
-const KIMI_API_KEY = process.env.KIMI_API_KEY || ''
-const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions'
-const KIMI_MODEL = 'kimi-k2.5'
-
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY
 const MINIMAX_API_URL = process.env.MINIMAX_API_URL || 'https://api.minimax.chat/v1/text/chatcompletion_v2'
 const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7-Highspeed'
@@ -15,22 +11,6 @@ interface AIscoreResult {
   opportunity: number
   reason: string
   suggested_angle: string
-}
-
-async function callAIWithFallback(prompt: string): Promise<AIscoreResult> {
-  try {
-    const result = await callKimi(prompt)
-    return result
-  } catch (error) {
-    console.error('Kimi failed, trying MiniMax:', error)
-    try {
-      const result = await callMiniMax(prompt)
-      return result
-    } catch (miniError) {
-      console.error('MiniMax also failed:', miniError)
-      throw miniError
-    }
-  }
 }
 
 async function callMiniMax(prompt: string): Promise<AIscoreResult> {
@@ -53,33 +33,6 @@ async function callMiniMax(prompt: string): Promise<AIscoreResult> {
 
   const data = await response.json()
   const content = data.choices?.[0]?.message?.content || data.output || ''
-  
-  return parseAIResponse(content)
-}
-
-async function callKimi(prompt: string): Promise<AIscoreResult> {
-  if (!KIMI_API_KEY) {
-    throw new Error('KIMI_API_KEY not configured')
-  }
-
-  const response = await fetch(KIMI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${KIMI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: KIMI_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Kimi API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  const content = data.choices?.[0]?.message?.content || ''
   
   return parseAIResponse(content)
 }
@@ -233,7 +186,7 @@ export async function POST(request: NextRequest) {
           post.num_comments
         )
 
-        const aiResult = await callAIWithFallback(prompt)
+        const aiResult = await callMiniMax(prompt)
 
         // 计算 ai_label（基于分数）
         const avgScore = (aiResult.relevance + aiResult.intent + aiResult.opportunity) / 3
@@ -242,9 +195,9 @@ export async function POST(request: NextRequest) {
         // 更新数据库
         await sql`
           UPDATE posts SET
-            ai_relevance_score = ${aiResult.relevance},
-            ai_intent_score = ${aiResult.intent},
-            ai_opportunity_score = ${aiResult.opportunity},
+            relevance_score = ${aiResult.relevance},
+            intent_score = ${aiResult.intent},
+            opportunity_score = ${aiResult.opportunity},
             ai_suggested_angle = ${aiResult.suggested_angle},
             ai_reasoning = ${aiResult.reason},
             ai_label = ${aiLabel},

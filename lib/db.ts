@@ -73,13 +73,15 @@ export async function initDb() {
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_scored_at TIMESTAMPTZ`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_label TEXT`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_reasoning TEXT`,
-      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_candidate INTEGER DEFAULT 0`,
-      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_ignored INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_candidate BOOLEAN DEFAULT FALSE`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_ignored BOOLEAN DEFAULT FALSE`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS hot_score FLOAT DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS relevance_score FLOAT DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS scraping_run_id TEXT`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS candidate_marked_at TIMESTAMPTZ`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS intent_score FLOAT DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS opportunity_score FLOAT DEFAULT 0`,
     ]
 
     for (const stmt of alterColumns) {
@@ -124,6 +126,29 @@ export async function initDb() {
     } catch (err) {
       console.error('[initDb] Error creating personas table:', err)
       throw err
+    }
+
+    // 补充 personas 表可能缺失的字段
+    const personaAlters = [
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS age INTEGER',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS gender TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS occupation TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS pain_points TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS goals TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS reddit_behavior TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS avatar_style TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS tone_of_voice TEXT',
+      'ALTER TABLE personas ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1',
+    ]
+    for (const stmt of personaAlters) {
+      try {
+        await sql.query(stmt)
+        console.log('[initDb] personas alter ok:', stmt.slice(30, 70))
+      } catch (e: any) {
+        if (!e.message?.includes('already exists')) {
+          console.error('[initDb] personas alter error:', e.message?.slice(0, 100))
+        }
+      }
     }
 
     // 4. contents 表 - 生成的内容（增强版）

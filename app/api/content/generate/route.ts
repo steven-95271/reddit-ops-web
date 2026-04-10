@@ -2,43 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
 import { checkContentQuality } from '@/lib/quality-check'
 
-// 调用 Kimi API
-async function callKimi(messages: Array<{ role: string; content: string }>): Promise<string> {
-  const apiKey = process.env.MOONSHOT_API_KEY
-  if (!apiKey) {
-    throw new Error('MOONSHOT_API_KEY not configured')
-  }
-
-  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'kimi-latest',
-      messages,
-      temperature: 0.8,
-      max_tokens: 2000,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Kimi API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  console.log('[Kimi Response]', JSON.stringify(data, null, 2))
-  
-  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-    console.error('[Kimi Error] Invalid response structure:', data)
-    throw new Error('Kimi API returned invalid response structure')
-  }
-  
-  return data.choices[0].message.content || ''
-}
-
-// 调用 MiniMax API (fallback)
+// 调用 MiniMax API
 async function callMiniMax(messages: Array<{ role: string; content: string }>): Promise<string> {
   const apiKey = process.env.MINIMAX_API_KEY
   if (!apiKey) {
@@ -228,15 +192,14 @@ export async function POST(request: NextRequest) {
     ]
 
     // 调用 AI 生成
-    let aiResponse: string
-    let modelUsed = 'kimi'
-    try {
-      aiResponse = await callKimi(messages)
-    } catch (kimiError) {
-      console.log('Kimi failed, trying MiniMax:', kimiError)
-      aiResponse = await callMiniMax(messages)
-      modelUsed = 'minimax'
+    const aiResponse = await callMiniMax(messages)
+    if (!aiResponse) {
+      return NextResponse.json({
+        success: false,
+        error: 'MiniMax generation failed. Check MINIMAX_API_KEY and MINIMAX_GROUP_ID.'
+      }, { status: 500 })
     }
+    const modelUsed = 'minimax'
 
     // 质量评分
     const qualityResult = checkContentQuality(aiResponse, brandNames)

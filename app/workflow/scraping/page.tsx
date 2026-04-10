@@ -38,7 +38,7 @@ interface ScrapingRun {
   phase: string
   query: string
   subreddit?: string
-  status: 'pending' | 'running' | 'succeeded' | 'failed'
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED-OUT' | 'ABORTED'
   params: {
     time_range: string
     max_posts: number
@@ -52,6 +52,10 @@ interface ScrapingRun {
   error_message?: string
   started_at?: string
   completed_at?: string
+  item_count?: number
+  cost_usd?: number
+  dataset_id?: string
+  finished_at?: string
 }
 
 interface PhaseConfig {
@@ -289,43 +293,53 @@ export default function ScrapingPage() {
     try {
       const res = await fetch(`/api/scraping/runs?projectId=${projectId}`)
       const data = await res.json()
-
+      
+      console.log('[loadHistoryRuns] Loaded', data.runs?.length, 'runs for project', projectId)
+      
       if (data.runs && data.runs.length > 0) {
-        console.log('[loadHistoryRuns] loaded', data.runs.length, 'runs from DB')
         setRuns(data.runs)
-
-        // 对仍在 RUNNING 状态的任务重新启动轮询
-        data.runs
-          .filter((r: any) => r.status === 'running' && r.apify_run_id)
-          .forEach((r: any) => {
-            console.log('[Resume polling] runId:', r.apify_run_id)
-            startPolling(r.apify_run_id, projectId)
-          })
+        
+        const runningTasks = data.runs.filter((r: any) => r.status === 'RUNNING')
+        console.log('[loadHistoryRuns] Resuming polling for', runningTasks.length, 'RUNNING tasks')
+        
+        runningTasks.forEach((r: any) => {
+          startPolling(r.apify_run_id, projectId)
+        })
       }
-    } catch (err) {
-      console.error('[loadHistoryRuns] failed:', err)
+    } catch (e) {
+      console.error('[loadHistoryRuns] Error:', e)
     }
   }
 
   // 强制同步所有 RUNNING 状态的任务
   async function syncAllRunningTasks() {
-    const runningRuns = runs.filter((r: ScrapingRun) => r.status === 'running')
-    console.log('[Sync] Force syncing', runningRuns.length, 'tasks')
+    const runningRuns = runs.filter((r: ScrapingRun) => r.status === 'RUNNING')
+    console.log('[Sync] Force syncing', runningRuns.length, 'running tasks')
 
     for (const run of runningRuns) {
       if (!run.apify_run_id) continue
       try {
         const res = await fetch(`/api/scraping/${run.apify_run_id}/status`)
         const data = await res.json()
-        console.log('[Sync] runId:', run.apify_run_id, 'status:', data.status)
+        console.log('[Sync] runId:', run.apify_run_id, '→', data.status)
 
-        if (TERMINAL_STATUSES.includes(data.status)) {
+        const TERMINAL = ['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']
+
+        if (TERMINAL.includes(data.status)) {
+          // 更新前端 state
           setRuns(prev => prev.map(r =>
             r.apify_run_id === run.apify_run_id
-              ? { ...r, status: data.status, item_count: data.itemCount, cost_usd: data.costUsd, dataset_id: data.datasetId }
+              ? {
+                  ...r,
+                  status: data.status,
+                  item_count: data.itemCount,
+                  cost_usd: data.costUsd,
+                  dataset_id: data.datasetId
+                }
               : r
           ))
 
+          // 写回数据库
           await fetch(`/api/scraping/runs/${run.apify_run_id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -338,16 +352,22 @@ export default function ScrapingPage() {
             })
           })
 
+          // 成功则同步数据到 posts 表
           if (data.status === 'SUCCEEDED' && data.datasetId && selectedProject?.id) {
-            await fetch(`/api/scraping/${run.apify_run_id}/results?project_id=${selectedProject.id}`)
-            console.log('[Sync] Results synced for runId:', run.apify_run_id)
+            console.log('[Sync] Pulling results for runId:', run.apify_run_id)
+            await fetch(
+              `/api/scraping/${run.apify_run_id}/results?project_id=${selectedProject.id}`
+            )
           }
         }
-      } catch (err) {
-        console.error('[Sync] Error for runId:', run.apify_run_id, err)
+      } catch (e) {
+        console.error('[Sync] Error for runId:', run.apify_run_id, e)
       }
     }
-    console.log('[Sync] Done')
+
+    // 同步完成后刷新列表
+    await loadHistoryRuns(selectedProject?.id || '')
+    console.log('[Sync] All done')
   }
 
   const fetchProjects = async () => {

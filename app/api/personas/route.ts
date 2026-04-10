@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
   try {
     await initDb()
     const body = await request.json()
+    console.log('[Personas] POST request received, projectId:', body.project_id)
+    console.log('[Personas] MINIMAX_API_KEY exists:', !!process.env.MINIMAX_API_KEY)
+    console.log('[Personas] MINIMAX_GROUP_ID exists:', !!process.env.MINIMAX_GROUP_ID)
     const {
       project_id,
       name,
