@@ -146,13 +146,8 @@ export async function getScrapingStatus(run_id: string): Promise<RunStatus> {
 
   try {
     const response = await fetch(
-      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs/${run_id}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-        },
-      }
+      `${APIFY_BASE_URL}/actor-runs/${run_id}?token=${APIFY_API_TOKEN}`,
+      { method: 'GET' }
     )
 
     if (!response.ok) {
@@ -180,15 +175,24 @@ export async function getScrapingResults(run_id: string): Promise<ScrapingResult
   }
 
   try {
-    // 获取任务结果数据集
+    // 先获取 run 信息拿到 datasetId
+    const runInfoRes = await fetch(
+      `${APIFY_BASE_URL}/actor-runs/${run_id}?token=${APIFY_API_TOKEN}`,
+      { method: 'GET' }
+    )
+    if (!runInfoRes.ok) {
+      throw new Error(`Apify API error: ${runInfoRes.status}`)
+    }
+    const runData = await runInfoRes.json()
+    const datasetId = runData.data?.defaultDatasetId
+    if (!datasetId) {
+      throw new Error(`No datasetId for run ${run_id}`)
+    }
+
+    // 用 datasetId 获取数据
     const response = await fetch(
-      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs/${run_id}/dataset/items`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-        },
-      }
+      `${APIFY_BASE_URL}/datasets/${datasetId}/items?token=${APIFY_API_TOKEN}`,
+      { method: 'GET' }
     )
 
     if (!response.ok) {
@@ -353,13 +357,8 @@ export async function getRunDatasetId(run_id: string): Promise<string | null> {
 
   try {
     const response = await fetch(
-      `${APIFY_BASE_URL}/acts/${REDDIT_SCRAPER_ACTOR_ID}/runs/${run_id}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-        },
-      }
+      `${APIFY_BASE_URL}/actor-runs/${run_id}?token=${APIFY_API_TOKEN}`,
+      { method: 'GET' }
     )
 
     if (!response.ok) {
@@ -388,13 +387,8 @@ export async function downloadDatasetAsCsv(dataset_id: string): Promise<string> 
 
   try {
     const response = await fetch(
-      `${APIFY_BASE_URL}/datasets/${dataset_id}/items?format=csv`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-        },
-      }
+      `${APIFY_BASE_URL}/datasets/${dataset_id}/items?format=csv&token=${APIFY_API_TOKEN}`,
+      { method: 'GET' }
     )
 
     if (!response.ok) {
