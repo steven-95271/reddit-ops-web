@@ -331,6 +331,27 @@ export default function ScrapingPage() {
         
         if (allCompleted) {
           setIsPolling(false)
+
+          // 对所有终态 run 写回 DB（确保状态持久化）
+          const completedRuns = data.data.runs.filter(
+            (r: ScrapingRun) => r.status === 'succeeded' || r.status === 'failed'
+          )
+          await Promise.all(
+            completedRuns.map((run: ScrapingRun) =>
+              fetch(`/api/scraping/runs/${run.apify_run_id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  status: run.status === 'succeeded' ? 'SUCCEEDED' : run.status.toUpperCase(),
+                  item_count: run.inserted_posts ?? 0,
+                  cost_usd: 0,
+                  dataset_id: run.apify_dataset_id ?? null,
+                  finished_at: new Date().toISOString()
+                })
+              })
+            )
+          )
+
           showToast('所有抓取任务已完成', 'success')
         } else {
           // 继续轮询
