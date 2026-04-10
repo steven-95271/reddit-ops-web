@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
         score, num_comments, upvote_ratio, created_utc,
         quality_score, ai_relevance_score, ai_intent_score, 
         ai_opportunity_score, ai_suggested_angle, category,
-        is_candidate, ignored, scraped_at
+        is_candidate, ignored, scraped_at,
+        COALESCE(is_candidate, FALSE) as is_candidate,
+        COALESCE(ignored, FALSE) as ignored
       FROM posts 
       WHERE project_id = ${project_id}
       ORDER BY quality_score DESC NULLS LAST, created_utc DESC
@@ -116,13 +118,13 @@ export async function GET(request: NextRequest) {
     }
     
     if (is_candidate === 'true') {
-      filteredPosts = filteredPosts.filter(post => post.is_candidate === true)
+      filteredPosts = filteredPosts.filter(post => !!post.is_candidate)
     }
     
     if (ignored === 'true') {
-      filteredPosts = filteredPosts.filter(post => post.ignored === true)
+      filteredPosts = filteredPosts.filter(post => !!post.ignored)
     } else if (ignored === 'false') {
-      filteredPosts = filteredPosts.filter(post => post.ignored === false)
+      filteredPosts = filteredPosts.filter(post => !post.ignored)
     }
     
     const total = filteredPosts.length
