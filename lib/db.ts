@@ -68,20 +68,26 @@ export async function initDb() {
 
     // 补充 posts 表可能缺失的字段（Postgres 支持 ADD COLUMN IF NOT EXISTS）
     // 注意：CREATE TABLE IF NOT EXISTS 只在表不存在时创建，旧部署的表可能缺少后来加的列
-    const alterStatements = [
-      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS scraping_run_id TEXT',
-      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_reasoning TEXT',
-      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_label TEXT',
-      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_scored_at TIMESTAMP',
-      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS candidate_marked_at TIMESTAMP',
+    const alterColumns = [
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_score INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_scored_at TIMESTAMPTZ`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_label TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_reasoning TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_candidate INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_ignored INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS hot_score FLOAT DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS relevance_score FLOAT DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS scraping_run_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS candidate_marked_at TIMESTAMPTZ`,
     ]
 
-    for (const stmt of alterStatements) {
+    for (const stmt of alterColumns) {
       try {
         await sql.query(stmt)
-        console.log('[initDb] Executed:', stmt)
-      } catch (err) {
-        console.error('[initDb] ALTER error:', err)
+        console.log('[initDb] Executed:', stmt.slice(0, 60))
+      } catch (e: any) {
+        console.log('[initDb] Column may already exist:', e?.message?.slice(0, 100))
       }
     }
 

@@ -166,7 +166,7 @@ export default function ScrapingPage() {
       try {
         const res = await fetch(`/api/scraping/${runId}/status`)
         const data = await res.json()
-        console.log('[Poll] runId:', runId, 'status:', data.status)
+        console.log('[Poll] runId:', runId, 'status:', data.status, 'items:', data.itemCount, 'dataset:', data.datasetId)
         const isTerminal = TERMINAL_STATUSES.includes(data.status)
         setSubredditRunStatuses(prev => {
           const subreddit = prev[subredditName]
@@ -307,6 +307,49 @@ export default function ScrapingPage() {
     }
   }
 
+  // 强制同步所有 RUNNING 状态的任务
+  async function syncAllRunningTasks() {
+    const runningRuns = runs.filter((r: ScrapingRun) => r.status === 'running')
+    console.log('[Sync] Force syncing', runningRuns.length, 'tasks')
+
+    for (const run of runningRuns) {
+      if (!run.apify_run_id) continue
+      try {
+        const res = await fetch(`/api/scraping/${run.apify_run_id}/status`)
+        const data = await res.json()
+        console.log('[Sync] runId:', run.apify_run_id, 'status:', data.status)
+
+        if (TERMINAL_STATUSES.includes(data.status)) {
+          setRuns(prev => prev.map(r =>
+            r.apify_run_id === run.apify_run_id
+              ? { ...r, status: data.status, item_count: data.itemCount, cost_usd: data.costUsd, dataset_id: data.datasetId }
+              : r
+          ))
+
+          await fetch(`/api/scraping/runs/${run.apify_run_id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: data.status,
+              item_count: data.itemCount ?? 0,
+              cost_usd: data.costUsd ?? 0,
+              dataset_id: data.datasetId ?? null,
+              finished_at: new Date().toISOString()
+            })
+          })
+
+          if (data.status === 'SUCCEEDED' && data.datasetId && selectedProject?.id) {
+            await fetch(`/api/scraping/${run.apify_run_id}/results?project_id=${selectedProject.id}`)
+            console.log('[Sync] Results synced for runId:', run.apify_run_id)
+          }
+        }
+      } catch (err) {
+        console.error('[Sync] Error for runId:', run.apify_run_id, err)
+      }
+    }
+    console.log('[Sync] Done')
+  }
+
   const fetchProjects = async () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/projects`)
@@ -384,7 +427,7 @@ export default function ScrapingPage() {
       try {
         const res = await fetch(`/api/scraping/${runId}/status`)
         const data = await res.json()
-        console.log('[Poll] runId:', runId, 'status:', data.status)
+        console.log('[Poll] runId:', runId, 'status:', data.status, 'items:', data.itemCount, 'dataset:', data.datasetId)
         const isTerminal = TERMINAL_STATUSES.includes(data.status)
 
         // 更新前端 state（如果是 subredditRunStatuses 中的 run）
@@ -1220,6 +1263,12 @@ export default function ScrapingPage() {
         {runs.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">任务列表</h2>
+            <button
+              onClick={syncAllRunningTasks}
+              className="mb-4 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100"
+            >
+              🔄 同步所有任务状态
+            </button>
             
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
