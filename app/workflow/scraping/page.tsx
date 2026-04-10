@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
 
@@ -126,6 +126,130 @@ export default function ScrapingPage() {
     phase3_scene_pain: new Set(),
     phase4_subreddits: new Set()
   })
+
+  // 终态状态常量
+  const TERMINAL_STATUSES = ['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']
+
+  // 每个 Subreddit 的运行状态: subredditName -> { status, runs[] }
+  interface SubredditRun {
+    runId: string
+    keyword: string
+    status: string
+    itemCount: number
+    costUsd: number
+    datasetId: string | null
+    errorMessage: string | null
+  }
+  const [subredditRunStatuses, setSubredditRunStatuses] = useState<Record<string, { status: string; runs: SubredditRun[] }>>({})
+
+  // 下载 CSV 函数
+  const downloadCSV = (datasetId: string) => {
+    if (!datasetId) return
+    const token = process.env.NEXT_PUBLIC_APIFY_TOKEN
+    if (!token) {
+      showToast('NEXT_PUBLIC_APIFY_TOKEN 未配置', 'error')
+      return
+    }
+    const url = `https://api.apify.com/v2/datasets/${datasetId}/items?format=csv&clean=true&attachment=true&token=${token}`
+    window.open(url, '_blank')
+  }
+
+  // 轮询单个 Run 状态
+  const pollingIntervals = useRef<Record<string, NodeJS.Timeout>>({})
+  const startPollingRun = (runId: string, subredditName: string) => {
+    if (pollingIntervals.current[runId]) {
+      clearInterval(pollingIntervals.current[runId])
+    }
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scraping/${runId}/status`)
+        const data = await res.json()
+        console.log('[Poll] runId:', runId, 'status:', data.status)
+        const isTerminal = TERMINAL_STATUSES.includes(data.status)
+        setSubredditRunStatuses(prev => {
+          const subreddit = prev[subredditName]
+          if (!subreddit) return prev
+          const allTerminal = subreddit.runs.every(r => TERMINAL_STATUSES.includes(r.status))
+          const newStatus = isTerminal && allTerminal ? 'DONE' : 'RUNNING'
+          return {
+            ...prev,
+            [subredditName]: {
+              status: newStatus,
+              runs: subreddit.runs.map(r =>
+                r.runId === runId ? { ...r, ...data } : r
+              )
+            }
+          }
+        })
+        if (isTerminal) {
+          clearInterval(poll)
+          delete pollingIntervals.current[runId]
+        }
+      } catch (error) {
+        console.error('[Poll] Error:', error)
+      }
+    }, 5000)
+    pollingIntervals.current[runId] = poll
+  }
+
+  // 抓取单个 Subreddit（为每个关键词启动独立 Run）
+  const handleScrapeSubreddit = async (subredditName: string, searchKeywords: string[]) => {
+    if (!selectedProject) return
+    setSubredditRunStatuses(prev => ({
+      ...prev,
+      [subredditName]: { status: 'STARTING', runs: [] }
+    }))
+    try {
+      const res = await fetch('/api/scraping/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject.id,
+          phase_configs: {
+            phase1_brand: phaseConfigs[0],
+            phase2_competitor: phaseConfigs[1],
+            phase3_scene_pain: phaseConfigs[2],
+            phase4_subreddits: phaseConfigs[3]
+          },
+          subreddits: [{ name: subredditName, keywords: searchKeywords }]
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        const runs = data.runs.map((r: any) => ({
+          runId: r.id,
+          keyword: r.query,
+          status: 'RUNNING',
+          itemCount: 0,
+          costUsd: 0,
+          datasetId: null,
+          errorMessage: null
+        }))
+        setSubredditRunStatuses(prev => ({
+          ...prev,
+          [subredditName]: { status: 'RUNNING', runs }
+        }))
+        data.runs.forEach((r: any) => {
+          if (r.status === 'running') {
+            startPollingRun(r.id, subredditName)
+          }
+        })
+        showToast(`已为 r/${subredditName} 启动 ${data.runs.length} 个任务`, 'success')
+      } else {
+        showToast(data.error || '启动失败', 'error')
+        setSubredditRunStatuses(prev => {
+          const { [subredditName]: _, ...rest } = prev
+          return rest
+        })
+      }
+    } catch (error) {
+      showToast('启动失败', 'error')
+      setSubredditRunStatuses(prev => {
+        const { [subredditName]: _, ...rest } = prev
+        return rest
+      })
+    }
+  }
 
   // 加载项目列表
   useEffect(() => {
@@ -708,32 +832,104 @@ export default function ScrapingPage() {
                   {isExpanded && (
                     <div className="p-4 bg-slate-50">
                       {phase === 'phase4_subreddits' ? (
-                        <div className="space-y-2">
-                          {targets.map((target, idx) => (
-                            <div key={idx} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
-                              <input
-                                type="checkbox"
-                                checked={selectedItems[phase]?.has(target.subreddit) || false}
-                                onChange={() => toggleItemSelection(phase, target.subreddit)}
-                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-purple-600">r/{target.subreddit}</span>
-                                  <span className="text-xs text-slate-400">|</span>
-                                  <span className="text-xs text-slate-500">搜索词: {target.search_within?.join(', ') || '无'}</span>
+                        <div className="space-y-3">
+                          {targets.map((target, idx) => {
+                            const subStatus = subredditRunStatuses[target.subreddit]
+                            return (
+                              <div key={idx} className="bg-white rounded-lg border border-slate-200 p-3">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedItems[phase]?.has(target.subreddit) || false}
+                                    onChange={() => toggleItemSelection(phase, target.subreddit)}
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-purple-600">r/{target.subreddit}</span>
+                                      <span className="text-xs text-slate-400">|</span>
+                                      <span className="text-xs text-slate-500">搜索词: {target.search_within?.join(', ') || '无'}</span>
+                                    </div>
+                                    <div className="text-xs text-slate-400">原因: {target.reason}</div>
+                                    {subStatus && (
+                                      <div className="text-xs mt-1">
+                                        {subStatus.status === 'STARTING' && <span className="text-gray-500">⏳ 启动中...</span>}
+                                        {subStatus.status === 'RUNNING' && <span className="text-blue-500">🔵 进行中 ({subStatus.runs.length} 个任务)</span>}
+                                        {subStatus.status === 'DONE' && <span className="text-green-500">✅ 完成</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!subStatus && (
+                                    <button
+                                      onClick={() => handleScrapeSubreddit(target.subreddit, target.search_within || [])}
+                                      disabled={loading}
+                                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                      抓取全部
+                                    </button>
+                                  )}
+                                  {subStatus?.status === 'RUNNING' && (
+                                    <button
+                                      onClick={() => handleScrapeSubreddit(target.subreddit, target.search_within || [])}
+                                      disabled={loading}
+                                      className="px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                      再次抓取
+                                    </button>
+                                  )}
                                 </div>
-                                <div className="text-xs text-slate-400 mt-1">原因: {target.reason}</div>
+                                {/* 每个 Run 的独立状态 */}
+                                {subStatus && subStatus.runs.length > 0 && (
+                                  <div className="mt-3 pl-7 space-y-2">
+                                    {subStatus.runs.map((run, runIdx) => (
+                                      <div key={runIdx} className="text-xs flex items-center gap-2 flex-wrap">
+                                        <span className="text-slate-600">{run.keyword || '(空关键词)'}</span>
+                                        {run.status === 'RUNNING' && (
+                                          <span className="text-blue-500">🔵 抓取中 · {run.itemCount} 条</span>
+                                        )}
+                                        {run.status === 'SUCCEEDED' && (
+                                          <>
+                                            <span className="text-green-500">✅ 已完成 · {run.itemCount} 条 · ${run.costUsd?.toFixed(3)}</span>
+                                            <button
+                                              onClick={() => downloadCSV(run.datasetId!)}
+                                              className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                            >
+                                              ⬇️ 下载 CSV
+                                            </button>
+                                          </>
+                                        )}
+                                        {run.status === 'TIMED-OUT' && (
+                                          <>
+                                            <span className="text-orange-500">⏰ 已超时 · 已抓 {run.itemCount} 条</span>
+                                            <button
+                                              onClick={() => downloadCSV(run.datasetId!)}
+                                              className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded hover:bg-orange-200"
+                                            >
+                                              ⬇️ 下载已抓取
+                                            </button>
+                                            <a
+                                              href={`https://console.apify.com/actors/automation-lab~reddit-scraper/runs/${run.runId}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:underline"
+                                            >
+                                              在 Apify 续跑 ↗
+                                            </a>
+                                          </>
+                                        )}
+                                        {run.status === 'FAILED' && (
+                                          <span className="text-red-500">❌ 失败：{run.errorMessage}</span>
+                                        )}
+                                        <span style={{ fontSize: 10, color: '#999', fontFamily: 'monospace' }}>
+                                          ID: {run.runId?.slice(0, 8)}...
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                              <button
-                                onClick={() => startSingleScraping(phase, target.subreddit, target.search_within?.[0] || '', target.subreddit)}
-                                disabled={loading || isPolling}
-                                className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
-                              >
-                                抓取
-                              </button>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
