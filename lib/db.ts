@@ -82,6 +82,13 @@ export async function initDb() {
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS candidate_marked_at TIMESTAMPTZ`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS intent_score FLOAT DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS opportunity_score FLOAT DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS reddit_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS reddit_url TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS upvotes INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS created_at_reddit TIMESTAMP`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS post_type TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS keyword TEXT`,
     ]
 
     for (const stmt of alterColumns) {
