@@ -9,6 +9,19 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = new URL(request.url)
     const project_id = searchParams.get('project_id')
+    
+    // 诊断日志
+    try {
+      const totalResult = await sql`SELECT COUNT(*) as count FROM posts`
+      const projectTotalResult = project_id
+        ? await sql`SELECT COUNT(*) as count FROM posts WHERE project_id = ${project_id}`
+        : { rows: [{ count: 0 }] }
+      console.log('[Posts] Total in DB:', totalResult.rows[0].count,
+        '| For project', project_id, ':', projectTotalResult.rows[0].count)
+    } catch (diagErr) {
+      console.error('[Posts] Diagnostic log error:', diagErr)
+    }
+
     const min_quality = searchParams.get('min_quality')
     const time_range = searchParams.get('time_range')
     const phase = searchParams.get('phase')

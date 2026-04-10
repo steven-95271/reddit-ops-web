@@ -235,6 +235,10 @@ export async function POST(request: NextRequest) {
 
         const aiResult = await callAIWithFallback(prompt)
 
+        // 计算 ai_label（基于分数）
+        const avgScore = (aiResult.relevance + aiResult.intent + aiResult.opportunity) / 3
+        const aiLabel = avgScore >= 7 ? 'S' : avgScore >= 5 ? 'A' : avgScore >= 3 ? 'B' : 'C'
+
         // 更新数据库
         await sql`
           UPDATE posts SET
@@ -242,6 +246,8 @@ export async function POST(request: NextRequest) {
             ai_intent_score = ${aiResult.intent},
             ai_opportunity_score = ${aiResult.opportunity},
             ai_suggested_angle = ${aiResult.suggested_angle},
+            ai_reasoning = ${aiResult.reason},
+            ai_label = ${aiLabel},
             ai_scored_at = NOW()
           WHERE id = ${post.id}
         `

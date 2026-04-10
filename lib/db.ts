@@ -66,6 +66,30 @@ export async function initDb() {
       throw err
     }
 
+    // 补充 posts 表可能缺失的字段（使用 sql.query 避免 tagged template 限制）
+    try {
+      const colsResult = await sql.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'posts' AND table_schema = 'public'
+      `)
+      const existingCols = colsResult.rows.map((r: any) => r.column_name)
+
+      const missingCols = [
+        { name: 'scraping_run_id', def: 'TEXT' },
+        { name: 'ai_reasoning', def: 'TEXT' },
+        { name: 'ai_label', def: 'TEXT' },
+      ]
+
+      for (const col of missingCols) {
+        if (!existingCols.includes(col.name)) {
+          await sql.query(`ALTER TABLE posts ADD COLUMN ${col.name} ${col.def}`)
+          console.log(`[initDb] Added column posts.${col.name}`)
+        }
+      }
+    } catch (err) {
+      console.error('[initDb] Error adding missing columns to posts:', err)
+    }
+
     // 3. personas 表 - 人设管理（增强版）
     try {
       await sql`
