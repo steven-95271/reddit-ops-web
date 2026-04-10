@@ -59,12 +59,11 @@ async function scrapeWithApify(url: string): Promise<string | null> {
 
     // 启动 Actor 任务
     const runResponse = await fetch(
-      `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs`,
+      `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs?token=${APIFY_API_TOKEN}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${APIFY_API_TOKEN}`,
         },
         body: JSON.stringify(actorInput),
       }
@@ -93,13 +92,8 @@ async function scrapeWithApify(url: string): Promise<string | null> {
     
     while (attempts < maxAttempts) {
       const statusResponse = await fetch(
-        `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs/${runId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-          },
-        }
+        `${APIFY_BASE_URL}/actor-runs/${runId}?token=${APIFY_API_TOKEN}`,
+        { method: 'GET' }
       )
 
       if (!statusResponse.ok) {
@@ -113,15 +107,28 @@ async function scrapeWithApify(url: string): Promise<string | null> {
       console.log(`[Apify] Run ${runId} status: ${status} (attempt ${attempts + 1}/${maxAttempts})`)
 
       if (['SUCCEEDED', 'FINISHED'].includes(status)) {
-        // 任务完成，获取结果
+        // 任务完成，先获取 datasetId，再获取结果
+        const runInfoResponse = await fetch(
+          `${APIFY_BASE_URL}/actor-runs/${runId}?token=${APIFY_API_TOKEN}`,
+          { method: 'GET' }
+        )
+
+        if (!runInfoResponse.ok) {
+          console.error('[Apify] Failed to get run info:', runInfoResponse.status)
+          return null
+        }
+
+        const runInfo = await runInfoResponse.json()
+        const datasetId = runInfo.data?.defaultDatasetId
+
+        if (!datasetId) {
+          console.error('[Apify] No dataset ID found')
+          return null
+        }
+
         const itemsResponse = await fetch(
-          `${APIFY_BASE_URL}/acts/${ACTOR_ID}/runs/${runId}/dataset/items`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${APIFY_API_TOKEN}`,
-            },
-          }
+          `${APIFY_BASE_URL}/datasets/${datasetId}/items?token=${APIFY_API_TOKEN}`,
+          { method: 'GET' }
         )
 
         if (!itemsResponse.ok) {
