@@ -67,11 +67,13 @@ export async function initDb() {
     }
 
     // 补充 posts 表可能缺失的字段（Postgres 支持 ADD COLUMN IF NOT EXISTS）
-    // CREATE TABLE 已定义 is_candidate (BOOLEAN), ignored (BOOLEAN), quality_score, hot_score 等
+    // 注意：CREATE TABLE IF NOT EXISTS 只在表不存在时创建，旧部署的表可能缺少后来加的列
     const alterStatements = [
       'ALTER TABLE posts ADD COLUMN IF NOT EXISTS scraping_run_id TEXT',
       'ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_reasoning TEXT',
       'ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_label TEXT',
+      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_scored_at TIMESTAMP',
+      'ALTER TABLE posts ADD COLUMN IF NOT EXISTS candidate_marked_at TIMESTAMP',
     ]
 
     for (const stmt of alterStatements) {
