@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     // 为每个词创建运行记录并启动任务
     const runs: Array<{
       id: string
+      apify_run_id: string | null
       phase: string
       query: string
       subreddit?: string
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
             WHERE id = ${runId}
           `
 
-          runs.push({ id: runId, phase, query, status: 'running' })
+          runs.push({ id: runId, apify_run_id: apifyRunId, phase, query, status: 'running' })
         } catch (error) {
           console.error(`Error starting scraping for ${query}:`, error)
           await sql`
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
             SET status = 'failed', error_message = ${error instanceof Error ? error.message : 'Unknown error'}
             WHERE id = ${runId}
           `
-          runs.push({ id: runId, phase, query, status: 'failed' })
+          runs.push({ id: runId, apify_run_id: null, phase, query, status: 'failed' })
         }
       }
     }
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
               WHERE id = ${runId}
             `
 
-            runs.push({ id: runId, phase: 'phase4_subreddits', query: keyword, subreddit, status: 'running' })
+            runs.push({ id: runId, apify_run_id: apifyRunId, phase: 'phase4_subreddits', query: keyword, subreddit, status: 'running' })
           } catch (error) {
             console.error(`Error starting scraping for ${subreddit}/${keyword}:`, error)
             await sql`
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
               SET status = 'failed', error_message = ${error instanceof Error ? error.message : 'Unknown error'}
               WHERE id = ${runId}
             `
-            runs.push({ id: runId, phase: 'phase4_subreddits', query: keyword, subreddit, status: 'failed' })
+            runs.push({ id: runId, apify_run_id: null, phase: 'phase4_subreddits', query: keyword, subreddit, status: 'failed' })
           }
         }
       }

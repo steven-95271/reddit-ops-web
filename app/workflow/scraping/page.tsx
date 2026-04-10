@@ -158,7 +158,7 @@ export default function ScrapingPage() {
   }
 
   // 轮询单个 Run 状态（Phase 4 用）
-  const startPollingRun = (runId: string, subredditName: string) => {
+  const startPollingRun = (runId: string, subredditName: string, projectId: string) => {
     if (pollingIntervals.current[runId]) {
       clearInterval(pollingIntervals.current[runId])
     }
@@ -186,6 +186,14 @@ export default function ScrapingPage() {
         if (isTerminal) {
           clearInterval(poll)
           delete pollingIntervals.current[runId]
+
+          // SUCCEEDED 时：同步数据到 posts 表
+          if (data.status === 'SUCCEEDED' && data.datasetId) {
+            await fetch(`/api/scraping/${runId}/results?project_id=${projectId}`, {
+              method: 'POST'
+            })
+            console.log('[Poll] Synced results for runId:', runId)
+          }
 
           await fetch(`/api/scraping/runs/${runId}`, {
             method: 'PATCH',
@@ -231,7 +239,7 @@ export default function ScrapingPage() {
       const data = await res.json()
       if (data.success) {
         const runs = data.runs.map((r: any) => ({
-          runId: r.id,
+          runId: r.apify_run_id || r.id,
           keyword: r.query,
           status: 'RUNNING',
           itemCount: 0,
@@ -244,8 +252,8 @@ export default function ScrapingPage() {
           [subredditName]: { status: 'RUNNING', runs }
         }))
         data.runs.forEach((r: any) => {
-          if (r.status === 'running') {
-            startPollingRun(r.id, subredditName)
+          if (r.status === 'running' && r.apify_run_id) {
+            startPollingRun(r.apify_run_id, subredditName, selectedProject.id)
           }
         })
         showToast(`已为 r/${subredditName} 启动 ${data.runs.length} 个任务`, 'success')
@@ -291,7 +299,7 @@ export default function ScrapingPage() {
           .filter((r: any) => r.status === 'running' && r.apify_run_id)
           .forEach((r: any) => {
             console.log('[Resume polling] runId:', r.apify_run_id)
-            startPolling(r.apify_run_id)
+            startPolling(r.apify_run_id, projectId)
           })
       }
     } catch (err) {
@@ -367,8 +375,8 @@ export default function ScrapingPage() {
     }
   }, [])
 
-  // 轮询单个 Apify Run 并在终态时写回 DB
-  const startPolling = useCallback((runId: string) => {
+  // 轮询单个 Apify Run 并在终态时写回 DB + 同步数据
+  const startPolling = useCallback((runId: string, projectId: string) => {
     if (pollingIntervals.current[runId]) {
       clearInterval(pollingIntervals.current[runId])
     }
@@ -399,10 +407,18 @@ export default function ScrapingPage() {
           return prev
         })
 
-        // 终态：停止轮询 + 写回 DB
+        // 终态：停止轮询 + 同步数据到 posts 表 + 写回 DB
         if (isTerminal) {
           clearInterval(poll)
           delete pollingIntervals.current[runId]
+
+          // SUCCEEDED 时：同步 Apify 数据到 posts 表
+          if (data.status === 'SUCCEEDED' && data.datasetId) {
+            await fetch(`/api/scraping/${runId}/results?project_id=${projectId}`, {
+              method: 'POST'
+            })
+            console.log('[Poll] Synced results for runId:', runId)
+          }
 
           await fetch(`/api/scraping/runs/${runId}`, {
             method: 'PATCH',
