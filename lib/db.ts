@@ -336,12 +336,22 @@ export async function initDb() {
       `
       console.log('[initDb] scraping_runs table created/verified')
 
-      // Add cost_usd column if it doesn't exist (for existing tables)
-      try {
-        await sql`ALTER TABLE scraping_runs ADD COLUMN cost_usd REAL DEFAULT 0`
-        console.log('[initDb] Added cost_usd column to scraping_runs')
-      } catch {
-        // Column may already exist, ignore
+      const scrapingRunAlterStatements = [
+        `ALTER TABLE scraping_runs ADD COLUMN IF NOT EXISTS cost_usd REAL DEFAULT 0`,
+        `ALTER TABLE scraping_runs ADD COLUMN IF NOT EXISTS apify_status TEXT`,
+        `ALTER TABLE scraping_runs ADD COLUMN IF NOT EXISTS last_checked_at TIMESTAMP`,
+        `ALTER TABLE scraping_runs ADD COLUMN IF NOT EXISTS results_synced_at TIMESTAMP`,
+        `ALTER TABLE scraping_runs ADD COLUMN IF NOT EXISTS sync_lock_token TEXT`,
+        `ALTER TABLE scraping_runs ADD COLUMN IF NOT EXISTS sync_lock_expires_at TIMESTAMP`,
+      ]
+
+      for (const stmt of scrapingRunAlterStatements) {
+        try {
+          await sql.query(stmt)
+          console.log('[initDb] Executed:', stmt.slice(0, 60))
+        } catch (e: any) {
+          console.log('[initDb] Column may already exist:', e?.message?.slice(0, 100))
+        }
       }
     } catch (err) {
       console.error('[initDb] Error creating scraping_runs table:', err)

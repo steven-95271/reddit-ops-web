@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { showToast } from '@/components/Toast'
 import WorkflowGuide from '@/components/WorkflowGuide'
 
@@ -35,10 +35,12 @@ interface Project {
 
 interface ScrapingRun {
   id: string
+  batch_id: string
+  project_id: string
   phase: string
   query: string
   subreddit?: string
-  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED-OUT' | 'ABORTED'
+  status: 'pending' | 'running' | 'succeeded' | 'failed'
   params: {
     time_range: string
     max_posts: number
@@ -47,15 +49,16 @@ interface ScrapingRun {
   total_posts: number
   inserted_posts: number
   skipped_posts: number
-  apify_run_id?: string
-  apify_dataset_id?: string
+  apify_run_id?: string | null
+  apify_dataset_id?: string | null
+  apify_status?: string | null
   error_message?: string
   started_at?: string
   completed_at?: string
-  item_count?: number
   cost_usd?: number
-  dataset_id?: string
-  finished_at?: string
+  created_at?: string
+  last_checked_at?: string | null
+  results_synced_at?: string | null
 }
 
 interface PhaseConfig {
@@ -99,12 +102,11 @@ export default function ScrapingPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(false)
-  const [batchId, setBatchId] = useState<string | null>(null)
   const [runs, setRuns] = useState<ScrapingRun[]>([])
-  const [isPolling, setIsPolling] = useState(false)
-
-  // 共享的轮询 intervals（组件级别声明，避免 TDZ）
-  const pollingIntervals = useRef<Record<string, NodeJS.Timeout>>({})
+  const [autoPollingEnabled, setAutoPollingEnabled] = useState(true)
+  const [isSyncingRuns, setIsSyncingRuns] = useState(false)
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
+  const autoPollingRef = useRef<NodeJS.Timeout | null>(null)
 
   // 四阶段配置 - 数组结构便于索引访问
   const [phaseConfigs, setPhaseConfigs] = useState<PhaseConfig[]>([
@@ -134,99 +136,18 @@ export default function ScrapingPage() {
     phase4_subreddits: new Set()
   })
 
-  // 终态状态常量
-  const TERMINAL_STATUSES = ['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']
-
-  // 每个 Subreddit 的运行状态: subredditName -> { status, runs[] }
-  interface SubredditRun {
-    runId: string
-    keyword: string
-    status: string
-    itemCount: number
-    costUsd: number
-    datasetId: string | null
-    errorMessage: string | null
-  }
-  const [subredditRunStatuses, setSubredditRunStatuses] = useState<Record<string, { status: string; runs: SubredditRun[] }>>({})
-
-  // 下载 CSV 函数
-  const downloadCSV = (datasetId: string) => {
-    if (!datasetId) return
-    const token = process.env.NEXT_PUBLIC_APIFY_TOKEN
-    if (!token) {
-      showToast('NEXT_PUBLIC_APIFY_TOKEN 未配置', 'error')
-      return
-    }
-    const url = `https://api.apify.com/v2/datasets/${datasetId}/items?format=csv&clean=true&attachment=true&token=${token}`
-    window.open(url, '_blank')
-  }
-
-  // 轮询单个 Run 状态（Phase 4 用）
-  const startPollingRun = (runId: string, subredditName: string, projectId: string) => {
-    if (pollingIntervals.current[runId]) {
-      clearInterval(pollingIntervals.current[runId])
-    }
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/scraping/${runId}/status`)
-        const data = await res.json()
-        console.log('[Poll] runId:', runId, 'status:', data.status, 'items:', data.itemCount, 'dataset:', data.datasetId)
-        const isTerminal = TERMINAL_STATUSES.includes(data.status)
-        setSubredditRunStatuses(prev => {
-          const subreddit = prev[subredditName]
-          if (!subreddit) return prev
-          const allTerminal = subreddit.runs.every(r => TERMINAL_STATUSES.includes(r.status))
-          const newStatus = isTerminal && allTerminal ? 'DONE' : 'RUNNING'
-          return {
-            ...prev,
-            [subredditName]: {
-              status: newStatus,
-              runs: subreddit.runs.map(r =>
-                r.runId === runId ? { ...r, ...data } : r
-              )
-            }
-          }
-        })
-        if (isTerminal) {
-          clearInterval(poll)
-          delete pollingIntervals.current[runId]
-
-          // SUCCEEDED 时：同步数据到 posts 表
-          if (data.status === 'SUCCEEDED' && data.datasetId) {
-            await fetch(`/api/scraping/${runId}/results?project_id=${projectId}`, {
-              method: 'POST'
-            })
-            console.log('[Poll] Synced results for runId:', runId)
-          }
-
-          await fetch(`/api/scraping/runs/${runId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: data.status,
-              item_count: data.itemCount ?? 0,
-              cost_usd: data.costUsd ?? 0,
-              dataset_id: data.datasetId ?? null,
-              finished_at: new Date().toISOString()
-            })
-          })
-        }
-      } catch (error) {
-        console.error('[Poll] Error:', error)
-      }
-    }, 5000)
-    pollingIntervals.current[runId] = poll
-  }
-
   // 抓取单个 Subreddit（为每个关键词启动独立 Run）
   const handleScrapeSubreddit = async (subredditName: string, searchKeywords: string[]) => {
     if (!selectedProject) return
-    setSubredditRunStatuses(prev => ({
-      ...prev,
-      [subredditName]: { status: 'STARTING', runs: [] }
-    }))
+
     try {
-      const res = await fetch('/api/scraping/batch', {
+      const items = (searchKeywords.length > 0 ? searchKeywords : ['']).map((keyword) => ({
+        phase: 'phase4_subreddits',
+        query: keyword,
+        subreddit: subredditName,
+      }))
+
+      const res = await fetch('/api/scraping/custom-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -235,45 +156,21 @@ export default function ScrapingPage() {
             phase1_brand: phaseConfigs[0],
             phase2_competitor: phaseConfigs[1],
             phase3_scene_pain: phaseConfigs[2],
-            phase4_subreddits: phaseConfigs[3]
+            phase4_subreddits: phaseConfigs[3],
           },
-          subreddits: [{ name: subredditName, keywords: searchKeywords }]
-        })
+          items,
+        }),
       })
       const data = await res.json()
       if (data.success) {
-        const runs = data.runs.map((r: any) => ({
-          runId: r.apify_run_id || r.id,
-          keyword: r.query,
-          status: 'RUNNING',
-          itemCount: 0,
-          costUsd: 0,
-          datasetId: null,
-          errorMessage: null
-        }))
-        setSubredditRunStatuses(prev => ({
-          ...prev,
-          [subredditName]: { status: 'RUNNING', runs }
-        }))
-        data.runs.forEach((r: any) => {
-          if (r.status === 'running' && r.apify_run_id) {
-            startPollingRun(r.apify_run_id, subredditName, selectedProject.id)
-          }
-        })
+        setAutoPollingEnabled(true)
+        await loadHistoryRuns(selectedProject.id)
         showToast(`已为 r/${subredditName} 启动 ${data.runs.length} 个任务`, 'success')
       } else {
         showToast(data.error || '启动失败', 'error')
-        setSubredditRunStatuses(prev => {
-          const { [subredditName]: _, ...rest } = prev
-          return rest
-        })
       }
     } catch (error) {
       showToast('启动失败', 'error')
-      setSubredditRunStatuses(prev => {
-        const { [subredditName]: _, ...rest } = prev
-        return rest
-      })
     }
   }
 
@@ -282,12 +179,35 @@ export default function ScrapingPage() {
     fetchProjects()
   }, [])
 
-  // 页面加载时从 DB 读取历史任务，并恢复 RUNNING 任务的轮询
+  // 页面加载时从 DB 读取历史任务
   useEffect(() => {
     if (selectedProject?.id) {
       loadHistoryRuns(selectedProject.id)
     }
   }, [selectedProject?.id])
+
+  useEffect(() => {
+    const hasActiveRuns = runs.some((run) => run.status === 'pending' || run.status === 'running')
+
+    if (!selectedProject?.id || !autoPollingEnabled || !hasActiveRuns) {
+      if (autoPollingRef.current) {
+        clearInterval(autoPollingRef.current)
+        autoPollingRef.current = null
+      }
+      return
+    }
+
+    autoPollingRef.current = setInterval(() => {
+      syncRuns({ silent: true })
+    }, 10000)
+
+    return () => {
+      if (autoPollingRef.current) {
+        clearInterval(autoPollingRef.current)
+        autoPollingRef.current = null
+      }
+    }
+  }, [autoPollingEnabled, runs, selectedProject?.id])
 
   async function loadHistoryRuns(projectId: string) {
     try {
@@ -298,76 +218,49 @@ export default function ScrapingPage() {
       
       if (data.runs && data.runs.length > 0) {
         setRuns(data.runs)
-        
-        const runningTasks = data.runs.filter((r: any) => r.status === 'RUNNING')
-        console.log('[loadHistoryRuns] Resuming polling for', runningTasks.length, 'RUNNING tasks')
-        
-        runningTasks.forEach((r: any) => {
-          startPolling(r.apify_run_id, projectId)
-        })
+      } else {
+        setRuns([])
       }
     } catch (e) {
       console.error('[loadHistoryRuns] Error:', e)
     }
   }
 
-  // 强制同步所有 RUNNING 状态的任务
-  async function syncAllRunningTasks() {
-    const runningRuns = runs.filter((r: ScrapingRun) => r.status === 'RUNNING')  // fixme 数据库字段和apify接口中status的大小写不一致
-    console.log('[Sync] Force syncing', runningRuns.length, 'running tasks')
-
-    for (const run of runningRuns) {
-      if (!run.apify_run_id) continue
-      try {
-        const res = await fetch(`/api/scraping/${run.apify_run_id}/status`)
-        const data = await res.json()
-        console.log('[Sync] runId:', run.apify_run_id, '→', data.status)
-
-        const TERMINAL = ['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']
-
-        if (TERMINAL.includes(data.status)) {
-          // 更新前端 state
-          setRuns(prev => prev.map(r =>
-            r.apify_run_id === run.apify_run_id
-              ? {
-                  ...r,
-                  status: data.status,
-                  item_count: data.itemCount,
-                  cost_usd: data.costUsd,
-                  dataset_id: data.datasetId
-                }
-              : r
-          ))
-
-          // 写回数据库
-          await fetch(`/api/scraping/runs/${run.apify_run_id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: data.status,
-              item_count: data.itemCount ?? 0,
-              cost_usd: data.costUsd ?? 0,
-              dataset_id: data.datasetId ?? null,
-              finished_at: new Date().toISOString()
-            })
-          })
-
-          // 成功则同步数据到 posts 表
-          if (data.status === 'SUCCEEDED' && data.datasetId && selectedProject?.id) {
-            console.log('[Sync] Pulling results for runId:', run.apify_run_id)
-            await fetch(
-              `/api/scraping/${run.apify_run_id}/results?project_id=${selectedProject.id}`
-            )
-          }
-        }
-      } catch (e) {
-        console.error('[Sync] Error for runId:', run.apify_run_id, e)
-      }
+  async function syncRuns(options?: { silent?: boolean }) {
+    if (!selectedProject?.id) {
+      return
     }
 
-    // 同步完成后刷新列表
-    await loadHistoryRuns(selectedProject?.id || '')
-    console.log('[Sync] All done')
+    if (!options?.silent) {
+      setIsSyncingRuns(true)
+    }
+
+    try {
+      const res = await fetch('/api/scraping/runs/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProject.id,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || '同步任务状态失败')
+      }
+
+      setRuns(data.data.runs || [])
+      setLastSyncAt(new Date().toISOString())
+    } catch (error) {
+      console.error('[syncRuns] Error:', error)
+      if (!options?.silent) {
+        showToast(error instanceof Error ? error.message : '同步任务状态失败', 'error')
+      }
+    } finally {
+      if (!options?.silent) {
+        setIsSyncingRuns(false)
+      }
+    }
   }
 
   const fetchProjects = async () => {
@@ -384,126 +277,6 @@ export default function ScrapingPage() {
       showToast('获取项目列表失败', 'error')
     }
   }
-
-  // 轮询状态
-  const pollStatus = useCallback(async (bid: string) => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/scraping/batch/${bid}`)
-      const data = await res.json()
-
-      if (data.success) {
-        console.log('[Scraping] API response:', JSON.stringify(data))
-        setRuns(data.data.runs)
-        
-        // 检查是否全部完成
-        const allCompleted = data.data.runs.every(
-          (run: ScrapingRun) => run.status === 'succeeded' || run.status === 'failed'
-        )
-        
-        if (allCompleted) {
-          setIsPolling(false)
-
-          // 对所有终态 run 写回 DB（确保状态持久化）
-          const completedRuns = data.data.runs.filter(
-            (r: ScrapingRun) => r.status === 'succeeded' || r.status === 'failed'
-          )
-          await Promise.all(
-            completedRuns.map((run: ScrapingRun) =>
-              fetch(`/api/scraping/runs/${run.apify_run_id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  status: run.status === 'succeeded' ? 'SUCCEEDED' : run.status.toUpperCase(),
-                  item_count: run.inserted_posts ?? 0,
-                  cost_usd: 0,
-                  dataset_id: run.apify_dataset_id ?? null,
-                  finished_at: new Date().toISOString()
-                })
-              })
-            )
-          )
-
-          showToast('所有抓取任务已完成', 'success')
-        } else {
-          // 继续轮询
-          setTimeout(() => pollStatus(bid), 10000)
-        }
-      } else {
-        showToast(data.error || '查询状态失败', 'error')
-        setIsPolling(false)
-      }
-    } catch (error) {
-      console.error('Error polling status:', error)
-      setIsPolling(false)
-    }
-  }, [])
-
-  // 轮询单个 Apify Run 并在终态时写回 DB + 同步数据
-  const startPolling = useCallback((runId: string, projectId: string) => {
-    if (pollingIntervals.current[runId]) {
-      clearInterval(pollingIntervals.current[runId])
-    }
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/scraping/${runId}/status`)
-        const data = await res.json()
-        console.log('[Poll] runId:', runId, 'status:', data.status, 'items:', data.itemCount, 'dataset:', data.datasetId)
-        const isTerminal = TERMINAL_STATUSES.includes(data.status)
-
-        // 更新前端 state（如果是 subredditRunStatuses 中的 run）
-        setSubredditRunStatuses(prev => {
-          for (const [subreddit, info] of Object.entries(prev)) {
-            const runIndex = info.runs.findIndex(r => r.runId === runId)
-            if (runIndex !== -1) {
-              const updatedRuns = [...info.runs]
-              updatedRuns[runIndex] = { ...updatedRuns[runIndex], ...data }
-              const allTerminal = updatedRuns.every(r => TERMINAL_STATUSES.includes(r.status))
-              return {
-                ...prev,
-                [subreddit]: {
-                  status: allTerminal && updatedRuns.every(r => r.status !== 'RUNNING') ? 'DONE' : 'RUNNING',
-                  runs: updatedRuns
-                }
-              }
-            }
-          }
-          return prev
-        })
-
-        // 终态：停止轮询 + 同步数据到 posts 表 + 写回 DB
-        if (isTerminal) {
-          clearInterval(poll)
-          delete pollingIntervals.current[runId]
-
-          // SUCCEEDED 时：同步 Apify 数据到 posts 表
-          if (data.status === 'SUCCEEDED' && data.datasetId) {
-            await fetch(`/api/scraping/${runId}/results?project_id=${projectId}`, {
-              method: 'POST'
-            })
-            console.log('[Poll] Synced results for runId:', runId)
-          }
-
-          await fetch(`/api/scraping/runs/${runId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: data.status,
-              item_count: data.itemCount ?? 0,
-              cost_usd: data.costUsd ?? 0,
-              dataset_id: data.datasetId ?? null,
-              finished_at: new Date().toISOString()
-            })
-          })
-          console.log('[Poll] Stopped polling for runId:', runId, 'final status:', data.status)
-        }
-      } catch (err) {
-        console.error('[Poll] Error:', err)
-        clearInterval(poll)
-        delete pollingIntervals.current[runId]
-      }
-    }, 5000)
-    pollingIntervals.current[runId] = poll
-  }, [])
 
   // 切换 Phase 展开/折叠
   const togglePhaseExpand = (phase: string) => {
@@ -565,9 +338,9 @@ export default function ScrapingPage() {
       const data = await res.json()
       if (data.success) {
         showToast(`已启动抓取任务: ${query}`, 'success')
-        // 刷新状态
-        if (batchId) {
-          pollStatus(batchId)
+        if (selectedProject?.id) {
+          setAutoPollingEnabled(true)
+          await loadHistoryRuns(selectedProject.id)
         }
       } else {
         showToast(data.error || '启动失败', 'error')
@@ -628,11 +401,11 @@ export default function ScrapingPage() {
       })
       const data = await res.json()
       if (data.success) {
-        setBatchId(data.data.batch_id)
-        setRuns(data.data.runs)
-        setIsPolling(true)
+        setAutoPollingEnabled(true)
+        if (selectedProject?.id) {
+          await loadHistoryRuns(selectedProject.id)
+        }
         showToast(`已启动 ${data.data.total_runs} 个抓取任务`, 'success')
-        setTimeout(() => pollStatus(data.data.batch_id), 5000)
       } else {
         showToast(data.error || '启动失败', 'error')
       }
@@ -669,13 +442,9 @@ export default function ScrapingPage() {
       const data = await res.json()
 
       if (data.success) {
-        setBatchId(data.data.batch_id)
-        setRuns(data.data.runs)
-        setIsPolling(true)
+        setAutoPollingEnabled(true)
+        await loadHistoryRuns(selectedProject.id)
         showToast(`已启动 ${data.data.total_runs} 个抓取任务`, 'success')
-        
-        // 开始轮询
-        setTimeout(() => pollStatus(data.data.batch_id), 5000)
       } else {
         showToast(data.error || '启动抓取失败', 'error')
       }
@@ -720,6 +489,10 @@ export default function ScrapingPage() {
 
   const phaseCounts = getPhaseCounts()
   const totalKeywords = Object.values(phaseCounts).reduce((a, b) => a + b, 0)
+  const hasActiveRuns = runs.some((run) => run.status === 'pending' || run.status === 'running')
+
+  const getRunsForSubreddit = (subredditName: string) =>
+    runs.filter((run) => run.phase === 'phase4_subreddits' && run.subreddit === subredditName)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -776,10 +549,8 @@ export default function ScrapingPage() {
             onChange={(e) => {
               const project = projects.find(p => p.id === e.target.value)
               setSelectedProject(project || null)
-              setBatchId(null)
               setRuns([])
             }}
-            disabled={isPolling}
             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
           >
             <option value="">请选择一个项目</option>
@@ -841,7 +612,7 @@ export default function ScrapingPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={startSelectedScraping}
-                    disabled={loading || isPolling || Object.values(selectedItems).every(s => Array.from(s).length === 0)}
+                    disabled={loading || Object.values(selectedItems).every(s => Array.from(s).length === 0)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     抓取所选 ({Object.values(selectedItems).reduce((s, set) => s + set.size, 0)})
@@ -932,7 +703,6 @@ export default function ScrapingPage() {
                         <select
                           value={config.time_range}
                           onChange={(e) => updatePhaseConfig(phase, 'time_range', e.target.value)}
-                          disabled={isPolling}
                           className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         >
                           <option value="24h">最近 24 小时</option>
@@ -958,7 +728,6 @@ export default function ScrapingPage() {
                           onChange={(e) => updatePhaseConfig(phase, 'max_posts', parseInt(e.target.value) || 100)}
                           min={10}
                           max={1000}
-                          disabled={isPolling}
                           className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         />
                       </div>
@@ -984,7 +753,6 @@ export default function ScrapingPage() {
                         <select
                           value={config.sort_by}
                           onChange={(e) => updatePhaseConfig(phase, 'sort_by', e.target.value)}
-                          disabled={isPolling}
                           className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         >
                           <option value="hot">热门 (Hot)</option>
@@ -1022,7 +790,7 @@ export default function ScrapingPage() {
                             })
                           }
                         }}
-                        disabled={loading || isPolling}
+                        disabled={loading}
                         className="text-xs text-green-600 hover:text-green-800"
                       >
                         启动全部 →
@@ -1036,7 +804,11 @@ export default function ScrapingPage() {
                       {phase === 'phase4_subreddits' ? (
                         <div className="space-y-3">
                           {targets.map((target, idx) => {
-                            const subStatus = subredditRunStatuses[target.subreddit]
+                            const subredditRuns = getRunsForSubreddit(target.subreddit)
+                            const hasSubredditRuns = subredditRuns.length > 0
+                            const subredditIsActive = subredditRuns.some(
+                              (run) => run.status === 'pending' || run.status === 'running'
+                            )
                             return (
                               <div key={idx} className="bg-white rounded-lg border border-slate-200 p-3">
                                 <div className="flex items-center gap-3">
@@ -1053,15 +825,14 @@ export default function ScrapingPage() {
                                       <span className="text-xs text-slate-500">搜索词: {target.search_within?.join(', ') || '无'}</span>
                                     </div>
                                     <div className="text-xs text-slate-400">原因: {target.reason}</div>
-                                    {subStatus && (
+                                    {hasSubredditRuns && (
                                       <div className="text-xs mt-1">
-                                        {subStatus.status === 'STARTING' && <span className="text-gray-500">⏳ 启动中...</span>}
-                                        {subStatus.status === 'RUNNING' && <span className="text-blue-500">🔵 进行中 ({subStatus.runs.length} 个任务)</span>}
-                                        {subStatus.status === 'DONE' && <span className="text-green-500">✅ 完成</span>}
+                                        {subredditIsActive && <span className="text-blue-500">进行中 ({subredditRuns.length} 个任务)</span>}
+                                        {!subredditIsActive && <span className="text-green-500">已同步 ({subredditRuns.length} 个任务)</span>}
                                       </div>
                                     )}
                                   </div>
-                                  {!subStatus && (
+                                  {!hasSubredditRuns && (
                                     <button
                                       onClick={() => handleScrapeSubreddit(target.subreddit, target.search_within || [])}
                                       disabled={loading}
@@ -1070,7 +841,7 @@ export default function ScrapingPage() {
                                       抓取全部
                                     </button>
                                   )}
-                                  {subStatus?.status === 'RUNNING' && (
+                                  {hasSubredditRuns && (
                                     <button
                                       onClick={() => handleScrapeSubreddit(target.subreddit, target.search_within || [])}
                                       disabled={loading}
@@ -1081,49 +852,33 @@ export default function ScrapingPage() {
                                   )}
                                 </div>
                                 {/* 每个 Run 的独立状态 */}
-                                {subStatus && subStatus.runs.length > 0 && (
+                                {hasSubredditRuns && (
                                   <div className="mt-3 pl-7 space-y-2">
-                                    {subStatus.runs.map((run, runIdx) => (
-                                      <div key={runIdx} className="text-xs flex items-center gap-2 flex-wrap">
-                                        <span className="text-slate-600">{run.keyword || '(空关键词)'}</span>
-                                        {run.status === 'RUNNING' && (
-                                          <span className="text-blue-500">🔵 抓取中 · {run.itemCount} 条</span>
+                                    {subredditRuns.map((run) => (
+                                      <div key={run.id} className="text-xs flex items-center gap-2 flex-wrap">
+                                        <span className="text-slate-600">{run.query || '(空关键词)'}</span>
+                                        {run.status === 'pending' && (
+                                          <span className="text-slate-500">等待启动</span>
                                         )}
-                                        {run.status === 'SUCCEEDED' && (
+                                        {run.status === 'running' && (
+                                          <span className="text-blue-500">抓取中 · {run.total_posts} 条</span>
+                                        )}
+                                        {run.status === 'succeeded' && (
                                           <>
-                                            <span className="text-green-500">✅ 已完成 · {run.itemCount} 条 · ${run.costUsd?.toFixed(3)}</span>
-                                            <button
-                                              onClick={() => downloadCSV(run.datasetId!)}
+                                            <span className="text-green-500">已完成 · {run.total_posts} 条 · ${run.cost_usd?.toFixed(3) || '0.000'}</span>
+                                            <a
+                                              href={`/api/scraping/${run.id}/download`}
                                               className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                                             >
-                                              ⬇️ 下载 CSV
-                                            </button>
-                                          </>
-                                        )}
-                                        {run.status === 'TIMED-OUT' && (
-                                          <>
-                                            <span className="text-orange-500">⏰ 已超时 · 已抓 {run.itemCount} 条</span>
-                                            <button
-                                              onClick={() => downloadCSV(run.datasetId!)}
-                                              className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded hover:bg-orange-200"
-                                            >
-                                              ⬇️ 下载已抓取
-                                            </button>
-                                            <a
-                                              href={`https://console.apify.com/actors/automation-lab~reddit-scraper/runs/${run.runId}`}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-blue-600 hover:underline"
-                                            >
-                                              在 Apify 续跑 ↗
+                                              下载 CSV
                                             </a>
                                           </>
                                         )}
-                                        {run.status === 'FAILED' && (
-                                          <span className="text-red-500">❌ 失败：{run.errorMessage}</span>
+                                        {run.status === 'failed' && (
+                                          <span className="text-red-500">失败：{run.error_message || run.apify_status || '未知错误'}</span>
                                         )}
                                         <span style={{ fontSize: 10, color: '#999', fontFamily: 'monospace' }}>
-                                          ID: {run.runId?.slice(0, 8)}...
+                                          ID: {run.apify_run_id?.slice(0, 8) || run.id.slice(0, 8)}...
                                         </span>
                                       </div>
                                     ))}
@@ -1146,7 +901,7 @@ export default function ScrapingPage() {
                               <span className="text-sm text-slate-700">{keyword}</span>
                               <button
                                 onClick={() => startSingleScraping(phase, `q_${idx}`, keyword)}
-                                disabled={loading || isPolling}
+                                disabled={loading}
                                 className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
                               >
                                 抓取
@@ -1270,12 +1025,24 @@ export default function ScrapingPage() {
               </div>
             </div>
 
-            {isPolling && (
-              <div className="mt-4 flex items-center gap-2 text-blue-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span className="text-sm">正在监控任务状态，每 10 秒自动刷新...</span>
-              </div>
-            )}
+            <div className="mt-4 flex items-center gap-3 text-sm">
+              <button
+                onClick={() => setAutoPollingEnabled((prev) => !prev)}
+                className={`px-3 py-1.5 rounded-lg border ${
+                  autoPollingEnabled
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {autoPollingEnabled ? '自动轮询: 开' : '自动轮询: 关'}
+              </button>
+              <span className={autoPollingEnabled && hasActiveRuns ? 'text-blue-600' : 'text-slate-500'}>
+                {autoPollingEnabled && hasActiveRuns ? '每 10 秒自动同步一次任务状态' : '自动轮询已停止'}
+              </span>
+              {lastSyncAt && (
+                <span className="text-slate-400">上次同步: {new Date(lastSyncAt).toLocaleTimeString()}</span>
+              )}
+            </div>
           </div>
         )}
 
@@ -1283,12 +1050,18 @@ export default function ScrapingPage() {
         {runs.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">任务列表</h2>
-            <button
-              onClick={syncAllRunningTasks}
-              className="mb-4 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100"
-            >
-              🔄 同步所有任务状态
-            </button>
+            <div className="mb-4 flex items-center gap-3">
+              <button
+                onClick={() => syncRuns()}
+                disabled={isSyncingRuns}
+                className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+              >
+                {isSyncingRuns ? '同步中...' : '同步所有任务状态'}
+              </button>
+              <span className="text-xs text-slate-500">
+                统一走后端同步接口，状态刷新、结果拉取和 `posts` 入库都在服务端完成
+              </span>
+            </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1395,7 +1168,7 @@ export default function ScrapingPage() {
         <div className="flex gap-4">
           <button
             onClick={startBatchScraping}
-            disabled={!selectedProject || loading || isPolling || totalKeywords === 0}
+            disabled={!selectedProject || loading || totalKeywords === 0}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
           >
             {loading ? (
@@ -1408,7 +1181,7 @@ export default function ScrapingPage() {
             )}
           </button>
 
-          {stats.succeeded > 0 && !isPolling && (
+          {stats.succeeded > 0 && !hasActiveRuns && (
             <button
               onClick={() => window.location.href = '/workflow/analysis'}
               className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all flex items-center gap-2 shadow-lg"

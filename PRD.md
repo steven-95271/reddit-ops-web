@@ -280,11 +280,12 @@ POST /api/scraping
   → 调用 Apify API 启动抓取任务
   → 返回 task_id
 
-GET /api/scraping/[task_id]/status
-  → 返回抓取进度
+GET /api/scraping/runs?projectId=...
+  → 读取本地 scraping_runs 历史记录
 
-POST /api/scraping/webhook
-  → Apify 回调：抓取完成 → 写入 posts 表
+POST /api/scraping/runs/sync
+  Body: { projectId }
+  → 后端统一同步 Apify 状态、回写 scraping_runs、成功终态时写入 posts
 ```
 
 #### 页面要素

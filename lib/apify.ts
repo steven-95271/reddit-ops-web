@@ -35,8 +35,12 @@ interface RunStatus {
   status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED_OUT' | 'ABORTED'
   startedAt?: string
   finishedAt?: string
+  defaultDatasetId?: string
+  statusMessage?: string
+  usageTotalUsd?: number
   errorMessage?: string
   stats?: {
+    itemCount?: number
     inputBodyLen: number
     outputBodyLen: number
   }

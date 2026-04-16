@@ -29,9 +29,9 @@ flowchart LR
     B --> C["POST /api/scraping/batch"]
     C --> D["创建 scraping_runs"]
     D --> E["Apify actor run"]
-    E --> F["轮询 /api/scraping/[runId]/status"]
-    F --> G["POST /api/scraping/[runId]/results"]
-    G --> H["写入 posts"]
+    E --> F["前端轮询 /api/scraping/runs/sync"]
+    F --> G["后端查询 Apify / 更新 scraping_runs"]
+    G --> H["终态时写入 posts"]
 ```
 
 ## 抓取配置
@@ -54,15 +54,9 @@ flowchart LR
 | `/api/scraping/single` | `POST` | 当前使用 | 无 | 为单个 query/subreddit 创建一条 `scraping_runs` 记录并启动一个 Apify run。 |
 | `/api/scraping/batch` | `POST` | 当前使用 | 无 | 按 P1 phase 配置批量创建并启动多个 run，是页面“全部抓取”的主入口。 |
 | `/api/scraping/custom-batch` | `POST` | 当前使用 | 无 | 只抓取用户勾选的部分 query/subreddit。 |
-
 | `/api/scraping/runs` | `GET` | 当前使用 | `projectId` 或 `batchId` | 读取本地 `scraping_runs` 历史记录。 |
+| `/api/scraping/runs/sync` | `POST` | 当前使用 | `projectId` 或 `batchId` 或 `runIds[]` | 统一同步入口。后端内部负责查询 Apify、回写 `scraping_runs`、并在成功终态时拉取 dataset 写入 `posts`。 |
 | `/api/scraping/[runId]/download` | `GET` | 当前使用，但只是下载原始 dataset | `[runId] = scraping_runs.id` | 先用本地 run 记录拿到 `apify_dataset_id`，再向 Apify 下载 CSV。不会从 `posts` 反导出。 |
-
-| `/api/scraping/batch/[id]` | `GET` | 当前使用 | `[id] = batch_id` | 查询一个 batch 下所有本地 run，并顺带向 Apify 查询运行状态；用于批量轮询。 |
-
-| `/api/scraping/runs/[runId]` | `PATCH` | 当前使用 | `[runId] = apify_run_id` | 把前端轮询到的终态、dataset id、cost、item count 回写到本地 `scraping_runs`。注意这里不是本地表主键。 |
-| `/api/scraping/[runId]/status` | `GET` | 当前使用 | `[runId] = apify_run_id` | 直接透传查询 Apify run 状态，前端轮询的主入口。 |
-| `/api/scraping/[runId]/results` | `POST` | 当前使用 | `[runId] = apify_run_id` | 从 Apify dataset 拉取结果并写入 `posts`。真正落库发生在这里。 |
 
 
 ## 相关但未打通的接口
@@ -73,14 +67,12 @@ flowchart LR
 
 ## `runId` 参数语义
 
-当前实现里同名参数有三种不同含义：
+当前实现里只保留两种主参数语义：
 
-- `batch/[id]` 里的 `id` 是本地 `batch_id`
-- `runs/[runId]` 里的 `runId` 实际是 `apify_run_id`
-- `[runId]/download` 里的 `runId` 是本地 `scraping_runs.id`
-- `[runId]/status`、`[runId]/results`、`[runId]` 里的 `runId` 是 `apify_run_id`
+- `/api/scraping/[runId]/download` 里的 `runId` 是本地 `scraping_runs.id`
+- `/api/scraping/runs/sync` 优先使用 `projectId`；也支持 `batchId` 或 `runIds[]`
 
-这也是 P2 API 目前最容易混淆的地方。
+页面自动轮询与“同步所有任务状态”按钮现在都传 `projectId`。
 
 ## 产出字段
 
@@ -104,43 +96,38 @@ flowchart LR
 - `scraping_run_id`
 - `keyword`
 
-但按当前代码实现，`/api/scraping/[runId]/results` 在插入 `posts` 时并没有写入这两个字段，也没有建立外键约束。因此现在只能确定帖子属于哪个 `project_id`，不能稳定追溯到：
+当前实现会在同步成功终态时写入这两个字段，因此帖子可以追溯到 run 与 query：
 
-- 是哪一个 `scraping_runs.id`
-- 对应哪个 `apify_run_id`
-- 是哪个 `query`
-- 是哪个 `subreddit + keyword` 组合产生的
+- `scraping_runs.id`
+- `query`
 
-这是当前数据模型里的真实缺口。
+但目前仍没有数据库外键约束，因此数据完整性还是靠应用层保证。
 
 ## 状态同步机制
 
-当前主链路是“前端轮询 + 前端触发回写”：
+当前主链路是“前端轮询统一同步接口 + 后端完成所有 Apify 交互与落库”：
 
 ```mermaid
 flowchart LR
-    A["前端定时请求 /status"] --> B["拿到 Apify 实时状态"]
-    B --> C["终态时调用 /results"]
-    B --> D["终态时调用 /runs/[runId] PATCH"]
-    C --> E["写入 posts"]
-    D --> F["更新 scraping_runs"]
+    A["前端定时请求 /api/scraping/runs/sync"] --> B["后端查询 Apify 实时状态"]
+    B --> C["更新 scraping_runs"]
+    B --> D["成功终态时拉取 dataset"]
+    D --> E["写入 posts"]
 ```
 
 具体表现：
 
-- `app/workflow/scraping/page.tsx` 会定时请求 `/api/scraping/[runId]/status`
-- 当状态进入终态时，前端再主动调用：
-  - `/api/scraping/[runId]/results`
-  - `/api/scraping/runs/[runId]`
+- `app/workflow/scraping/page.tsx` 会定时请求 `/api/scraping/runs/sync`
+- 请求体当前使用 `{ projectId }`
+- 页面上“同步所有任务状态”按钮也调用同一个接口
 - 后端目前没有独立的后台 worker 持续更新状态
 - `/api/apify-webhook` 也没有接入实际状态流转
 
 ## 当前已知限制
 
 - `posts` 和 `scraping_runs` 没有真正写实的关联关系
-- `/results` 只写 `posts`，不会回填 `inserted_posts` / `skipped_posts`
-- 部分代码路径对 `/results` 的调用方法不一致，主 route 只支持 `POST`
-- API 命名中的 `runId` 语义不统一，维护成本较高
+- 没有独立后台调度器，状态推进仍依赖前端轮询或手动同步
+- `runs/sync` 是可能较慢的聚合同步接口，项目级 run 数很多时会明显变慢
 
 ## 下一步
 

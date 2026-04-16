@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const batchId = generateId()
     const runs: Array<{
       id: string
+      apify_run_id: string | null
       phase: string
       query: string
       subreddit?: string
@@ -63,14 +64,14 @@ export async function POST(request: NextRequest) {
           WHERE id = ${runId}
         `
 
-        runs.push({ id: runId, phase, query, subreddit, status: 'running' })
+        runs.push({ id: runId, apify_run_id: apifyRunId, phase, query, subreddit, status: 'running' })
       } catch (error) {
         await sql`
           UPDATE scraping_runs 
           SET status = 'failed', error_message = ${error instanceof Error ? error.message : 'Unknown error'}
           WHERE id = ${runId}
         `
-        runs.push({ id: runId, phase, query, subreddit, status: 'failed' })
+        runs.push({ id: runId, apify_run_id: null, phase, query, subreddit, status: 'failed' })
       }
     }
 
