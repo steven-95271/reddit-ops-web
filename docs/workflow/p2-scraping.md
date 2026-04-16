@@ -54,15 +54,16 @@ flowchart LR
 | `/api/scraping/single` | `POST` | 当前使用 | 无 | 为单个 query/subreddit 创建一条 `scraping_runs` 记录并启动一个 Apify run。 |
 | `/api/scraping/batch` | `POST` | 当前使用 | 无 | 按 P1 phase 配置批量创建并启动多个 run，是页面“全部抓取”的主入口。 |
 | `/api/scraping/custom-batch` | `POST` | 当前使用 | 无 | 只抓取用户勾选的部分 query/subreddit。 |
-| `/api/scraping/batch/[id]` | `GET` | 当前使用 | `[id] = batch_id` | 查询一个 batch 下所有本地 run，并顺带向 Apify 查询运行状态；用于批量轮询。 |
+
 | `/api/scraping/runs` | `GET` | 当前使用 | `projectId` 或 `batchId` | 读取本地 `scraping_runs` 历史记录。 |
+| `/api/scraping/[runId]/download` | `GET` | 当前使用，但只是下载原始 dataset | `[runId] = scraping_runs.id` | 先用本地 run 记录拿到 `apify_dataset_id`，再向 Apify 下载 CSV。不会从 `posts` 反导出。 |
+
+| `/api/scraping/batch/[id]` | `GET` | 当前使用 | `[id] = batch_id` | 查询一个 batch 下所有本地 run，并顺带向 Apify 查询运行状态；用于批量轮询。 |
+
 | `/api/scraping/runs/[runId]` | `PATCH` | 当前使用 | `[runId] = apify_run_id` | 把前端轮询到的终态、dataset id、cost、item count 回写到本地 `scraping_runs`。注意这里不是本地表主键。 |
 | `/api/scraping/[runId]/status` | `GET` | 当前使用 | `[runId] = apify_run_id` | 直接透传查询 Apify run 状态，前端轮询的主入口。 |
 | `/api/scraping/[runId]/results` | `POST` | 当前使用 | `[runId] = apify_run_id` | 从 Apify dataset 拉取结果并写入 `posts`。真正落库发生在这里。 |
-| `/api/scraping/[runId]/download` | `GET` | 当前使用，但只是下载原始 dataset | `[runId] = scraping_runs.id` | 先用本地 run 记录拿到 `apify_dataset_id`，再向 Apify 下载 CSV。不会从 `posts` 反导出。 |
 
-| `/api/scraping` | `POST` | 兼容残留 / 基本未使用 | 无 | 旧版“一次性启动整项目抓取”的接口。直接调用 `startScraping()`，不会写 `scraping_runs`，前端页面也没有走它。可以视为遗留接口。 |
-| `/api/scraping/[runId]` | `GET` | 兼容残留 / 未使用 | `[runId] = apify_run_id` | 旧版状态查询代理，返回结构和 `/status` 不同；当前页面没有调用。 |
 
 ## 相关但未打通的接口
 

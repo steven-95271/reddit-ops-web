@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    await initDb()
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
     const batchId = searchParams.get('batchId')

@@ -313,7 +313,7 @@ export default function ScrapingPage() {
 
   // 强制同步所有 RUNNING 状态的任务
   async function syncAllRunningTasks() {
-    const runningRuns = runs.filter((r: ScrapingRun) => r.status === 'RUNNING')
+    const runningRuns = runs.filter((r: ScrapingRun) => r.status === 'RUNNING')  // fixme 数据库字段和apify接口中status的大小写不一致
     console.log('[Sync] Force syncing', runningRuns.length, 'running tasks')
 
     for (const run of runningRuns) {
