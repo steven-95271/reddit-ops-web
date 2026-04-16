@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 const workflowItems = [
   { href: '/workflow/config', icon: '⚙️', label: 'P1 配置', step: 'P1' },
@@ -19,11 +20,29 @@ const auxiliaryItems = [
 
 export default function Sidebar({ projectId }: { projectId?: string }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard'
     if (href === '/history') return pathname === '/history'
     return pathname.startsWith(href)
+  }
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+      })
+    } catch (error) {
+      console.error('[Sidebar] Failed to logout:', error)
+    } finally {
+      router.replace('/login')
+      router.refresh()
+      setIsLoggingOut(false)
+    }
   }
 
   return (
@@ -79,6 +98,17 @@ export default function Sidebar({ projectId }: { projectId?: string }) {
           </div>
         </div>
       </nav>
+
+      <div className="border-t border-slate-200/50 px-3 py-4">
+        <button
+          className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isLoggingOut}
+          onClick={handleLogout}
+          type="button"
+        >
+          {isLoggingOut ? '退出中...' : '退出登录'}
+        </button>
+      </div>
     </aside>
   )
 }
