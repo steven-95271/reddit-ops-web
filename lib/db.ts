@@ -1,4 +1,97 @@
-import { sql } from '@vercel/postgres'
+import { sql as vercelSql } from '@vercel/postgres'
+import { Pool, type QueryResult, type QueryResultRow } from 'pg'
+
+type SqlClient = {
+  <T extends QueryResultRow = QueryResultRow>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<QueryResult<T>>
+  query<T extends QueryResultRow = QueryResultRow>(
+    queryText: string,
+    values?: readonly unknown[]
+  ): Promise<QueryResult<T>>
+}
+
+let localPool: Pool | null = null
+
+function isLocalEnv(): boolean {
+  const envMarkers = [
+    process.env.APP_ENV,
+    process.env.ENV,
+    process.env.RUNTIME_ENV,
+    process.env.NEXT_PUBLIC_APP_ENV,
+  ]
+    .filter(Boolean)
+    .map((value) => value!.toLowerCase())
+
+  if (envMarkers.includes('local')) {
+    return true
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    return true
+  }
+
+  const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? ''
+  return /localhost|127\.0\.0\.1/.test(connectionString)
+}
+
+function getConnectionString(): string {
+  const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL
+
+  if (!connectionString) {
+    throw new Error('Missing POSTGRES_URL or DATABASE_URL')
+  }
+
+  return connectionString
+}
+
+function getLocalPool(): Pool {
+  if (localPool) {
+    return localPool
+  }
+
+  localPool = new Pool({
+    connectionString: getConnectionString(),
+  })
+
+  return localPool
+}
+
+function buildQuery(
+  strings: TemplateStringsArray,
+  values: readonly unknown[]
+): { text: string; values: readonly unknown[] } {
+  let text = strings[0] ?? ''
+
+  for (let index = 0; index < values.length; index += 1) {
+    text += `$${index + 1}${strings[index + 1] ?? ''}`
+  }
+
+  return { text, values }
+}
+
+const localSql = Object.assign(
+  async function localSqlTag<T extends QueryResultRow = QueryResultRow>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<QueryResult<T>> {
+    const { text, values: queryValues } = buildQuery(strings, values)
+    return getLocalPool().query<T>(text, queryValues as unknown[])
+  },
+  {
+    query<T extends QueryResultRow = QueryResultRow>(
+      queryText: string,
+      values: readonly unknown[] = []
+    ): Promise<QueryResult<T>> {
+      return getLocalPool().query<T>(queryText, values as unknown[])
+    },
+  }
+) as SqlClient
+
+export const sql: SqlClient = isLocalEnv()
+  ? localSql
+  : (vercelSql as unknown as SqlClient)
 
 export async function initDb() {
   try {
@@ -261,5 +354,3 @@ export async function initDb() {
     throw error
   }
 }
-
-export { sql }
