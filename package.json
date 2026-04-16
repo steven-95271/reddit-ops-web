@@ -15,7 +15,8 @@
         "pg": "^8.20.0",
         "react": "^18",
         "react-dom": "^18",
-        "react-dropzone": "^15.0.0"
+        "react-dropzone": "^15.0.0",
+        "xlsx": "^0.18.5"
     },
     "devDependencies": {
         "@types/node": "^20",

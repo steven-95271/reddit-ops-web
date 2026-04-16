@@ -127,6 +127,10 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS posts (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
+          scraping_run_id TEXT,
+          apify_run_id TEXT,
+          batch_id TEXT,
+          phase TEXT,
           reddit_id TEXT,
           subreddit TEXT NOT NULL,
           title TEXT NOT NULL,
@@ -172,6 +176,9 @@ export async function initDb() {
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS hot_score FLOAT DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS relevance_score FLOAT DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS scraping_run_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS apify_run_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS batch_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS phase TEXT`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS candidate_marked_at TIMESTAMPTZ`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS intent_score FLOAT DEFAULT 0`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS opportunity_score FLOAT DEFAULT 0`,
@@ -355,6 +362,27 @@ export async function initDb() {
       }
     } catch (err) {
       console.error('[initDb] Error creating scraping_runs table:', err)
+      throw err
+    }
+
+    try {
+      await sql`
+        UPDATE posts AS p
+        SET
+          apify_run_id = COALESCE(p.apify_run_id, sr.apify_run_id),
+          batch_id = COALESCE(p.batch_id, sr.batch_id),
+          phase = COALESCE(p.phase, sr.phase)
+        FROM scraping_runs AS sr
+        WHERE p.scraping_run_id = sr.id
+          AND (
+            p.apify_run_id IS NULL
+            OR p.batch_id IS NULL
+            OR p.phase IS NULL
+          )
+      `
+      console.log('[initDb] Backfilled posts scraping metadata from scraping_runs')
+    } catch (err) {
+      console.error('[initDb] Error backfilling posts scraping metadata:', err)
       throw err
     }
 

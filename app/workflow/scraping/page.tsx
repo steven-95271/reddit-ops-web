@@ -102,6 +102,7 @@ export default function ScrapingPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<'csv' | 'xlsx' | null>(null)
   const [runs, setRuns] = useState<ScrapingRun[]>([])
   const [autoPollingEnabled, setAutoPollingEnabled] = useState(true)
   const [isSyncingRuns, setIsSyncingRuns] = useState(false)
@@ -494,6 +495,39 @@ export default function ScrapingPage() {
   const getRunsForSubreddit = (subredditName: string) =>
     runs.filter((run) => run.phase === 'phase4_subreddits' && run.subreddit === subredditName)
 
+  const exportProjectPosts = async (format: 'csv' | 'xlsx') => {
+    if (!selectedProject?.id) {
+      showToast('请先选择一个项目', 'error')
+      return
+    }
+
+    setExportingFormat(format)
+    try {
+      const res = await fetch(`/api/posts/export?project_id=${selectedProject.id}&format=${format}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || '导出失败')
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const disposition = res.headers.get('Content-Disposition')
+      const fileNameMatch = disposition?.match(/filename="([^"]+)"/)
+      const fileName = fileNameMatch?.[1] || `${selectedProject.name}_posts.${format}`
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '导出失败', 'error')
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -587,6 +621,31 @@ export default function ScrapingPage() {
                   ⚠️ 该项目尚未配置四阶段关键词，请先完成 P1 配置
                 </div>
               )}
+
+              <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-800">导出当前项目全部 posts</div>
+                  <div className="text-xs text-slate-500">
+                    按当前项目导出已入库帖子，包含 run id、apify_run_id、batch_id、phase 等抓取来源字段
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => exportProjectPosts('csv')}
+                    disabled={exportingFormat !== null}
+                    className="px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                  >
+                    {exportingFormat === 'csv' ? '导出中...' : '下载 CSV'}
+                  </button>
+                  <button
+                    onClick={() => exportProjectPosts('xlsx')}
+                    disabled={exportingFormat !== null}
+                    className="px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    {exportingFormat === 'xlsx' ? '导出中...' : '下载 XLSX'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
