@@ -1,158 +1,41 @@
-# Reddit 内容运营自动化系统
+# Reddit Ops 文档索引
 
-> 智能抓取 Reddit 热点、多维评分筛选、AI 内容生成与审核，构建数据驱动的社媒运营闭环。
+> 以下文档按当前仓库实现更新，默认以 `Next.js + Vercel Postgres + MiniMax + Apify` 为准。
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## 快速导航
 
----
-
-## 🎯 快速导航
-
-| 阶段 | 名称 | 说明 |
-|------|------|------|
-| [L1 总览](workflow/overview.md) | 流程总览 | 6阶段完整流程图 |
-| [P1](workflow/p1-config.md) | 项目配置 | AI 3轮对话生成搜索策略 |
-| [P2](workflow/p2-scraping.md) | 内容抓取 | APIFY + Mock 双模式 |
-| [P3](workflow/p3-analysis.md) | 热帖识别 | 5维评分 + 自动分类 |
-| [P4-1](workflow/p4-persona.md) | 人设设计 | 3种默认人设 |
-| [P4-2](workflow/p4-content.md) | 内容创作 | AI 人设风格生成 |
-| [P5](workflow/p5-publish.md) | 发布追踪 | 审核工作流 + 品牌追踪 |
-
----
-
-## 📊 系统架构
-
-<div class="mermaid">
-flowchart TB
-    subgraph Frontend["🌐 前端层"]
-        F1[Flask/Jinja2<br/>生产环境]
-        F2[Next.js 14<br/>开发中]
-    end
-
-    subgraph Backend["⚙️ 后端层"]
-        B1[Flask 3.x App]
-        B2[REST API<br/>/api/*]
-        B3[Scheduler<br/>每日流水线]
-    end
-
-    subgraph Data["💾 数据层"]
-        D1[SQLite<br/>app.db]
-        D2[JSON<br/>文件系统]
-        D3[Apify API<br/>Reddit抓取]
-    end
-
-    Frontend <--> Backend
-    Backend <--> Data
-</div>
-
----
-
-## 🔄 核心流程
-
-<div class="mermaid">
-flowchart LR
-    subgraph Input["📥 输入"]
-        I1[产品信息]
-        I2[关键词]
-        I3[竞品]
-    end
-
-    subgraph P1["🎯 P1<br/>项目配置"]
-        P1_1[AI扩展关键词]
-        P1_2[AI推荐板块]
-        P1_3[生成策略]
-    end
-
-    subgraph P2["🔍 P2<br/>内容抓取"]
-        P2_1[APIFY抓取]
-        P2_2[Mock测试]
-    end
-
-    subgraph P3["📊 P3<br/>热帖识别"]
-        P3_1[计算评分]
-        P3_2[自动分类]
-        P3_3[筛选候选]
-    end
-
-    subgraph P4["✍️ P4<br/>内容创作"]
-        P4_1[人设设计]
-        P4_2[AI生成]
-    end
-
-    subgraph P5["🚀 P5<br/>发布追踪"]
-        P5_1[审核工作流]
-        P5_2[品牌追踪]
-    end
-
-    Input --> P1
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-    P4 --> P5
-</div>
-
----
-
-## 📈 主要功能
-
-| 功能 | 说明 |
+| 文档 | 说明 |
 |------|------|
-| 智能抓取 | Apify Reddit 数据抓取，支持 Mock 测试 |
-| 双评分算法 | Hot Score (0-100) + Composite Score (0-1) |
-| 五维分类 | A结构型测评/B场景痛点/C观点争议/D竞品KOL/E平台趋势 |
-| AI 生成 | OpenAI GPT-4o-mini + 模板回退 |
-| 多账号人设 | 3种默认人设，支持自定义扩展 |
-| 品牌追踪 | 自有品牌 + 竞品提及监控 |
+| [workflow/overview.md](workflow/overview.md) | 工作流总览与数据流 |
+| [workflow/p1-config.md](workflow/p1-config.md) | 项目配置与 AI 扩展 |
+| [workflow/p2-scraping.md](workflow/p2-scraping.md) | Apify 抓取与运行状态 |
+| [workflow/p3-analysis.md](workflow/p3-analysis.md) | 帖子筛选、AI 评分、候选管理 |
+| [workflow/p4-persona.md](workflow/p4-persona.md) | AI 生成人设与编辑 |
+| [workflow/p4-content.md](workflow/p4-content.md) | 内容生成、质量检查、改写 |
+| [workflow/p5-publish.md](workflow/p5-publish.md) | 待发布队列与发布追踪 |
 
----
+## 当前架构
 
-## 🚀 快速开始
+```mermaid
+flowchart TB
+    U["UI Pages<br/>app/workflow/*"] --> API["Route Handlers<br/>app/api/*"]
+    API --> DB["Vercel Postgres"]
+    API --> MM["MiniMax"]
+    API --> AP["Apify"]
+    U --> AUX["Dashboard / History"]
+    AUX --> API
+```
 
-</div>bash
-# 克隆仓库
-git clone https://github.com/steven-95271/reddit-ops-web.git
-cd reddit-ops-web
+## 运行说明
 
-# 安装依赖
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+1. `npm install`
+2. 配置 `POSTGRES_URL`、`MINIMAX_API_KEY`、`MINIMAX_GROUP_ID`、`APIFY_API_TOKEN`
+3. `npm run dev`
+4. 首次访问 `/api/init` 初始化数据库
 
-# 启动服务
-python app.py
-</div>
+## 说明
 
-访问 http://127.0.0.1:5000
+- 历史文档中若仍提到 Flask、本地 JSON 存储、OpenAI fallback、多平台自动发布，请以当前代码实现为准。
+- `app/api/run-pipeline/route.ts` 仍是示例接口，不代表完整自动化已打通。
 
----
-
-## 📂 文档目录
-
-</div>
-docs/
-├── index.md                 # 本文件
-├── workflow/
-│   ├── overview.md         # L1 流程总览
-│   ├── p1-config.md       # P1 项目配置
-│   ├── p2-scraping.md     # P2 内容抓取
-│   ├── p3-analysis.md     # P3 热帖识别
-│   ├── p4-persona.md      # P4-1 人设设计
-│   ├── p4-content.md      # P4-2 内容创作
-│   └── p5-publish.md      # P5 发布追踪
-└── architecture/
-    └── system-design.md    # 系统架构设计
-</div>
-
----
-
-## 🔗 相关链接
-
-- 🌐 [GitHub 仓库](https://github.com/steven-95271/reddit-ops-web)
-- 📖 [项目 README](https://steven-95271.github.io/reddit-ops-web/)
-- 📊 [Mermaid Live Editor](https://mermaid.live/edit#https://raw.githubusercontent.com/steven-95271/reddit-ops-web/main/docs/index.md) - 在线预览图表
-
----
-
-*最后更新：2026-04-01*
+最后更新：2026-04-16

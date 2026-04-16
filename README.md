@@ -1,190 +1,122 @@
-# Reddit 内容运营自动化系统
+# Reddit Ops Web
 
-> 智能抓取 Reddit 热点、多维评分筛选、AI 内容生成与审核，构建数据驱动的社媒运营闭环。
+> 基于 Next.js 14 的 Reddit 内容运营工作台，覆盖项目配置、抓取、分析、人设、创作、发布与历史追踪。
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org) [![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com) [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org) [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## 当前状态
 
----
+这个仓库当前是一个单体 `Next.js` 应用
+- 前端：`app/` 下的 App Router 页面
+- 后端：`app/api/*` 下的 Route Handlers
+- 数据库：`@vercel/postgres`
+- AI：`MiniMax`
+- 抓取：`Apify Reddit Scraper`
 
-## 🎯 系统概览
+## 工作流
 
-Reddit Ops 是一个 Reddit 内容运营自动化工具，通过 **6 步工作流** 帮你实现从数据抓取到内容发布的全流程自动化：
-
-```
-P1 配置 → P2 抓取 → P3 分析 → P4-1 人设 → P4-2 创作 → P5 发布
-```
-
-### 工作流程详解
-
-| 阶段 | 路由 | 功能 | 说明 |
-|------|------|------|------|
-| **P1 配置** | `/workflow/config` | 项目配置 | AI 多轮对话生成关键词、推荐 Subreddits、搜索策略 |
-| **P2 抓取** | `/workflow/scraping` | 内容抓取 | APIFY 真实抓取 / Mock 模式，支持进度监控 |
-| **P3 分析** | `/workflow/analysis` | 热帖识别 | 多维评分（S/A/B/C）、5 维分类、候选筛选 |
-| **P4-1 人设** | `/workflow/persona` | 人设设计 | 3 种默认人设 + 自定义，管理账号风格 |
-| **P4-2 创作** | `/workflow/content` | 内容创作 | AI 扮演人设生成内容，支持审核编辑 |
-| **P5 发布** | `/workflow/publish` | 发布追踪 | 审核工作流、发布队列、品牌提及追踪 |
-| **仪表盘** | `/dashboard` | 数据概览 | 全局统计数据、分类分布 |
-| **历史** | `/history` | 历史记录 | 发布历史、操作日志 |
-
----
-
-## 📊 系统架构
-
-```mermaid
-flowchart TB
-    subgraph Frontend["🌐 前端层"]
-        F1[Next.js 14<br/>React + TypeScript<br/>Tailwind CSS]
-    end
-
-    subgraph Backend["⚙️ 后端层"]
-        B1[Flask 3.x App]
-        B2[REST API<br/>/api/*]
-        B3[Scheduler<br/>每日流水线]
-    end
-
-    subgraph Data["💾 数据层"]
-        D1[SQLite<br/>app.db]
-        D2[JSON<br/>文件系统]
-        D3[Apify API<br/>Reddit抓取]
-    end
-
-    Frontend <--> Backend
-    Backend <--> Data
+```text
+P1 配置 -> P2 抓取 -> P3 分析 -> P4-1 人设 -> P4-2 创作 -> P5 发布
 ```
 
----
+| 阶段 | 路由 | 当前实现 |
+|------|------|----------|
+| P1 配置 | `/workflow/config` | 创建项目、从产品 URL 提取信息、AI 扩展关键词与 subreddit 策略 |
+| P2 抓取 | `/workflow/scraping` | 按 phase 批量发起 Apify 抓取、轮询状态、同步结果到 `posts` |
+| P3 分析 | `/workflow/analysis` | 帖子筛选、AI 评分、候选标记、忽略管理 |
+| P4-1 人设 | `/workflow/persona` | AI 生成人设、预览、编辑、自定义新增 |
+| P4-2 创作 | `/workflow/content` | 三种模式生成内容：回复帖、回复评论、自由发帖 |
+| P5 发布 | `/workflow/publish` | 待发布队列、复制内容、手动登记发布链接、维护互动数据 |
+| 仪表盘 | `/dashboard` | 漏斗、项目进度、评分分布、内容状态 |
+| 历史 | `/history` | 按项目查看已生成内容与状态 |
 
-## 🔄 核心流程
+## 技术栈
 
-```mermaid
-flowchart LR
-    subgraph Input["📥 输入"]
-        I1[产品信息]
-        I2[关键词]
-        I3[竞品]
-    end
+- `Next.js 14`
+- `React 18`
+- `TypeScript`
+- `Tailwind CSS`
+- `@vercel/postgres`
+- `MiniMax API`
+- `Apify API`
 
-    subgraph P1["🎯 P1<br/>项目配置"]
-        P1_1[AI扩展关键词]
-        P1_2[AI推荐板块]
-        P1_3[生成策略]
-    end
+## 本地运行
 
-    subgraph P2["🔍 P2<br/>内容抓取"]
-        P2_1[APIFY抓取]
-        P2_2[Mock测试]
-    end
-
-    subgraph P3["📊 P3<br/>热帖识别"]
-        P3_1[计算评分]
-        P3_2[自动分类]
-        P3_3[筛选候选]
-    end
-
-    subgraph P4["✍️ P4<br/>内容创作"]
-        P4_1[人设设计]
-        P4_2[AI生成]
-    end
-
-    subgraph P5["🚀 P5<br/>发布追踪"]
-        P5_1[审核工作流]
-        P5_2[品牌追踪]
-    end
-
-    Input --> P1
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-    P4 --> P5
-```
-
----
-
-## 📈 主要功能
-
-| 功能 | 说明 |
-|------|------|
-| **智能抓取** | Apify Reddit 数据抓取，支持 Mock 测试模式 |
-| **双评分算法** | Hot Score (0-100) + Composite Score (0-1) |
-| **五维分类** | A 结构型测评 / B 场景痛点 / C 观点争议 / D 竞品KOL / E 平台趋势 |
-| **AI 生成** | OpenAI GPT-4o-mini + 模板回退机制 |
-| **多账号人设** | 3 种默认人设（运动/音频/通勤），支持自定义扩展 |
-| **品牌追踪** | 自有品牌 + 竞品提及监控，情感分析 |
-| **流程进度条** | 每个页面顶部显示 P1→P5 进度，清晰定位当前阶段 |
-
----
-
-## 🚀 快速开始
-
-### 前端（Next.js）
+### 1. 安装依赖
 
 ```bash
-# 克隆仓库
-git clone https://github.com/steven-95271/reddit-ops-web.git
-cd reddit-ops-web
-
-# 安装依赖
 npm install
+```
 
-# 启动开发服务器
+### 2. 配置环境变量
+
+至少需要以下变量：
+
+```bash
+POSTGRES_URL=...
+MINIMAX_API_KEY=...
+MINIMAX_GROUP_ID=...
+APIFY_API_TOKEN=...
+NEXT_PUBLIC_APIFY_TOKEN=...
+```
+
+可选变量：
+
+```bash
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+MINIMAX_API_URL=...
+MINIMAX_MODEL=MiniMax-M2.7-Highspeed
+VERCEL_URL=...
+```
+
+### 3. 启动开发服务器
+
+```bash
 npm run dev
 ```
 
-访问 http://localhost:3000
+默认访问 [http://localhost:3000](http://localhost:3000)。
 
-### 后端（Flask）
+### 4. 初始化数据库
 
-```bash
-# 创建虚拟环境
-python3 -m venv venv
-source venv/bin/activate
+首次运行后访问：
 
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动服务
-python app.py
+```text
+/api/init
 ```
 
----
+该接口会创建并补齐当前代码使用的表结构：
 
-## 📁 项目结构
+- `projects`
+- `posts`
+- `personas`
+- `contents`
+- `publish_log`
+- `scraping_runs`
 
-```
-├── app/                    # Next.js 前端
-│   ├── page.tsx            # 首页（欢迎弹窗）
-│   ├── layout.tsx          # 根布局
-│   ├── globals.css         # 全局样式
-│   ├── dashboard/          # 仪表盘
-│   ├── history/            # 历史记录
-│   ├── workflow/           # 工作流页面
-│   │   ├── layout.tsx      # 共享布局（含流程进度条）
-│   │   ├── config/         # P1 配置
-│   │   ├── scraping/       # P2 抓取
-│   │   ├── analysis/       # P3 分析
-│   │   ├── persona/        # P4-1 人设
-│   │   ├── content/        # P4-2 创作
-│   │   └── publish/        # P5 发布
-│   └── api/                # API 路由
-├── components/             # 共享组件
-│   ├── Sidebar.tsx         # 侧边导航
-│   ├── BaseLayout.tsx      # 基础布局
-│   └── Toast.tsx           # 提示组件
-├── p1_config_generator.py  # P1 配置生成器
-├── p2_scraping_manager.py  # P2 抓取管理器
-├── p3_analyzer.py          # P3 分析器
-├── docs/                   # 文档
-└── data/                   # 数据存储
+## 目录结构
+
+```text
+app/
+  api/                 Next.js API 路由
+  workflow/            P1-P5 页面
+  dashboard/           数据仪表盘
+  history/             内容历史
+components/            页面组件与工作流组件
+lib/                   数据库、AI、Apify、评分与类型
+docs/                  项目文档
 ```
 
----
+## 实现边界
 
-## 🌐 在线文档
+当前仓库里仍有少量“设计稿/占位接口”文件，但不应视为已完整上线能力：
 
-- 📖 [在线文档站](https://steven-95271.github.io/reddit-ops-web/) - 包含完整流程图
-- 📊 [Mermaid Live Editor](https://mermaid.live/edit#https://raw.githubusercontent.com/steven-95271/reddit-ops-web/main/docs/index.md) - 在线编辑图表
+- `app/api/run-pipeline/route.ts` 目前返回的是示例结果，不是完整自动流水线
+- 发布阶段是“半自动”：在页面中复制内容并手动去 Reddit 发布
+- 文档中的 GitHub Pages 静态文档仍可参考，但以应用代码行为为准
 
----
+## 文档入口
 
-*最后更新：2026-04-03*
+- [docs/index.md](/Users/tianzhipeng/Documents/private/cnm/vt/reddit-ops-web/docs/index.md)
+- [docs/workflow/overview.md](/Users/tianzhipeng/Documents/private/cnm/vt/reddit-ops-web/docs/workflow/overview.md)
+
+最后更新：2026-04-16
