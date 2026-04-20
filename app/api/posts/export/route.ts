@@ -23,6 +23,19 @@ type ExportPostRow = {
   upvotes: number | null
   num_comments: number | null
   comments: number | null
+  type: string | null
+  post_id: string | null
+  parent_id: string | null
+  depth: number | null
+  post_title: string | null
+  subreddit_subscribers: number | null
+  upvote_ratio: number | null
+  link_flair_text: string | null
+  permalink: string | null
+  is_stickied: boolean | null
+  is_nsfw: boolean | null
+  replies: number | null
+  total_awards: number | null
   quality_score: number | null
   ai_relevance_score: number | null
   ai_intent_score: number | null
@@ -119,6 +132,19 @@ export async function GET(request: NextRequest) {
         upvotes,
         num_comments,
         comments,
+        type,
+        post_id,
+        parent_id,
+        depth,
+        post_title,
+        subreddit_subscribers,
+        upvote_ratio,
+        link_flair_text,
+        permalink,
+        is_stickied,
+        is_nsfw,
+        replies,
+        total_awards,
         quality_score,
         ai_relevance_score,
         ai_intent_score,
@@ -154,6 +180,19 @@ export async function GET(request: NextRequest) {
       upvotes: row.upvotes,
       num_comments: row.num_comments,
       comments: row.comments,
+      type: row.type,
+      post_id: row.post_id,
+      parent_id: row.parent_id,
+      depth: row.depth,
+      post_title: row.post_title,
+      subreddit_subscribers: row.subreddit_subscribers,
+      upvote_ratio: row.upvote_ratio,
+      link_flair_text: row.link_flair_text,
+      permalink: row.permalink,
+      is_stickied: row.is_stickied,
+      is_nsfw: row.is_nsfw,
+      replies: row.replies,
+      total_awards: row.total_awards,
       quality_score: row.quality_score,
       ai_relevance_score: row.ai_relevance_score,
       ai_intent_score: row.ai_intent_score,

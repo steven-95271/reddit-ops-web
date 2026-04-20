@@ -189,6 +189,18 @@ export async function initDb() {
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS created_at_reddit TIMESTAMP`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS post_type TEXT`,
       `ALTER TABLE posts ADD COLUMN IF NOT EXISTS keyword TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS type TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS post_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS parent_id TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS depth INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS post_title TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS subreddit_subscribers INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS link_flair_text TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS permalink TEXT`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_stickied BOOLEAN DEFAULT FALSE`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_nsfw BOOLEAN DEFAULT FALSE`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS replies INTEGER DEFAULT 0`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS total_awards INTEGER DEFAULT 0`,
     ]
 
     for (const stmt of alterColumns) {

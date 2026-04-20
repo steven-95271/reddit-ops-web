@@ -223,6 +223,9 @@ async function saveScrapingResults(row: ScrapingRunRow): Promise<ScrapingRunRow>
       ? new Date(post.created_utc * 1000).toISOString()
       : syncedAt
     const redditUrl = post.permalink ? `https://www.reddit.com${post.permalink}` : (post.url || '')
+    const postType = post.type || 'post'
+    const postBody = post.body || post.selftext || ''
+    const postTitleForComment = post.type === 'comment' ? (post.post_title || post.title || '') : ''
 
     const insertResult = await sql`
       INSERT INTO posts (
@@ -246,7 +249,20 @@ async function saveScrapingResults(row: ScrapingRunRow): Promise<ScrapingRunRow>
         comments,
         created_utc,
         created_at_reddit,
-        scraped_at
+        scraped_at,
+        type,
+        post_id,
+        parent_id,
+        depth,
+        post_title,
+        subreddit_subscribers,
+        upvote_ratio,
+        link_flair_text,
+        permalink,
+        is_stickied,
+        is_nsfw,
+        replies,
+        total_awards
       )
       VALUES (
         ${postId},
@@ -259,7 +275,7 @@ async function saveScrapingResults(row: ScrapingRunRow): Promise<ScrapingRunRow>
         ${post.post_id || null},
         ${post.subreddit || ''},
         ${post.title || ''},
-        ${post.body || ''},
+        ${postBody},
         ${post.author || ''},
         ${post.url || ''},
         ${redditUrl},
@@ -269,7 +285,20 @@ async function saveScrapingResults(row: ScrapingRunRow): Promise<ScrapingRunRow>
         ${post.num_comments || 0},
         ${createdAt},
         ${createdAt},
-        ${syncedAt}
+        ${syncedAt},
+        ${postType},
+        ${post.type === 'comment' ? (post.parent_id || null) : null},
+        ${post.parent_id || null},
+        ${post.depth || 0},
+        ${postTitleForComment || null},
+        ${post.subreddit_subscribers || 0},
+        ${post.upvote_ratio || 0},
+        ${post.link_flair_text || null},
+        ${post.permalink || null},
+        ${post.is_stickied || false},
+        ${post.is_nsfw || false},
+        ${post.replies || 0},
+        ${post.total_awards || 0}
       )
       ON CONFLICT (id) DO NOTHING
     `

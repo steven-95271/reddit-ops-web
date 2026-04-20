@@ -41,6 +41,18 @@ interface ScrapingResult {
   created_utc: number
   post_id?: string
   permalink?: string
+  type?: string
+  parent_id?: string
+  depth?: number
+  post_title?: string
+  subreddit_subscribers?: number
+  upvote_ratio?: number
+  link_flair_text?: string
+  is_stickied?: boolean
+  is_nsfw?: boolean
+  replies?: number
+  total_awards?: number
+  selftext?: string
 }
 
 interface RunStatus {
@@ -231,6 +243,18 @@ export async function getScrapingResults(run_id: string): Promise<ScrapingResult
       created_utc: item.created_utc || 0,
       post_id: item.id || item.post_id || '',
       permalink: item.permalink || '',
+      type: item.type || 'post',
+      parent_id: item.parentId || item.parent_id || null,
+      depth: item.depth ?? item.commentDepth ?? 0,
+      post_title: item.postTitle || item.post_title || item.linkTitle || null,
+      subreddit_subscribers: item.subredditSubscribers || item.subreddit_subscribers || 0,
+      upvote_ratio: item.upvoteRatio || item.upvote_ratio || 0,
+      link_flair_text: item.linkFlairText || item.link_flair_text || null,
+      is_stickied: item.isStickied || item.is_stickied || false,
+      is_nsfw: item.isNSFW || item.is_nsfw || item.over18 || false,
+      replies: item.replies ?? item.numReplies ?? 0,
+      total_awards: item.totalAwards || item.total_awards || 0,
+      selftext: item.selftext || '',
     }))
 
     console.log(`Retrieved ${results.length} posts from Apify run ${run_id}`)
