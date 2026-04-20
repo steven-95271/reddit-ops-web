@@ -9,12 +9,24 @@ const APIFY_BASE_URL = 'https://api.apify.com/v2'
 // Actor ID for Reddit Scraper (注意：Apify URL 中 / 改为 ~)
 const REDDIT_SCRAPER_ACTOR_ID = 'automation-lab~reddit-scraper'
 
+export interface AdvancedApifyConfig {
+  maxPostsPerSource?: number
+  includeComments?: boolean
+  maxCommentsPerPost?: number
+  commentDepth?: number
+  deduplicatePosts?: boolean
+  ignoreStickied?: boolean
+  proxyGroup?: 'RESIDENTIAL' | 'DATACENTER'
+  maxRetries?: number
+}
+
 interface ScrapingParams {
   subreddits: string[]
   keywords: string[]
-  time_range: '24h' | '7d' | '30d'
+  time_range: '24h' | '7d' | '30d' | 'year' | 'all'
   max_posts: number
-  sort_by: 'hot' | 'new' | 'top'
+  sort_by: 'hot' | 'new' | 'top' | 'relevance'
+  advanced?: AdvancedApifyConfig
 }
 
 interface ScrapingResult {
@@ -296,20 +308,22 @@ export async function startScrapingSingle(params: ScrapingParams): Promise<strin
     }
 
     // 构建 Apify Actor 输入
+    const adv = params.advanced
     const actorInput = {
       searchQuery,
       searchSubreddit,
       sort: params.sort_by,
       timeFilter: timeFilterMap[params.time_range] || 'week',
-      maxPostsPerSource: Math.min(params.max_posts, 30), // 限制30条避免超时
-      includeComments: true,
-      maxCommentsPerPost: 10,
-      commentDepth: 2,
-      deduplicatePosts: true,
-      maxRetries: 3,
+      maxPostsPerSource: adv?.maxPostsPerSource ?? Math.min(params.max_posts, 30),
+      includeComments: adv?.includeComments ?? true,
+      maxCommentsPerPost: adv?.maxCommentsPerPost ?? 10,
+      commentDepth: adv?.commentDepth ?? 2,
+      deduplicatePosts: adv?.deduplicatePosts ?? true,
+      ignoreStickied: adv?.ignoreStickied ?? false,
+      maxRetries: adv?.maxRetries ?? 3,
       proxyConfiguration: {
         useApifyProxy: true,
-        apifyProxyGroups: ['RESIDENTIAL']
+        apifyProxyGroups: [adv?.proxyGroup ?? 'RESIDENTIAL']
       }
     }
 

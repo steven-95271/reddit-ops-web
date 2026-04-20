@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initDb, sql } from '@/lib/db'
-import { startScrapingSingle } from '@/lib/apify'
+import { startScrapingSingle, AdvancedApifyConfig } from '@/lib/apify'
 import crypto from 'crypto'
 
 function generateId(): string {
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     await initDb()
     const body = await request.json()
-    const { project_id, phase_configs, items } = body
+    const { project_id, phase_configs, items, advanced_config } = body
 
     if (!project_id || !items || !Array.isArray(items)) {
       return NextResponse.json({
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
           id, batch_id, project_id, phase, query, subreddit, status, params, created_at
         ) VALUES (
           ${runId}, ${batchId}, ${project_id}, ${phase}, ${query}, ${subreddit || null},
-          'pending', ${JSON.stringify(config)}, NOW()
+          'pending', ${JSON.stringify({ ...config, advanced_config })}, NOW()
         )
       `
 
@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
           subreddits: subreddit ? [subreddit] : [],
           time_range: config.time_range,
           max_posts: config.max_posts,
-          sort_by: config.sort_by
+          sort_by: config.sort_by,
+          advanced: advanced_config as AdvancedApifyConfig | undefined,
         })
 
         await sql`

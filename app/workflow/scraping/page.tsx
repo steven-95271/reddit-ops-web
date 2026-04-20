@@ -126,6 +126,96 @@ export default function ScrapingPage() {
     maxRetries: 5
   })
 
+  // 简单/高级模式切换
+  const [isAdvancedMode, setIsAdvancedMode] = useState(false)
+
+  // 高级模式参数（每 phase 独立）
+  const [advancedParams, setAdvancedParams] = useState<Record<string, {
+    maxPostsPerSource: number
+    includeComments: boolean
+    maxCommentsPerPost: number
+    commentDepth: number
+    deduplicatePosts: boolean
+    ignoreStickied: boolean
+    proxyGroup: 'RESIDENTIAL' | 'DATACENTER'
+    maxRetries: number
+  }>>({})
+
+  const defaultAdvancedParams = {
+    maxPostsPerSource: 30,
+    includeComments: true,
+    maxCommentsPerPost: 10,
+    commentDepth: 2,
+    deduplicatePosts: true,
+    ignoreStickied: false,
+    proxyGroup: 'RESIDENTIAL' as const,
+    maxRetries: 3,
+  }
+
+  // 临时关键词覆盖：phase -> string[]（null 表示使用原始配置）
+  const [keywordOverrides, setKeywordOverrides] = useState<Record<string, string[] | null>>({})
+
+  // 新关键词输入框
+  const [newKeywordInputs, setNewKeywordInputs] = useState<Record<string, string>>({})
+
+  // 获取某 phase 的生效关键词列表
+  const getEffectiveKeywords = (phase: string): string[] => {
+    if (keywordOverrides[phase] !== null && keywordOverrides[phase] !== undefined) {
+      return keywordOverrides[phase]!
+    }
+    if (phase === 'phase4_subreddits') return []
+    const phaseKey = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
+    return selectedProject?.keywords?.[phaseKey]?.queries || []
+  }
+
+  const hasKeywordOverride = (phase: string) => keywordOverrides[phase] !== null && keywordOverrides[phase] !== undefined
+
+  const resetKeywords = (phase: string) => {
+    setKeywordOverrides(prev => {
+      const next = { ...prev }
+      delete next[phase]
+      return next
+    })
+  }
+
+  const addTempKeyword = (phase: string) => {
+    const input = newKeywordInputs[phase]?.trim()
+    if (!input) return
+    const current = getEffectiveKeywords(phase)
+    if (current.includes(input)) return
+    setKeywordOverrides(prev => ({
+      ...prev,
+      [phase]: [...current, input]
+    }))
+    setNewKeywordInputs(prev => ({ ...prev, [phase]: '' }))
+  }
+
+  const removeKeyword = (phase: string, keyword: string) => {
+    const current = getEffectiveKeywords(phase)
+    setKeywordOverrides(prev => ({
+      ...prev,
+      [phase]: current.filter(k => k !== keyword)
+    }))
+  }
+
+  // 获取某 phase 的高级参数
+  const getPhaseAdvanced = (phase: string) => advancedParams[phase] || defaultAdvancedParams
+
+  const updatePhaseAdvanced = (phase: string, key: string, value: any) => {
+    setAdvancedParams(prev => ({
+      ...prev,
+      [phase]: { ...(prev[phase] || defaultAdvancedParams), [key]: value }
+    }))
+  }
+
+  // 成本估算
+  const estimateCost = (phase: string) => {
+    const p = getPhaseAdvanced(phase)
+    const cost = (p.maxPostsPerSource * 0.0008) + (p.maxPostsPerSource * p.maxCommentsPerPost * 0.0004) + 0.003
+    const totalComments = p.includeComments ? p.maxPostsPerSource * p.maxCommentsPerPost : 0
+    return { cost: cost.toFixed(3), posts: p.maxPostsPerSource, comments: totalComments }
+  }
+
   // 展开的 Phase
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
 
@@ -160,6 +250,7 @@ export default function ScrapingPage() {
             phase4_subreddits: phaseConfigs[3],
           },
           items,
+          ...(isAdvancedMode ? { advanced_config: getPhaseAdvanced('phase4_subreddits') } : {}),
         }),
       })
       const data = await res.json()
@@ -332,7 +423,7 @@ export default function ScrapingPage() {
           subreddit,
           config: {
             ...(phaseConfigs[phaseToIndex[phase]] ?? defaultPhaseConfig),
-            ...advancedConfig
+            ...(isAdvancedMode ? getPhaseAdvanced(phase) : advancedConfig)
           }
         })
       })
@@ -369,19 +460,23 @@ export default function ScrapingPage() {
           const targets = selectedProject?.keywords?.phase4_subreddits?.targets || []
           for (const target of targets) {
             if (itemSet.has(target.subreddit)) {
-              itemsToScrape.push({
-                phase,
-                query: target.search_within?.[0] || '',
-                subreddit: target.subreddit
-              })
+              const effectiveSearchWithin = hasKeywordOverride(phase)
+                ? getEffectiveKeywords(phase)
+                : (target.search_within || [])
+              for (const kw of (effectiveSearchWithin.length > 0 ? effectiveSearchWithin : [''])) {
+                itemsToScrape.push({
+                  phase,
+                  query: kw,
+                  subreddit: target.subreddit
+                })
+              }
             }
           }
         } else {
-          const phaseKey = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
-          const queries = selectedProject?.keywords?.[phaseKey]?.queries || []
-          for (let i = 0; i < queries.length; i++) {
+          const effectiveQueries = getEffectiveKeywords(phase)
+          for (let i = 0; i < effectiveQueries.length; i++) {
             if (itemSet.has(`q_${i}`)) {
-              itemsToScrape.push({ phase, query: queries[i] })
+              itemsToScrape.push({ phase, query: effectiveQueries[i] })
             }
           }
         }
@@ -397,7 +492,8 @@ export default function ScrapingPage() {
             phase3_scene_pain: phaseConfigs[2],
             phase4_subreddits: phaseConfigs[3]
           },
-          items: itemsToScrape
+          items: itemsToScrape,
+          ...(isAdvancedMode ? { advanced_config: advancedParams } : {}),
         })
       })
       const data = await res.json()
@@ -481,9 +577,9 @@ export default function ScrapingPage() {
   const getPhaseCounts = () => {
     if (!selectedProject?.keywords) return {}
     return {
-      phase1_brand: selectedProject.keywords.phase1_brand?.queries?.length || 0,
-      phase2_competitor: selectedProject.keywords.phase2_competitor?.queries?.length || 0,
-      phase3_scene_pain: selectedProject.keywords.phase3_scene_pain?.queries?.length || 0,
+      phase1_brand: getEffectiveKeywords('phase1_brand').length,
+      phase2_competitor: getEffectiveKeywords('phase2_competitor').length,
+      phase3_scene_pain: getEffectiveKeywords('phase3_scene_pain').length,
       phase4_subreddits: selectedProject.keywords.phase4_subreddits?.targets?.length || 0
     }
   }
@@ -668,7 +764,18 @@ export default function ScrapingPage() {
                     已选择 {Object.values(selectedItems).reduce((s, set) => s + set.size, 0)} / {totalKeywords} 项
                   </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3">
+                  {/* 简单/高级模式切换 */}
+                  <button
+                    onClick={() => setIsAdvancedMode(!isAdvancedMode)}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                      isAdvancedMode
+                        ? 'border-purple-200 bg-purple-50 text-purple-700'
+                        : 'border-slate-200 bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    {isAdvancedMode ? '高级模式' : '简单模式'}
+                  </button>
                   <button
                     onClick={startSelectedScraping}
                     disabled={loading || Object.values(selectedItems).every(s => Array.from(s).length === 0)}
@@ -689,18 +796,14 @@ export default function ScrapingPage() {
               const config = phaseConfigs[phaseToIndex[phase]] ?? defaultPhaseConfig
               const isExpanded = expandedPhases[phase]
               const selectedCount = selectedItems[phase]?.size || 0
+              const overridden = hasKeywordOverride(phase)
+              const effectiveKeywords = getEffectiveKeywords(phase)
 
-              // 获取关键词列表
-              let keywords: string[] = []
               let targets: Array<{ subreddit: string; reason: string; search_within: string[] }> = []
               if (phase === 'phase4_subreddits') {
                 targets = selectedProject?.keywords?.phase4_subreddits?.targets || []
-              } else {
-                const phaseKey = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
-                keywords = selectedProject?.keywords?.[phaseKey]?.queries || []
               }
 
-              // Phase 说明
               const phaseDescriptions: Record<string, string> = {
                 phase1_brand: '直接搜索品牌相关讨论，宽泛覆盖，获取品牌声量数据',
                 phase2_competitor: '竞品对比内容，高价值购买决策情报，了解市场份额',
@@ -739,26 +842,10 @@ export default function ScrapingPage() {
                       </div>
                     </div>
 
-                    {/* 参数配置行 */}
+                    {/* 简单模式参数（3 列） */}
                     <div className="grid grid-cols-3 gap-4 mt-4">
                       <div>
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs font-medium text-slate-600">时间范围</label>
-                          <button
-                            onClick={() => {
-                              const explanations: Record<string, string> = {
-                                '24h': '适合快速获取最新动态，数据量小但即时性强',
-                                '7d': '平衡数据量和时效性，适合常规监控',
-                                '30d': '完整月度数据，适合趋势分析',
-                                'year': '年度数据，适合全面了解讨论演变'
-                              }
-                              alert(explanations[config.time_range])
-                            }}
-                            className="text-slate-400 hover:text-slate-600"
-                          >
-                            ⓘ
-                          </button>
-                        </div>
+                        <label className="text-xs font-medium text-slate-600">时间范围</label>
                         <select
                           value={config.time_range}
                           onChange={(e) => updatePhaseConfig(phase, 'time_range', e.target.value)}
@@ -770,17 +857,8 @@ export default function ScrapingPage() {
                           <option value="year">最近一年</option>
                         </select>
                       </div>
-                      
                       <div>
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs font-medium text-slate-600">最大数量</label>
-                          <button
-                            onClick={() => alert('建议值：100-200条。过多会导致抓取慢且数据重复，过少则样本不足。')}
-                            className="text-slate-400 hover:text-slate-600"
-                          >
-                            ⓘ
-                          </button>
-                        </div>
+                        <label className="text-xs font-medium text-slate-600">最大数量</label>
                         <input
                           type="number"
                           value={config.max_posts}
@@ -790,25 +868,8 @@ export default function ScrapingPage() {
                           className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
                         />
                       </div>
-                      
                       <div>
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs font-medium text-slate-600">排序方式</label>
-                          <button
-                            onClick={() => {
-                              const explanations: Record<string, string> = {
-                                'hot': '热门内容，Reddit算法综合评分，适合获取高参与度内容',
-                                'new': '最新内容，时效性强，适合发现新趋势',
-                                'top': '评分最高内容，质量最高，适合深度分析',
-                                'relevance': '相关度排序，算法匹配最精准，适合搜索场景'
-                              }
-                              alert(explanations[config.sort_by])
-                            }}
-                            className="text-slate-400 hover:text-slate-600"
-                          >
-                            ⓘ
-                          </button>
-                        </div>
+                        <label className="text-xs font-medium text-slate-600">排序方式</label>
                         <select
                           value={config.sort_by}
                           onChange={(e) => updatePhaseConfig(phase, 'sort_by', e.target.value)}
@@ -821,6 +882,103 @@ export default function ScrapingPage() {
                         </select>
                       </div>
                     </div>
+
+                    {/* 高级模式参数面板 */}
+                    {isAdvancedMode && (
+                      <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="text-xs font-medium text-purple-700 mb-2">高级 Apify 参数</div>
+                        <div className="grid grid-cols-4 gap-3">
+                          <div>
+                            <label className="text-xs text-slate-600">maxPostsPerSource</label>
+                            <input
+                              type="number"
+                              value={getPhaseAdvanced(phase).maxPostsPerSource}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'maxPostsPerSource', parseInt(e.target.value) || 30)}
+                              min={1} max={500}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">includeComments</label>
+                            <select
+                              value={getPhaseAdvanced(phase).includeComments ? 'true' : 'false'}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'includeComments', e.target.value === 'true')}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            >
+                              <option value="true">是</option>
+                              <option value="false">否</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">maxCommentsPerPost</label>
+                            <input
+                              type="number"
+                              value={getPhaseAdvanced(phase).maxCommentsPerPost}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'maxCommentsPerPost', parseInt(e.target.value) || 10)}
+                              min={0} max={100}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">commentDepth</label>
+                            <input
+                              type="number"
+                              value={getPhaseAdvanced(phase).commentDepth}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'commentDepth', parseInt(e.target.value) || 2)}
+                              min={1} max={5}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">deduplicatePosts</label>
+                            <select
+                              value={getPhaseAdvanced(phase).deduplicatePosts ? 'true' : 'false'}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'deduplicatePosts', e.target.value === 'true')}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            >
+                              <option value="true">是</option>
+                              <option value="false">否</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">ignoreStickied</label>
+                            <select
+                              value={getPhaseAdvanced(phase).ignoreStickied ? 'true' : 'false'}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'ignoreStickied', e.target.value === 'true')}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            >
+                              <option value="false">否</option>
+                              <option value="true">是</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">代理类型</label>
+                            <select
+                              value={getPhaseAdvanced(phase).proxyGroup}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'proxyGroup', e.target.value)}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            >
+                              <option value="RESIDENTIAL">RESIDENTIAL</option>
+                              <option value="DATACENTER">DATACENTER</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">maxRetries</label>
+                            <input
+                              type="number"
+                              value={getPhaseAdvanced(phase).maxRetries}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'maxRetries', parseInt(e.target.value) || 3)}
+                              min={0} max={10}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            />
+                          </div>
+                        </div>
+                        {/* 成本估算 */}
+                        <div className="mt-2 text-xs text-purple-700 bg-purple-100 rounded px-2 py-1">
+                          预估：每词抓取 {estimateCost(phase).posts} 条帖子 + {estimateCost(phase).comments} 条评论，单次成本约 ${estimateCost(phase).cost}
+                        </div>
+                      </div>
+                    )}
 
                     {/* 批量操作 */}
                     <div className="flex gap-2 mt-4">
@@ -838,13 +996,12 @@ export default function ScrapingPage() {
                       </button>
                       <button
                         onClick={() => {
-                          // 启动当前 phase 所有任务
                           if (phase === 'phase4_subreddits') {
                             targets.forEach(t => {
                               startSingleScraping(phase, t.subreddit, t.search_within?.[0] || '', t.subreddit)
                             })
                           } else {
-                            keywords.forEach((q, i) => {
+                            effectiveKeywords.forEach((q, i) => {
                               startSingleScraping(phase, `q_${i}`, q)
                             })
                           }
@@ -910,35 +1067,21 @@ export default function ScrapingPage() {
                                     </button>
                                   )}
                                 </div>
-                                {/* 每个 Run 的独立状态 */}
                                 {hasSubredditRuns && (
                                   <div className="mt-3 pl-7 space-y-2">
                                     {subredditRuns.map((run) => (
                                       <div key={run.id} className="text-xs flex items-center gap-2 flex-wrap">
                                         <span className="text-slate-600">{run.query || '(空关键词)'}</span>
-                                        {run.status === 'pending' && (
-                                          <span className="text-slate-500">等待启动</span>
-                                        )}
-                                        {run.status === 'running' && (
-                                          <span className="text-blue-500">抓取中 · {run.total_posts} 条</span>
-                                        )}
+                                        {run.status === 'pending' && <span className="text-slate-500">等待启动</span>}
+                                        {run.status === 'running' && <span className="text-blue-500">抓取中 · {run.total_posts} 条</span>}
                                         {run.status === 'succeeded' && (
                                           <>
                                             <span className="text-green-500">已完成 · {run.total_posts} 条 · ${run.cost_usd?.toFixed(3) || '0.000'}</span>
-                                            <a
-                                              href={`/api/scraping/${run.id}/download`}
-                                              className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                            >
-                                              下载 CSV
-                                            </a>
+                                            <a href={`/api/scraping/${run.id}/download`} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">下载 CSV</a>
                                           </>
                                         )}
-                                        {run.status === 'failed' && (
-                                          <span className="text-red-500">失败：{run.error_message || run.apify_status || '未知错误'}</span>
-                                        )}
-                                        <span style={{ fontSize: 10, color: '#999', fontFamily: 'monospace' }}>
-                                          ID: {run.apify_run_id?.slice(0, 8) || run.id.slice(0, 8)}...
-                                        </span>
+                                        {run.status === 'failed' && <span className="text-red-500">失败：{run.error_message || run.apify_status || '未知错误'}</span>}
+                                        <span style={{ fontSize: 10, color: '#999', fontFamily: 'monospace' }}>ID: {run.apify_run_id?.slice(0, 8) || run.id.slice(0, 8)}...</span>
                                       </div>
                                     ))}
                                   </div>
@@ -948,25 +1091,78 @@ export default function ScrapingPage() {
                           })}
                         </div>
                       ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {keywords.map((keyword, idx) => (
-                            <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
-                              <input
-                                type="checkbox"
-                                checked={selectedItems[phase]?.has(`q_${idx}`) || false}
-                                onChange={() => toggleItemSelection(phase, `q_${idx}`)}
-                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="text-sm text-slate-700">{keyword}</span>
+                        <div>
+                          {/* 临时标记提示 */}
+                          {overridden && (
+                            <div className="flex items-center gap-2 mb-3 px-2 py-1.5 bg-amber-50 border border-dashed border-amber-300 rounded text-xs text-amber-700">
+                              <span>已修改本次关键词（不保存到 P1 配置）</span>
                               <button
-                                onClick={() => startSingleScraping(phase, `q_${idx}`, keyword)}
-                                disabled={loading}
-                                className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
+                                onClick={() => resetKeywords(phase)}
+                                className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 rounded font-medium"
                               >
-                                抓取
+                                重置为原始配置
                               </button>
                             </div>
-                          ))}
+                          )}
+                          {/* 关键词列表 */}
+                          <div className="flex flex-wrap gap-2">
+                            {effectiveKeywords.map((keyword, idx) => {
+                              const originalKeywords = (() => {
+                                const pk = phase as 'phase1_brand' | 'phase2_competitor' | 'phase3_scene_pain'
+                                return selectedProject?.keywords?.[pk]?.queries || []
+                              })()
+                              const isTemp = !originalKeywords.includes(keyword)
+                              const isRemoved = overridden && !effectiveKeywords.includes(keyword) && originalKeywords.includes(keyword)
+                              if (isRemoved) return null
+                              return (
+                                <div key={idx} className={`flex items-center gap-1.5 p-2 rounded-lg border text-sm ${
+                                  isTemp
+                                    ? 'bg-amber-50 border-dashed border-amber-300 text-amber-800'
+                                    : 'bg-white border-slate-200 text-slate-700'
+                                }`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedItems[phase]?.has(`q_${idx}`) || false}
+                                    onChange={() => toggleItemSelection(phase, `q_${idx}`)}
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span>{keyword}</span>
+                                  {isTemp && <span className="text-[10px] text-amber-500">临时</span>}
+                                  <button
+                                    onClick={() => removeKeyword(phase, keyword)}
+                                    className="text-slate-400 hover:text-red-500 ml-1"
+                                    title="从本次抓取移除"
+                                  >
+                                    ✕
+                                  </button>
+                                  <button
+                                    onClick={() => startSingleScraping(phase, `q_${idx}`, keyword)}
+                                    disabled={loading}
+                                    className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
+                                  >
+                                    抓取
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {/* 添加临时关键词 */}
+                          <div className="mt-3 flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newKeywordInputs[phase] || ''}
+                              onChange={(e) => setNewKeywordInputs(prev => ({ ...prev, [phase]: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === 'Enter') addTempKeyword(phase) }}
+                              placeholder="输入临时关键词（本次有效，不保存）"
+                              className="flex-1 px-3 py-2 border border-dashed border-amber-300 bg-amber-50 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent placeholder:text-amber-400"
+                            />
+                            <button
+                              onClick={() => addTempKeyword(phase)}
+                              className="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-200 border border-dashed border-amber-300"
+                            >
+                              + 添加
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -975,84 +1171,6 @@ export default function ScrapingPage() {
               )
             })}
 
-            {/* 高级参数配置 */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <button
-                onClick={() => setExpandedPhases(prev => ({ ...prev, advanced: !prev.advanced }))}
-                className="flex items-center gap-2 text-sm font-medium text-slate-700"
-              >
-                <svg className={`w-4 h-4 transition-transform ${expandedPhases.advanced ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                高级 Apify 参数配置
-              </button>
-              
-              {expandedPhases.advanced && (
-                <div className="mt-4 grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">includeComments (是否抓取评论)</label>
-                    <select
-                      value={advancedConfig.includeComments ? 'true' : 'false'}
-                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, includeComments: e.target.value === 'true' }))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    >
-                      <option value="true">是</option>
-                      <option value="false">否</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">maxCommentsPerPost (每帖子最大评论数)</label>
-                    <input
-                      type="number"
-                      value={advancedConfig.maxCommentsPerPost}
-                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, maxCommentsPerPost: parseInt(e.target.value) || 20 }))}
-                      min={1}
-                      max={100}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">commentDepth (评论深度)</label>
-                    <input
-                      type="number"
-                      value={advancedConfig.commentDepth}
-                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, commentDepth: parseInt(e.target.value) || 3 }))}
-                      min={1}
-                      max={10}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">maxRetries (最大重试次数)</label>
-                    <input
-                      type="number"
-                      value={advancedConfig.maxRetries}
-                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, maxRetries: parseInt(e.target.value) || 5 }))}
-                      min={0}
-                      max={10}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">deduplicatePosts (去重)</label>
-                    <select
-                      value={advancedConfig.deduplicatePosts ? 'true' : 'false'}
-                      onChange={(e) => setAdvancedConfig(prev => ({ ...prev, deduplicatePosts: e.target.value === 'true' }))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    >
-                      <option value="true">是</option>
-                      <option value="false">否</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2 text-xs text-slate-500 bg-slate-50 p-3 rounded">
-                    <strong>参数说明：</strong> 这些参数控制 Apify Reddit Scraper 的行为。
-                    includeComments开启后会在帖子下抓取评论；maxCommentsPerPost限制每帖评论数；
-                    commentDepth控制评论嵌套深度；deduplicatePosts去除重复帖子；
-                    maxRetries网络失败时的重试次数。
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         )}
 
