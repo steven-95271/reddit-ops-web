@@ -65,6 +65,7 @@ export default function ConfigPage() {
   const [expanding, setExpanding] = useState(false)
   const [saving, setSaving] = useState(false)
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'xlsx' | null>(null)
   
   // 添加自定义关键词
   const [addingKeywordPhase, setAddingKeywordPhase] = useState<string | null>(null)
@@ -270,6 +271,31 @@ export default function ConfigPage() {
       showToast(`AI 生成失败：${error instanceof Error ? error.message : String(error)}`, 'error')
     } finally {
       setExpanding(false)
+    }
+  }
+
+  const exportProject = async (format: 'json' | 'xlsx') => {
+    if (!viewingProject) return
+    setExportingFormat(format)
+    try {
+      const res = await fetch(`/api/projects/${viewingProject.id}/export?format=${format}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || '导出失败')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const disposition = res.headers.get('Content-Disposition')
+      const fileNameMatch = disposition?.match(/filename="([^"]+)"/)
+      const fileName = fileNameMatch?.[1] || `P1配置.${format}`
+      const link = document.createElement('a')
+      link.href = url; link.download = fileName
+      document.body.appendChild(link); link.click(); link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '导出失败', 'error')
+    } finally {
+      setExportingFormat(null)
     }
   }
 
@@ -807,8 +833,8 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                 </div>
               </div>
 
-              {/* AI 生成按钮 */}
-              <div className="flex justify-center">
+              {/* AI 生成 + 导出按钮 */}
+              <div className="flex justify-center gap-3">
                 <button
                   onClick={handleAIExpand}
                   disabled={expanding}
@@ -820,10 +846,22 @@ AI 根据产品品类，从 Reddit 上筛选相关度高的社区，并标注：
                       AI 生成中...
                     </>
                   ) : (
-                    <>
-                      🤖 AI 生成配置
-                    </>
+                    <>🤖 AI 生成配置</>
                   )}
+                </button>
+                <button
+                  onClick={() => exportProject('json')}
+                  disabled={exportingFormat !== null}
+                  className="px-4 py-3 rounded-xl border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 self-center"
+                >
+                  {exportingFormat === 'json' ? '导出中...' : '导出 JSON'}
+                </button>
+                <button
+                  onClick={() => exportProject('xlsx')}
+                  disabled={exportingFormat !== null}
+                  className="px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 self-center"
+                >
+                  {exportingFormat === 'xlsx' ? '导出中...' : '导出 XLSX'}
                 </button>
               </div>
 
