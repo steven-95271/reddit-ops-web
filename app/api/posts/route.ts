@@ -68,6 +68,20 @@ export async function GET(request: NextRequest) {
       ORDER BY p.quality_score DESC NULLS LAST, p.created_utc DESC
     `
 
+    const typeStats = result.rows.reduce((acc: Record<string, number>, p: any) => {
+      const t = p.type || 'NULL'
+      acc[t] = (acc[t] || 0) + 1
+      return acc
+    }, {})
+    console.log('[posts API] type distribution:', JSON.stringify(typeStats), '| total:', result.rows.length, '| project:', project_id)
+
+    if (typeStats['NULL'] && result.rows.length > 0) {
+      const backfillResult = await sql`
+        UPDATE posts SET type = 'post' WHERE type IS NULL
+      `
+      console.log('[posts API] Backfilled type=post for', backfillResult.rowCount, 'rows')
+    }
+
     return NextResponse.json({
       success: true,
       data: {
