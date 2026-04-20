@@ -217,6 +217,13 @@ async function saveScrapingResults(row: ScrapingRunRow): Promise<ScrapingRunRow>
   let skipped = 0
   const syncedAt = new Date().toISOString()
 
+  const parsedTypeStats = results.reduce((acc: Record<string, number>, r) => {
+    const t = r.type || 'NULL'
+    acc[t] = (acc[t] || 0) + 1
+    return acc
+  }, {})
+  console.log('[saveScrapingResults] parsed type distribution:', JSON.stringify(parsedTypeStats), '| total:', results.length, '| run:', row.apify_run_id)
+
   for (const post of results) {
     const postId = post.post_id || `${post.subreddit}_${post.created_utc}_${(post.title || '').slice(0, 50)}`
     const createdAt = post.created_utc

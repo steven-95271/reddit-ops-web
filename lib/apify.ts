@@ -230,6 +230,21 @@ export async function getScrapingResults(run_id: string): Promise<ScrapingResult
     }
 
     const rawData = await response.json()
+
+    console.log('[getScrapingResults] raw items count:', rawData.length)
+    if (rawData.length > 0) {
+      const rawTypeStats = rawData.reduce((acc: Record<string, number>, r: any) => {
+        const t = r.type || 'MISSING'
+        acc[t] = (acc[t] || 0) + 1
+        return acc
+      }, {})
+      console.log('[getScrapingResults] raw Apify type distribution:', JSON.stringify(rawTypeStats))
+      console.log('[getScrapingResults] sample raw item keys:', Object.keys(rawData[0]).join(', '))
+      if (rawData[0].type === undefined) {
+        console.log('[getScrapingResults] WARNING: first item has no type field! keys with "type"/"Type":',
+          Object.keys(rawData[0]).filter(k => k.toLowerCase().includes('type')))
+      }
+    }
     
     // 解析为标准格式
     const results: ScrapingResult[] = rawData.map((item: any) => ({
