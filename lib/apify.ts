@@ -15,9 +15,10 @@ export interface AdvancedApifyConfig {
   maxCommentsPerPost?: number
   commentDepth?: number
   deduplicatePosts?: boolean
-  ignoreStickied?: boolean
-  proxyGroup?: 'RESIDENTIAL' | 'DATACENTER'
   maxRetries?: number
+  filterKeywords?: string[]
+  keywordMatchMode?: string
+  maxCostPerRun?: number
 }
 
 interface ScrapingParams {
@@ -319,11 +320,12 @@ export async function startScrapingSingle(params: ScrapingParams): Promise<strin
       maxCommentsPerPost: adv?.maxCommentsPerPost ?? 10,
       commentDepth: adv?.commentDepth ?? 2,
       deduplicatePosts: adv?.deduplicatePosts ?? true,
-      ignoreStickied: adv?.ignoreStickied ?? false,
       maxRetries: adv?.maxRetries ?? 3,
+      ...(adv?.filterKeywords && adv.filterKeywords.length > 0 ? { filterKeywords: adv.filterKeywords } : {}),
+      ...(adv?.keywordMatchMode ? { keywordMatchMode: adv.keywordMatchMode } : {}),
+      ...(adv?.maxCostPerRun ? { maxCostPerRun: adv.maxCostPerRun } : {}),
       proxyConfiguration: {
         useApifyProxy: true,
-        apifyProxyGroups: [adv?.proxyGroup ?? 'RESIDENTIAL']
       }
     }
 

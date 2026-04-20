@@ -136,9 +136,10 @@ export default function ScrapingPage() {
     maxCommentsPerPost: number
     commentDepth: number
     deduplicatePosts: boolean
-    ignoreStickied: boolean
-    proxyGroup: 'RESIDENTIAL' | 'DATACENTER'
     maxRetries: number
+    filterKeywords: string[]
+    keywordMatchMode: string
+    maxCostPerRun: number
   }>>({})
 
   const defaultAdvancedParams = {
@@ -147,9 +148,27 @@ export default function ScrapingPage() {
     maxCommentsPerPost: 10,
     commentDepth: 2,
     deduplicatePosts: true,
-    ignoreStickied: false,
-    proxyGroup: 'RESIDENTIAL' as const,
     maxRetries: 3,
+    filterKeywords: [] as string[],
+    keywordMatchMode: 'Any keyword (title + body)',
+    maxCostPerRun: 2,
+  }
+
+  // 过滤关键词输入
+  const [filterKeywordInputs, setFilterKeywordInputs] = useState<Record<string, string>>({})
+
+  const addFilterKeyword = (phase: string) => {
+    const input = filterKeywordInputs[phase]?.trim()
+    if (!input) return
+    const current = getPhaseAdvanced(phase).filterKeywords
+    if (current.includes(input)) return
+    updatePhaseAdvanced(phase, 'filterKeywords', [...current, input])
+    setFilterKeywordInputs(prev => ({ ...prev, [phase]: '' }))
+  }
+
+  const removeFilterKeyword = (phase: string, kw: string) => {
+    const current = getPhaseAdvanced(phase).filterKeywords
+    updatePhaseAdvanced(phase, 'filterKeywords', current.filter(k => k !== kw))
   }
 
   // 临时关键词覆盖：phase -> string[]（null 表示使用原始配置）
@@ -213,7 +232,7 @@ export default function ScrapingPage() {
     const p = getPhaseAdvanced(phase)
     const cost = (p.maxPostsPerSource * 0.0008) + (p.maxPostsPerSource * p.maxCommentsPerPost * 0.0004) + 0.003
     const totalComments = p.includeComments ? p.maxPostsPerSource * p.maxCommentsPerPost : 0
-    return { cost: cost.toFixed(3), posts: p.maxPostsPerSource, comments: totalComments }
+    return { cost: cost.toFixed(3), posts: p.maxPostsPerSource, comments: totalComments, cap: p.maxCostPerRun }
   }
 
   // 展开的 Phase
@@ -941,28 +960,6 @@ export default function ScrapingPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs text-slate-600">ignoreStickied</label>
-                            <select
-                              value={getPhaseAdvanced(phase).ignoreStickied ? 'true' : 'false'}
-                              onChange={(e) => updatePhaseAdvanced(phase, 'ignoreStickied', e.target.value === 'true')}
-                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
-                            >
-                              <option value="false">否</option>
-                              <option value="true">是</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs text-slate-600">代理类型</label>
-                            <select
-                              value={getPhaseAdvanced(phase).proxyGroup}
-                              onChange={(e) => updatePhaseAdvanced(phase, 'proxyGroup', e.target.value)}
-                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
-                            >
-                              <option value="RESIDENTIAL">RESIDENTIAL</option>
-                              <option value="DATACENTER">DATACENTER</option>
-                            </select>
-                          </div>
-                          <div>
                             <label className="text-xs text-slate-600">maxRetries</label>
                             <input
                               type="number"
@@ -972,10 +969,51 @@ export default function ScrapingPage() {
                               className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
                             />
                           </div>
+                          <div>
+                            <label className="text-xs text-slate-600">maxCostPerRun ($)</label>
+                            <input
+                              type="number"
+                              value={getPhaseAdvanced(phase).maxCostPerRun}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'maxCostPerRun', parseFloat(e.target.value) || 2)}
+                              min={0.1} max={10} step={0.1}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-600">keywordMatchMode</label>
+                            <select
+                              value={getPhaseAdvanced(phase).keywordMatchMode}
+                              onChange={(e) => updatePhaseAdvanced(phase, 'keywordMatchMode', e.target.value)}
+                              className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            >
+                              <option value="Any keyword (title + body)">Any keyword (title + body)</option>
+                              <option value="Any keyword in title only">Any keyword in title only</option>
+                              <option value="All keywords (title + body)">All keywords (title + body)</option>
+                            </select>
+                          </div>
+                          <div className="col-span-4">
+                            <label className="text-xs text-slate-600">filterKeywords（帖子二次过滤）</label>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {getPhaseAdvanced(phase).filterKeywords.map((kw, ki) => (
+                                <span key={ki} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs border border-purple-200">
+                                  {kw}
+                                  <button onClick={() => removeFilterKeyword(phase, kw)} className="text-purple-400 hover:text-red-500">✕</button>
+                                </span>
+                              ))}
+                              <input
+                                type="text"
+                                value={filterKeywordInputs[phase] || ''}
+                                onChange={(e) => setFilterKeywordInputs(prev => ({ ...prev, [phase]: e.target.value }))}
+                                onKeyDown={(e) => { if (e.key === 'Enter') addFilterKeyword(phase) }}
+                                placeholder="输入过滤词后回车"
+                                className="px-2 py-0.5 border border-dashed border-purple-300 rounded text-xs bg-purple-50 w-36 focus:ring-1 focus:ring-purple-400"
+                              />
+                            </div>
+                          </div>
                         </div>
                         {/* 成本估算 */}
                         <div className="mt-2 text-xs text-purple-700 bg-purple-100 rounded px-2 py-1">
-                          预估：每词抓取 {estimateCost(phase).posts} 条帖子 + {estimateCost(phase).comments} 条评论，单次成本约 ${estimateCost(phase).cost}
+                          预估：每词最多抓取 {estimateCost(phase).posts} 条帖子 + {estimateCost(phase).comments} 条评论，单次最大成本上限 ${estimateCost(phase).cap}（实际开销可能因过滤后更低）
                         </div>
                       </div>
                     )}
